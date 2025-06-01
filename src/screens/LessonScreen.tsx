@@ -7,13 +7,16 @@ import {
   Animated,
   Alert,
   SafeAreaView,
+  ScrollView,
 } from 'react-native';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import { LESSONS_DATA } from '../data/lessons';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 const LessonScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'lesson'>>();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { lesson } = route.params;
 
   const [currentStep, setCurrentStep] = React.useState(0);
@@ -26,7 +29,7 @@ const LessonScreen = () => {
     Alert.alert('¡Felicitaciones!', 'Has completado la lección', [
       {
         text: 'Volver',
-        onPress: () => console.log('Volver a Home o navegar atrás'),
+        onPress: () => navigation.goBack(),
       },
     ]);
   };
@@ -74,7 +77,7 @@ const LessonScreen = () => {
         <Text style={styles.points}>Puntos: ⭐ {userPoints}</Text>
       </View>
 
-      <View style={styles.stepContainer}>
+      <ScrollView contentContainerStyle={styles.stepContainer} showsVerticalScrollIndicator={false}>
         <Animated.View style={[styles.stepIcon, { transform: [{ scale: scaleAnim }] }]}>
           <Text style={styles.stepIconText}>{step.icon}</Text>
         </Animated.View>
@@ -97,7 +100,7 @@ const LessonScreen = () => {
             <Text style={styles.completeButtonText}>¡Completado! ✨</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -123,10 +126,10 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   stepContainer: {
-    flex: 1,
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingBottom: 60,
   },
   stepIcon: {
     width: 120,

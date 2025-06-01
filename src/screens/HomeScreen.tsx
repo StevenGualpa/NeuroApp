@@ -1,29 +1,41 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  SafeAreaView,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { LESSONS_DATA, Lesson } from '../data/lessons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { LESSONS_DATA } from '../data/lessons';
 
 const HomeScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'home'>>();
 
-  const goToLesson = (lesson: Lesson) => {
-navigation.navigate('lesson', { lesson });
+  // Extraer categorías únicas de las lecciones
+  const categories = Array.from(
+    new Set(LESSONS_DATA.map((lesson) => lesson.category))
+  );
+
+  const goToCategory = (category: string) => {
+    navigation.navigate('sublessonList', { category });
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.title}>🌟 Mi Día a Día 🌟</Text>
+      <Text style={styles.title}>🌟 Mis Normas Básicas 🌟</Text>
       <ScrollView contentContainerStyle={styles.scroll}>
-        {LESSONS_DATA.map(lesson => (
+        {categories.map((category, index) => (
           <TouchableOpacity
-            key={lesson.id}
+            key={index}
             style={styles.card}
-            onPress={() => goToLesson(lesson)}
+            onPress={() => goToCategory(category)}
           >
-            <Text style={styles.cardIcon}>{lesson.icon}</Text>
-            <Text style={styles.cardTitle}>{lesson.title}</Text>
+            <Text style={styles.cardIcon}>📘</Text>
+            <Text style={styles.cardTitle}>{category}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
