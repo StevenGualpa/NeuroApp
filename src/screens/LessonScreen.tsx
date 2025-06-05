@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { LESSONS_DATA } from '../data/lessons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { LESSONS_DATA } from '../data/lessons';
 
 const LessonScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'lesson'>>();
@@ -27,17 +27,12 @@ const LessonScreen = () => {
 
   const completeLession = () => {
     Alert.alert('¡Felicitaciones!', 'Has completado la lección', [
-      {
-        text: 'Volver',
-        onPress: () => navigation.goBack(),
-      },
+      { text: 'Volver', onPress: () => navigation.goBack() },
     ]);
   };
 
   const completeStep = (selectedOptionCorrect?: boolean) => {
-    if (step.options && selectedOptionCorrect === undefined) {
-      return;
-    }
+    if (step.options && selectedOptionCorrect === undefined) return;
 
     if (selectedOptionCorrect === false) {
       Alert.alert('Inténtalo de nuevo', 'Esa no es la respuesta correcta.');
@@ -83,6 +78,11 @@ const LessonScreen = () => {
         </Animated.View>
 
         <Text style={styles.stepText}>{step.text}</Text>
+
+        {/* Mostrar tipo de actividad */}
+        {step.activityType && (
+          <Text style={styles.activityTypeText}>Actividad: {step.activityType}</Text>
+        )}
 
         {step.options ? (
           step.options.map((option, idx) => (
@@ -148,8 +148,14 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 20,
+    marginBottom: 10,
     textAlign: 'center',
+  },
+  activityTypeText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+    fontStyle: 'italic',
   },
   completeButton: {
     backgroundColor: '#4caf50',
