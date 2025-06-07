@@ -32,6 +32,7 @@ const activityTypes = [
   'Selecciona la opción correcta',
   'Ordena los pasos',
   'Asocia elementos',
+  'Memoria visual',
 ] as const;
 
 const ActivityMenuScreen = () => {

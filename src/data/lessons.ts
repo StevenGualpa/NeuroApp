@@ -196,6 +196,7 @@ export const LESSONS_DATA: Lesson[] = [
     }
   ]
 },
+//"Asocia elementos
 {
   id: 7,
   title: "Estudiar",
@@ -248,7 +249,7 @@ export const LESSONS_DATA: Lesson[] = [
   completed: false,
   steps: [
 {
-  id: 11,
+  id: 1,
   text: "¿Cuál pictograma representa 'Escribir en clase'?",
   icon: "✏️",
   completed: false,
@@ -261,8 +262,204 @@ export const LESSONS_DATA: Lesson[] = [
   ]
 },
   ]
+},
+{
+  id: 10,
+  title: "Dibujar en clase",
+  icon: "🔗",
+  category: "Actividades Escolares",
+  completed: false,
+  steps: [
+{
+  id: 1,
+  text: "¿Cuál pictograma representa 'Dibujar en clase'?",
+  icon: "🎨",
+  completed: false,
+  activityType: "Asocia elementos",
+  options: [
+    { icon: "🎨", label: "Dibujar", correct: true },
+    { icon: "📚", label: "Estudiar", correct: false },
+    { icon: "🎵", label: "Escuchar música", correct: false },
+    { icon: "🏃", label: "Correr", correct: false }
+  ]
 }
-
-
+  ]
+},
+{
+  id: 11,
+  title: "Ir al recreo",
+  icon: "🔗",
+  category: "Actividades Escolares",
+  completed: false,
+  steps: [
+{
+  id: 1,
+  text: "¿Cuál pictograma representa 'Ir al recreo'?",
+  icon: "🛝",
+  completed: false,
+  activityType: "Asocia elementos",
+  options: [
+    { icon: "🛝", label: "Recreo", correct: true },
+    { icon: "📖", label: "Leer", correct: false },
+    { icon: "🛌", label: "Dormir", correct: false },
+    { icon: "✏️", label: "Escribir", correct: false }
+  ]
+}
+  ]
+},
+{
+  id: 12,
+  title: "Guardar silencio",
+  icon: "🔗",
+  category: "Actividades Escolares",
+  completed: false,
+  steps: [
+{
+  id: 1,
+  text: "¿Cuál pictograma representa 'Guardar silencio' en clase?",
+  icon: "🤫",
+  completed: false,
+  activityType: "Asocia elementos",
+  options: [
+    { icon: "🤫", label: "Silencio", correct: true },
+    { icon: "🎉", label: "Fiesta", correct: false },
+    { icon: "📣", label: "Hablar fuerte", correct: false },
+    { icon: "📱", label: "Usar celular", correct: false }
+  ]
+},
+  ]
+},
+{
+  id: 13,
+  title: "Identificar frutas",
+  icon: "🔗",
+  category: "Alimentación Saludable",
+  completed: false,
+  steps: [
+{
+  id: 1,
+  text: "¿Cuál pictograma representa una fruta?",
+  icon: "🍎",
+  completed: false,
+  activityType: "Asocia elementos",
+  options: [
+    { icon: "🍎", label: "Manzana", correct: true },
+    { icon: "🍔", label: "Hamburguesa", correct: false },
+    { icon: "🍩", label: "Dona", correct: false },
+    { icon: "🥤", label: "Refresco", correct: false }
+  ]
+},
+  ]
+},
+{
+  id: 14,
+  title: "Asociar comida saludable",
+  icon: "🔗",
+  category: "Alimentación Saludable",
+  completed: false,
+  steps: [
+{
+  id: 1,
+  text: "¿Cuál opción es más saludable?",
+  icon: "🥗",
+  completed: false,
+  activityType: "Asocia elementos",
+  options: [
+    { icon: "🥗", label: "Ensalada", correct: true },
+    { icon: "🍟", label: "Papas fritas", correct: false },
+    { icon: "🍕", label: "Pizza", correct: false },
+    { icon: "🍰", label: "Pastel", correct: false }
+  ]
+},
+  ]
+},
+{
+  id: 15,
+  title: "Buen comportamiento en grupo",
+  icon: "🔗",
+  category: "Socialización",
+  completed: false,
+  steps: [
+{
+  id: 1,
+  text: "¿Qué pictograma representa 'Compartir'?",
+  icon: "🤝",
+  completed: false,
+  activityType: "Asocia elementos",
+  options: [
+    { icon: "🤝", label: "Compartir", correct: true },
+    { icon: "✋", label: "Detener", correct: false },
+    { icon: "🙅", label: "No", correct: false },
+    { icon: "😡", label: "Enojado", correct: false }
+  ]
+},
+  ]
+},
+{
+  id: 16,
+  title: "Identificar transporte seguro",
+  icon: "🔗",
+  category: "Transporte y Movilidad",
+  completed: false,
+  steps: [
+{
+  id: 1,
+  text: "¿Cuál pictograma representa un autobús?",
+  icon: "🚌",
+  completed: false,
+  activityType: "Asocia elementos",
+  options: [
+    { icon: "🚌", label: "Autobús", correct: true },
+    { icon: "✈️", label: "Avión", correct: false },
+    { icon: "🚲", label: "Bicicleta", correct: false },
+    { icon: "🚗", label: "Carro", correct: false }
+  ]
+},
+  ]
+},
+{
+  id: 17,
+  title: "Reconocer emoción de felicidad",
+  icon: "🔗",
+  category: "Emociones",
+  completed: false,
+  steps: [
+{
+  id: 1,
+  text: "¿Cuál pictograma representa estar feliz?",
+  icon: "😊",
+  completed: false,
+  activityType: "Asocia elementos",
+  options: [
+    { icon: "😊", label: "Feliz", correct: true },
+    { icon: "😢", label: "Triste", correct: false },
+    { icon: "😠", label: "Enojado", correct: false },
+    { icon: "😴", label: "Dormido", correct: false }
+  ]
+},
+  ]
+},
+{
+  id: 18,
+  title: "Encuentra los pares de objetos escolares", // 🔖 título identificador
+  icon: "📚",
+  category: "Objetos Escolares",
+  completed: false,
+  steps: [
+    {
+      id: 1,
+      text: "Empareja los objetos escolares iguales.",
+      icon: "🧠",
+      completed: false,
+      activityType: "Memoria visual",
+      options: [
+        { icon: "✏️", label: "Lápiz", correct: true },
+        { icon: "📐", label: "Escuadra", correct: true },
+        { icon: "✏️", label: "Lápiz", correct: true },
+        { icon: "📐", label: "Escuadra", correct: true }
+      ]
+    }
+  ]
+}
   // … continúa con los siguientes casos agregando "activityType" en cada step
 ];
