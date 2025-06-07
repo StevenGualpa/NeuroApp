@@ -3,8 +3,21 @@ export interface Step {
   text: string;
   icon: string;
   completed: boolean;
-  activityType: 'Selecciona la opción correcta' | 'Ordena los pasos' | 'Asocia elementos'; // puedes agregar más
+  activityType:
+    | 'Selecciona la opción correcta'
+    | 'Ordena los pasos'
+    | 'Arrastra y suelta'
+    | 'Asocia elementos'
+    | 'Repetir sonidos o palabras'
+    | 'Sí / No'
+    | 'Emparejamiento emocional'
+    | 'Construye la rutina'
+    | 'Memoria visual'
+    | 'Temporizador';
   options?: { icon: string; correct: boolean; label: string }[];
+  soundUrl?: string; // para repetir sonidos
+  image?: string; // para memorias, emociones u otras
+  description?: string; // opcional para narrativas
 }
 
 export interface Lesson {
@@ -95,5 +108,161 @@ export const LESSONS_DATA: Lesson[] = [
       }
     ]
   },
+{
+    id: 4,
+    title: "Evitar tocar enchufes (Sí / No)",
+    icon: "⚠️",
+    category: "Seguridad en el hogar",
+    completed: false,
+    steps: [
+      {
+        id: 1,
+        text: "¿Está bien tocar un enchufe con las manos mojadas?",
+        icon: "💦⚡",
+        completed: false,
+        activityType: "Sí / No",
+        options: [
+          { icon: "✅", label: "Sí", correct: false },
+          { icon: "❌", label: "No", correct: true }
+        ]
+      }
+    ]
+  },
+  {
+  id: 5,
+  title: "Cruzar la calle correctamente",
+  icon: "🚶‍♂️",
+  category: "Normas Viales y Transporte",
+  completed: false,
+  steps: [
+    {
+      id: 1,
+      text: "¿Dónde debes cruzar la calle?",
+      icon: "🚦",
+      completed: false,
+      activityType: "Selecciona la opción correcta",
+      options: [
+        { icon: "🏞️", label: "En medio del parque", correct: false },
+        { icon: "⚫⚪⚫", label: "En el paso de cebra", correct: true }
+      ]
+    },
+    {
+      id: 2,
+      text: "¿Qué color debe tener el semáforo para cruzar?",
+      icon: "🚥",
+      completed: false,
+      activityType: "Selecciona la opción correcta",
+      options: [
+        { icon: "🔴", label: "Rojo", correct: false },
+        { icon: "🟢", label: "Verde", correct: true }
+      ]
+    }
+  ]
+},
+{
+  id: 6,
+  title: "Prepararse para dormir",
+  icon: "🛌",
+  category: "Rutinas Diarias",
+  completed: false,
+  steps: [
+    {
+      id: 1,
+      text: "Ponerse el pijama",
+      icon: "👕",
+      completed: false,
+      activityType: "Ordena los pasos"
+    },
+    {
+      id: 2,
+      text: "Cepillarse los dientes",
+      icon: "🪥",
+      completed: false,
+      activityType: "Ordena los pasos"
+    },
+    {
+      id: 3,
+      text: "Leer un cuento",
+      icon: "📖",
+      completed: false,
+      activityType: "Ordena los pasos"
+    },
+    {
+      id: 4,
+      text: "Ir a la cama",
+      icon: "🛏️",
+      completed: false,
+      activityType: "Ordena los pasos"
+    }
+  ]
+},
+{
+  id: 7,
+  title: "Estudiar",
+  icon: "🔗",
+  category: "Actividades Escolares",
+  completed: false,
+  steps: [
+  {
+    id: 1,
+    text: "¿Cuál pictograma representa 'Estudiar'?",
+    icon: "📚",
+    completed: false,
+    activityType: "Asocia elementos",
+    options: [
+      { icon: "📚", label: "Estudiar", correct: true },
+      { icon: "🎮", label: "Jugar", correct: false },
+      { icon: "🛌", label: "Dormir", correct: false },
+      { icon: "🚪", label: "Salir", correct: false }
+    ]
+  },
+  ]
+},
+{
+  id: 8,
+  title: "Leer un libro",
+  icon: "🔗",
+  category: "Actividades Escolares",
+  completed: false,
+  steps: [
+{
+  id: 1,
+  text: "¿Cuál pictograma representa 'Leer un libro'?",
+  icon: "📖",
+  completed: false,
+  activityType: "Asocia elementos",
+  options: [
+    { icon: "📖", label: "Leer", correct: true },
+    { icon: "✏️", label: "Escribir", correct: false },
+    { icon: "🎨", label: "Dibujar", correct: false },
+    { icon: "🧃", label: "Tomar jugo", correct: false }
+  ]
+},
+  ]
+},
+{
+  id: 9,
+  title: "Escribir en clase",
+  icon: "🔗",
+  category: "Actividades Escolares",
+  completed: false,
+  steps: [
+{
+  id: 11,
+  text: "¿Cuál pictograma representa 'Escribir en clase'?",
+  icon: "✏️",
+  completed: false,
+  activityType: "Asocia elementos",
+  options: [
+    { icon: "✏️", label: "Escribir", correct: true },
+    { icon: "📖", label: "Leer", correct: false },
+    { icon: "🛏️", label: "Dormir", correct: false },
+    { icon: "🍎", label: "Comer", correct: false }
+  ]
+},
+  ]
+}
+
+
   // … continúa con los siguientes casos agregando "activityType" en cada step
 ];

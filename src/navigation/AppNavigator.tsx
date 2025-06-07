@@ -23,7 +23,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const AppNavigator = () => (
   <NavigationContainer>
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="login">
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="activityMenu">
       <Stack.Screen name="home" component={HomeScreen} />
         <Stack.Screen name="activityMenu" component={ActivityMenuScreen} />
       <Stack.Screen name="lesson" component={LessonScreen} />
