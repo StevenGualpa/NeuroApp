@@ -454,8 +454,6 @@ export const LESSONS_DATA: Lesson[] = [
       activityType: "Memoria visual",
       options: [
         { icon: "✏️", label: "Lápiz", correct: true },
-        { icon: "📐", label: "Escuadra", correct: true },
-        { icon: "✏️", label: "Lápiz", correct: true },
         { icon: "📐", label: "Escuadra", correct: true }
       ]
     }

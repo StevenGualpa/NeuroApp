@@ -25,6 +25,14 @@ const LessonScreen = () => {
 
   const step = lesson.steps[currentStep];
 
+  // Redirige a la pantalla de memoria visual si corresponde
+React.useEffect(() => {
+  if (step.activityType === 'Memoria visual') {
+    navigation.replace('memoryGame', { step, lessonTitle: lesson.title });
+  }
+}, [step, navigation, lesson.title]);
+
+
   const completeLession = () => {
     Alert.alert('¡Felicitaciones!', 'Has completado la lección', [
       { text: 'Volver', onPress: () => navigation.goBack() },
