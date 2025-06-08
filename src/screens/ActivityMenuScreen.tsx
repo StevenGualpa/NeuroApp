@@ -33,6 +33,7 @@ const activityTypes = [
   'Ordena los pasos',
   'Asocia elementos',
   'Memoria visual',
+  'Repetir sonidos',
 ] as const;
 
 const ActivityMenuScreen = () => {

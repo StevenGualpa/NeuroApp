@@ -12,7 +12,6 @@ import {
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { LESSONS_DATA } from '../data/lessons';
 
 const LessonScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'lesson'>>();
@@ -25,13 +24,13 @@ const LessonScreen = () => {
 
   const step = lesson.steps[currentStep];
 
-  // Redirige a la pantalla de memoria visual si corresponde
-React.useEffect(() => {
-  if (step.activityType === 'Memoria visual') {
-    navigation.replace('memoryGame', { step, lessonTitle: lesson.title });
-  }
-}, [step, navigation, lesson.title]);
-
+  React.useEffect(() => {
+    if (step.activityType === 'Memoria visual') {
+      navigation.replace('memoryGame', { step, lessonTitle: lesson.title });
+    } else if (step.activityType === 'Repetir sonidos') {
+      navigation.replace('repeatSound', { step, lessonTitle: lesson.title });
+    }
+  }, [step, navigation, lesson.title]);
 
   const completeLession = () => {
     Alert.alert('¡Felicitaciones!', 'Has completado la lección', [
@@ -87,7 +86,6 @@ React.useEffect(() => {
 
         <Text style={styles.stepText}>{step.text}</Text>
 
-        {/* Mostrar tipo de actividad */}
         {step.activityType && (
           <Text style={styles.activityTypeText}>Actividad: {step.activityType}</Text>
         )}

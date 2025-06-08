@@ -8,7 +8,7 @@ export interface Step {
     | 'Ordena los pasos'
     | 'Arrastra y suelta'
     | 'Asocia elementos'
-    | 'Repetir sonidos o palabras'
+    | 'Repetir sonidos'
     | 'Sí / No'
     | 'Emparejamiento emocional'
     | 'Construye la rutina'
@@ -18,6 +18,8 @@ export interface Step {
   soundUrl?: string; // para repetir sonidos
   image?: string; // para memorias, emociones u otras
   description?: string; // opcional para narrativas
+  audio?: string; // ✅ <-- esta es la que necesitas agregar
+
 }
 
 export interface Lesson {
@@ -458,6 +460,29 @@ export const LESSONS_DATA: Lesson[] = [
       ]
     }
   ]
+},
+{
+  id: 19,
+  title: "Reconoce el sonido correcto", // 🔖 título identificador
+  icon: "🔊",
+  category: "Lenguaje y Comunicación",
+  completed: false,
+  steps: [
+    {
+      id: 1,
+      text: "Escucha y elige el pictograma que representa lo que oíste.",
+      icon: "👂",
+      completed: false,
+      activityType: "Repetir sonidos",
+      audio: "comer", // texto a reproducir
+      options: [
+        { icon: "🍽️", label: "Comer", correct: true },
+        { icon: "🛁", label: "Bañarse", correct: false },
+        { icon: "🏃", label: "Correr", correct: false }
+      ]
+    }
+  ]
 }
+
   // … continúa con los siguientes casos agregando "activityType" en cada step
 ];
