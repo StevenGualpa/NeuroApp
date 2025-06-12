@@ -52,7 +52,11 @@ const LessonScreen = () => {
     } else if (step.activityType === 'Repetir sonidos') {
       navigation.replace('repeatSound', { step, lessonTitle: lesson.title });
     } else if (step.activityType === 'Arrastra y suelta') {
-      navigation.replace('dragDrop', { step, lessonTitle: lesson.title }); // ✅ nombre correcto
+      navigation.replace('dragDrop', { step, lessonTitle: lesson.title });
+    } else if (step.activityType === 'Asocia elementos') {
+      navigation.replace('match', { step, lessonTitle: lesson.title });
+    } else if (step.activityType === 'Selecciona la opción correcta') {
+      navigation.replace('selectOption', { step, lessonTitle: lesson.title });
     }
   }, [step, navigation, lesson.title]);
 
