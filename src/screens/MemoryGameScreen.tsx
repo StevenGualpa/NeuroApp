@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableWithoutFeedback,
+  TouchableOpacity,
   Animated,
   Alert,
   SafeAreaView,
@@ -338,6 +339,16 @@ const MemoryGameScreen = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Back Button */}
+      <View style={styles.backButtonContainer}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backButtonText}>← Volver</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -345,12 +356,12 @@ const MemoryGameScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F8FF',
+    backgroundColor: '#f8faff',
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingBottom: 30,
+    paddingBottom: 80, // Espacio para el botón de volver
   },
   header: {
     alignItems: 'center',
@@ -365,7 +376,7 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontWeight: '800',
     textAlign: 'center',
-    color: '#2D3436',
+    color: '#1a1a1a',
     marginBottom: 8,
     textShadowColor: 'rgba(0, 0, 0, 0.1)',
     textShadowOffset: { width: 1, height: 1 },
@@ -374,15 +385,15 @@ const styles = StyleSheet.create({
   titleUnderline: {
     width: 60,
     height: 4,
-    backgroundColor: '#9B59B6',
+    backgroundColor: '#4285f4',
     borderRadius: 2,
   },
   activityBadge: {
-    backgroundColor: '#9B59B6',
+    backgroundColor: '#4285f4',
     paddingHorizontal: 20,
     paddingVertical: 8,
     borderRadius: 20,
-    shadowColor: '#8E44AD',
+    shadowColor: '#4285f4',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -404,7 +415,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 25,
     marginBottom: 20,
-    shadowColor: '#9B59B6',
+    shadowColor: '#4285f4',
     shadowOffset: {
       width: 0,
       height: 4,
@@ -413,7 +424,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
     borderLeftWidth: 5,
-    borderLeftColor: '#9B59B6',
+    borderLeftColor: '#4285f4',
   },
   instructionHeader: {
     flexDirection: 'row',
@@ -428,12 +439,12 @@ const styles = StyleSheet.create({
   instructionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#2D3436',
+    color: '#1a1a1a',
   },
   instruction: {
     fontSize: 16,
     textAlign: 'center',
-    color: '#636E72',
+    color: '#6b7280',
     fontWeight: '500',
     lineHeight: 22,
   },
@@ -460,22 +471,22 @@ const styles = StyleSheet.create({
   progressTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#2D3436',
+    color: '#1a1a1a',
   },
   progressText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#9B59B6',
+    color: '#4285f4',
   },
   progressBarContainer: {
     height: 8,
-    backgroundColor: '#E8E8E8',
+    backgroundColor: '#e8f0fe',
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#9B59B6',
+    backgroundColor: '#4285f4',
     borderRadius: 4,
   },
   gameContainer: {
@@ -510,17 +521,17 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   front: {
-    backgroundColor: '#FF6B6B',
-    borderColor: '#FF4757',
+    backgroundColor: '#6b7280',
+    borderColor: '#4b5563',
   },
   back: {
-    backgroundColor: '#4ECDC4',
-    borderColor: '#26D0CE',
+    backgroundColor: '#4285f4',
+    borderColor: '#1976d2',
   },
   matchedCard: {
-    backgroundColor: '#55A3FF',
-    borderColor: '#3742FA',
-    shadowColor: '#3742FA',
+    backgroundColor: '#4caf50',
+    borderColor: '#2e7d32',
+    shadowColor: '#4caf50',
     shadowOpacity: 0.3,
   },
   cardQuestionText: {
@@ -542,7 +553,7 @@ const styles = StyleSheet.create({
   motivationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(155, 89, 182, 0.1)',
+    backgroundColor: 'rgba(66, 133, 244, 0.1)',
     paddingHorizontal: 25,
     paddingVertical: 15,
     borderRadius: 25,
@@ -554,8 +565,30 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#9B59B6',
+    color: '#4285f4',
     textAlign: 'center',
+  },
+  backButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#f8faff',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 10,
+  },
+  backButton: {
+    backgroundColor: '#6b7280',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignSelf: 'flex-start',
+  },
+  backButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

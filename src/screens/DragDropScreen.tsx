@@ -272,13 +272,33 @@ const DragDropScreen = () => {
       {/* Game Complete */}
       {isGameComplete && (
         <View style={styles.completionContainer}>
-          <Text style={styles.completionText}>🎉 ¡Felicitaciones!</Text>
-          <Text style={styles.completionSubtext}>Has completado la actividad</Text>
-          <TouchableOpacity style={styles.resetButton} onPress={resetGame}>
-            <Text style={styles.resetButtonText}>Jugar de nuevo</Text>
-          </TouchableOpacity>
+          <View style={styles.completionContent}>
+            <Text style={styles.completionText}>🎉 ¡Felicitaciones!</Text>
+            <Text style={styles.completionSubtext}>Has completado la actividad perfectamente</Text>
+            <View style={styles.completionButtons}>
+              <TouchableOpacity style={styles.resetButton} onPress={resetGame}>
+                <Text style={styles.resetButtonText}>🔄 Jugar de nuevo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.continueButton} 
+                onPress={() => navigation.goBack()}
+              >
+                <Text style={styles.continueButtonText}>✨ Continuar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       )}
+
+      {/* Back Button */}
+      <View style={styles.footer}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backButtonText}>← Volver</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 };
@@ -286,51 +306,54 @@ const DragDropScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#f8faff',
   },
   header: {
     backgroundColor: '#ffffff',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '800',
     textAlign: 'center',
-    color: '#1e293b',
+    color: '#1a1a1a',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
     textAlign: 'center',
-    color: '#64748b',
-    marginBottom: 16,
+    color: '#6b7280',
+    marginBottom: 20,
+    fontWeight: '500',
   },
   scoreContainer: {
     alignItems: 'center',
   },
   scoreText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#3b82f6',
-    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#4285f4',
+    marginBottom: 12,
   },
   progressBar: {
     width: '80%',
     height: 8,
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#e8f0fe',
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#10b981',
+    backgroundColor: '#4285f4',
     borderRadius: 4,
   },
   zonesContainer: {
@@ -344,23 +367,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     width: width / 2.3,
     minHeight: 140,
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 16,
     marginVertical: 8,
-    borderWidth: 2,
-    borderColor: '#e2e8f0',
+    borderWidth: 3,
+    borderColor: '#e8f0fe',
     borderStyle: 'dashed',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
   },
   zoneTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '700',
     textAlign: 'center',
-    color: '#1e293b',
+    color: '#1a1a1a',
     marginBottom: 12,
   },
   zoneContent: {
@@ -370,45 +393,47 @@ const styles = StyleSheet.create({
   },
   emptyZoneText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#9ca3af',
     fontStyle: 'italic',
     textAlign: 'center',
+    fontWeight: '500',
   },
   placedItem: {
     alignItems: 'center',
     marginVertical: 4,
-    padding: 8,
-    backgroundColor: '#f0f9ff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#3b82f6',
+    padding: 10,
+    backgroundColor: '#e8f5e8',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#4caf50',
+    minWidth: 80,
   },
   placedIcon: {
-    fontSize: 24,
+    fontSize: 28,
     marginBottom: 4,
   },
   placedLabel: {
     fontSize: 12,
-    color: '#1e293b',
+    color: '#2e7d32',
     textAlign: 'center',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   optionsContainer: {
     backgroundColor: '#ffffff',
     margin: 20,
     marginTop: 10,
-    borderRadius: 16,
+    borderRadius: 20,
     padding: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   optionsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1e293b',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a1a1a',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -416,28 +441,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    gap: 12,
   },
   draggable: {
     width: 90,
     height: 90,
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    margin: 8,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowRadius: 12,
+    elevation: 8,
     borderWidth: 2,
-    borderColor: '#e2e8f0',
+    borderColor: '#e8f0fe',
     position: 'relative',
   },
   draggablePlaced: {
-    opacity: 0.5,
+    opacity: 0.6,
     backgroundColor: '#f8fafc',
-    borderColor: '#10b981',
+    borderColor: '#4caf50',
+    shadowColor: '#4caf50',
   },
   optionIcon: {
     fontSize: 32,
@@ -446,23 +472,34 @@ const styles = StyleSheet.create({
   optionLabel: {
     fontSize: 12,
     textAlign: 'center',
-    color: '#1e293b',
-    fontWeight: '500',
+    color: '#1a1a1a',
+    fontWeight: '600',
+  },
+  placedIcon: {
+    opacity: 0.7,
+  },
+  placedLabel: {
+    color: '#6b7280',
   },
   checkmark: {
     position: 'absolute',
     top: -8,
     right: -8,
-    width: 24,
-    height: 24,
-    backgroundColor: '#10b981',
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    backgroundColor: '#4caf50',
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#4caf50',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   checkmarkText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   completionContainer: {
@@ -471,31 +508,88 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     alignItems: 'center',
     justifyContent: 'center',
   },
+  completionContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 32,
+    alignItems: 'center',
+    marginHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 10,
+  },
   completionText: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    marginBottom: 8,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   completionSubtext: {
     fontSize: 18,
-    color: '#ffffff',
-    marginBottom: 24,
+    color: '#6b7280',
+    marginBottom: 32,
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  completionButtons: {
+    flexDirection: 'row',
+    gap: 16,
   },
   resetButton: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: '#6b7280',
     paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    shadowColor: '#6b7280',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   resetButtonText: {
     color: '#ffffff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
+  },
+  continueButton: {
+    backgroundColor: '#4285f4',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  continueButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 10,
+  },
+  backButton: {
+    backgroundColor: '#6b7280',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignSelf: 'flex-start',
+  },
+  backButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

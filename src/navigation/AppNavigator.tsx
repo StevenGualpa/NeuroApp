@@ -13,6 +13,7 @@ import RepeatSoundScreen from '../screens/RepeatSoundScreen';
 import DragDropScreen from '../screens/DragDropScreen';
 import MatchScreen from '../screens/MatchScreen';
 import SelectOptionScreen from '../screens/SelectOptionScreen';
+import OrderStepsScreen from '../screens/OrderStepsScreen'; // ✅ Nueva pantalla
 
 import type { Lesson } from '../data/lessons';
 
@@ -42,6 +43,7 @@ export type RootStackParamList = {
   dragDrop: { step: Step; lessonTitle: string };
   match: { step: Step; lessonTitle: string };
   selectOption: { step: Step; lessonTitle: string };
+  orderSteps: { step: Step; lessonTitle: string }; // ✅ Nuevo screen
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -59,6 +61,7 @@ const AppNavigator = () => (
       <Stack.Screen name="dragDrop" component={DragDropScreen} />
       <Stack.Screen name="match" component={MatchScreen} />
       <Stack.Screen name="selectOption" component={SelectOptionScreen} />
+      <Stack.Screen name="orderSteps" component={OrderStepsScreen} />
     </Stack.Navigator>
   </NavigationContainer>
 );

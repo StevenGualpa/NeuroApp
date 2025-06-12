@@ -1,4 +1,4 @@
-// LessonScreen.tsx
+// src/screens/LessonScreen.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
@@ -47,6 +47,7 @@ const LessonScreen = () => {
       }),
     ]).start();
 
+    // Redirecciones según tipo de actividad
     if (step.activityType === 'Memoria visual') {
       navigation.replace('memoryGame', { step, lessonTitle: lesson.title });
     } else if (step.activityType === 'Repetir sonidos') {
@@ -57,6 +58,8 @@ const LessonScreen = () => {
       navigation.replace('match', { step, lessonTitle: lesson.title });
     } else if (step.activityType === 'Selecciona la opción correcta') {
       navigation.replace('selectOption', { step, lessonTitle: lesson.title });
+    } else if (step.activityType === 'Ordena los pasos') {
+      navigation.replace('orderSteps', { step, lessonTitle: lesson.title }); // ✅ nuevo caso
     }
   }, [step, navigation, lesson.title]);
 

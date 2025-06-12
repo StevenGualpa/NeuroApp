@@ -30,10 +30,11 @@ const activityConfig = [
 
 const activityTypes = [
   'Selecciona la opción correcta',
-  'Arrastra y suelta',
+  'Ordena los pasos',
   'Asocia elementos',
   'Memoria visual',
   'Repetir sonidos',
+  'Arrastra y suelta',
 ] as const;
 
 const ActivityMenuScreen = () => {
