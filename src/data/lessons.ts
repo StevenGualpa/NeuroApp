@@ -14,7 +14,12 @@ export interface Step {
     | 'Construye la rutina'
     | 'Memoria visual'
     | 'Temporizador';
-  options?: { icon: string; correct: boolean; label: string }[];
+  options?: { 
+    icon: string; 
+    correct?: boolean;
+    correctZone?: string;
+    label: string 
+  }[];
   soundUrl?: string; // para repetir sonidos
   image?: string; // para memorias, emociones u otras
   description?: string; // opcional para narrativas
@@ -33,21 +38,7 @@ export interface Lesson {
 }
 
 export const LESSONS_DATA: Lesson[] = [
-  {
-    id: 1,
-    title: "Lavarse las manos",
-    icon: "🧼",
-    category: "Higiene Personal",
-    completed: false,
-    steps: [
-      { id: 1, text: "Abrir el grifo", icon: "🚿", completed: false, activityType: "Ordena los pasos" },
-      { id: 2, text: "Mojar las manos", icon: "💧", completed: false, activityType: "Ordena los pasos" },
-      { id: 3, text: "Poner jabón", icon: "🧼", completed: false, activityType: "Ordena los pasos" },
-      { id: 4, text: "Frotar las manos", icon: "👐", completed: false, activityType: "Ordena los pasos" },
-      { id: 5, text: "Enjuagar", icon: "💦", completed: false, activityType: "Ordena los pasos" },
-      { id: 6, text: "Secar con toalla", icon: "🏺", completed: false, activityType: "Ordena los pasos" }
-    ]
-  },
+
   {
     id: 2,
     title: "¿Qué haces primero al lavarte las manos?",
@@ -482,7 +473,31 @@ export const LESSONS_DATA: Lesson[] = [
       ]
     }
   ]
-}
+},
+{
+  id: 20,
+  title: "Clasifica los objetos reciclables",
+  icon: "🗑️",
+  category: "Medio Ambiente",
+  completed: false,
+  steps: [
+    {
+      id: 1,
+      text: "Arrastra los elementos a su zona correcta.",
+      icon: "🧃",
+      completed: false,
+      activityType: "Arrastra y suelta",
+      options: [
+        { icon: "🧃", label: "Jugo", correctZone: "recyclable" },
+        { icon: "🍕", label: "Pizza", correctZone: "nonRecyclable" },
+        { icon: "📰", label: "Periódico", correctZone: "recyclable" },
+        { icon: "🍔", label: "Hamburguesa", correctZone: "nonRecyclable" }
+      ]
+    }
+  ]
+},
+
+
 
   // … continúa con los siguientes casos agregando "activityType" en cada step
 ];

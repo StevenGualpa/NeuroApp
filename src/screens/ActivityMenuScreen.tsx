@@ -30,7 +30,7 @@ const activityConfig = [
 
 const activityTypes = [
   'Selecciona la opción correcta',
-  'Ordena los pasos',
+  'Arrastra y suelta',
   'Asocia elementos',
   'Memoria visual',
   'Repetir sonidos',
