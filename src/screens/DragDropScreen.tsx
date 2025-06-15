@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  Alert,
   PanResponder,
   Animated,
   Dimensions,
@@ -13,6 +12,7 @@ import {
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import FeedbackAnimation from '../components/FeedbackAnimation';
 
 const { width, height } = Dimensions.get('window');
 
@@ -44,6 +44,10 @@ const DragDropScreen = () => {
   const [correctlyPlaced, setCorrectlyPlaced] = useState<Set<number>>(new Set());
   const [zoneItems, setZoneItems] = useState<{ [key: string]: PlacedItem[] }>({});
   const [score, setScore] = useState(0);
+  
+  // Animation states
+  const [showAnimation, setShowAnimation] = useState(false);
+  const [animationType, setAnimationType] = useState<'success' | 'error' | 'winner' | 'loser'>('success');
 
   const zones = Array.from(new Set(step.options?.map(o => o.correctZone) || []));
   const totalItems = step.options?.length || 0;
@@ -69,6 +73,23 @@ const DragDropScreen = () => {
     }, 100);
   };
 
+  const showFeedbackAnimation = (type: 'success' | 'error' | 'winner' | 'loser') => {
+    setAnimationType(type);
+    setShowAnimation(true);
+  };
+
+  const handleAnimationFinish = () => {
+    setShowAnimation(false);
+    
+    // Check if game is complete after success animation
+    if (animationType === 'success' && score + 1 === totalItems) {
+      // Small delay before showing winner animation
+      setTimeout(() => {
+        showFeedbackAnimation('winner');
+      }, 300);
+    }
+  };
+
   const handleCorrectDrop = (zone: string, option: Option, index: number) => {
     setCorrectlyPlaced(prev => new Set([...prev, index]));
     setZoneItems(prev => ({
@@ -77,15 +98,13 @@ const DragDropScreen = () => {
     }));
     setScore(prev => prev + 1);
     
-    Alert.alert('🎉 ¡Excelente!', `${option.label} es correcto para ${zone}`, [
-      { text: 'Continuar', style: 'default' }
-    ]);
+    // Show success animation instead of alert
+    showFeedbackAnimation('success');
   };
 
   const handleIncorrectDrop = (zone: string, option: Option) => {
-    Alert.alert('❌ Intenta de nuevo', `${option.label} no pertenece a ${zone}`, [
-      { text: 'OK', style: 'default' }
-    ]);
+    // Show error animation instead of alert
+    showFeedbackAnimation('error');
   };
 
   const checkCollision = (gestureX: number, gestureY: number): string | null => {
@@ -269,8 +288,8 @@ const DragDropScreen = () => {
         </View>
       </View>
 
-      {/* Game Complete */}
-      {isGameComplete && (
+      {/* Game Complete Modal - Only show when winner animation is not showing */}
+      {isGameComplete && !showAnimation && (
         <View style={styles.completionContainer}>
           <View style={styles.completionContent}>
             <Text style={styles.completionText}>🎉 ¡Felicitaciones!</Text>
@@ -288,6 +307,14 @@ const DragDropScreen = () => {
             </View>
           </View>
         </View>
+      )}
+
+      {/* Feedback Animation */}
+      {showAnimation && (
+        <FeedbackAnimation
+          type={animationType}
+          onFinish={handleAnimationFinish}
+        />
       )}
 
       {/* Back Button */}
