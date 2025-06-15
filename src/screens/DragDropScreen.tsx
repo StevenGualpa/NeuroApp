@@ -13,6 +13,8 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
+import AchievementNotification from '../components/AchievementNotification';
+import { AchievementService, Achievement } from '../services/AchievementService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -36,6 +38,14 @@ interface ZoneBounds {
   height: number;
 }
 
+interface GameStats {
+  totalAttempts: number;
+  errors: number;
+  stars: number;
+  completionTime: number;
+  perfectRun: boolean;
+}
+
 const DragDropScreen = () => {
   const route = useRoute<DragDropRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -49,12 +59,34 @@ const DragDropScreen = () => {
   const [showAnimation, setShowAnimation] = useState(false);
   const [animationType, setAnimationType] = useState<'success' | 'error' | 'winner' | 'loser'>('success');
 
+  // Achievement states
+  const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
+  const [showAchievementNotification, setShowAchievementNotification] = useState(false);
+  const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
+
+  // Gamification states
+  const [gameStats, setGameStats] = useState<GameStats>({
+    totalAttempts: 0,
+    errors: 0,
+    stars: 0,
+    completionTime: 0,
+    perfectRun: true,
+  });
+  const [startTime] = useState<number>(Date.now());
+  const [showStars, setShowStars] = useState(false);
+  const [gameCompleted, setGameCompleted] = useState(false);
+
   const zones = Array.from(new Set(step.options?.map(o => o.correctZone) || []));
   const totalItems = step.options?.length || 0;
 
   // Refs for zone positions - using absolute coordinates
   const zoneRefs = useRef<{ [key: string]: View | null }>({});
   const zoneBounds = useRef<{ [key: string]: ZoneBounds }>({});
+
+  // Initialize achievements service
+  useEffect(() => {
+    AchievementService.initializeAchievements();
+  }, []);
 
   // Update zone bounds when layout changes
   const updateZoneBounds = (zone: string) => {
@@ -73,20 +105,104 @@ const DragDropScreen = () => {
     }, 100);
   };
 
+  // Calculate stars based on performance
+  const calculateStars = (errors: number, totalItems: number, completionTime: number): number => {
+    const maxTime = totalItems * 10000; // 10 seconds per item as baseline
+    const timeBonus = completionTime < maxTime * 0.5 ? 1 : 0;
+    
+    if (errors === 0) {
+      return 3; // Perfect performance
+    } else if (errors <= Math.ceil(totalItems * 0.2)) {
+      return 2 + timeBonus; // Good performance (max 20% errors)
+    } else if (errors <= Math.ceil(totalItems * 0.5)) {
+      return 1 + timeBonus; // Acceptable performance (max 50% errors)
+    } else {
+      return 1; // Minimum star for completion
+    }
+  };
+
   const showFeedbackAnimation = (type: 'success' | 'error' | 'winner' | 'loser') => {
     setAnimationType(type);
     setShowAnimation(true);
+  };
+
+  // Handle achievement notifications queue
+  const processAchievementQueue = () => {
+    if (achievementQueue.length > 0 && !showAchievementNotification) {
+      const nextAchievement = achievementQueue[0];
+      setNewAchievement(nextAchievement);
+      setShowAchievementNotification(true);
+      setAchievementQueue(prev => prev.slice(1));
+    }
+  };
+
+  const handleAchievementNotificationHide = () => {
+    setShowAchievementNotification(false);
+    setNewAchievement(null);
+    
+    // Process next achievement in queue after a delay
+    setTimeout(() => {
+      processAchievementQueue();
+    }, 1000);
+  };
+
+  // Record game completion and check for achievements
+  const recordGameCompletion = async (finalStats: GameStats) => {
+    try {
+      const gameData = {
+        stars: finalStats.stars,
+        isPerfect: finalStats.perfectRun,
+        completionTime: finalStats.completionTime,
+        errors: finalStats.errors,
+      };
+
+      const newlyUnlocked = await AchievementService.recordGameCompletion(gameData);
+      
+      if (newlyUnlocked.length > 0) {
+        // Add achievements to queue
+        setAchievementQueue(prev => [...prev, ...newlyUnlocked]);
+        
+        // Start processing queue if not already showing notification
+        if (!showAchievementNotification) {
+          setTimeout(() => {
+            processAchievementQueue();
+          }, 2000); // Wait 2 seconds after game completion
+        }
+      }
+    } catch (error) {
+      console.error('Error recording game completion:', error);
+    }
   };
 
   const handleAnimationFinish = () => {
     setShowAnimation(false);
     
     // Check if game is complete after success animation
-    if (animationType === 'success' && score + 1 === totalItems) {
+    if (animationType === 'success' && score === totalItems && !gameCompleted) {
+      // Mark game as completed to prevent multiple triggers
+      setGameCompleted(true);
+      
+      // Calculate final stats
+      const completionTime = Date.now() - startTime;
+      const finalStats = {
+        ...gameStats,
+        completionTime,
+        stars: calculateStars(gameStats.errors, totalItems, completionTime),
+      };
+      setGameStats(finalStats);
+      
+      // Record game completion for achievements
+      recordGameCompletion(finalStats);
+      
       // Small delay before showing winner animation
       setTimeout(() => {
         showFeedbackAnimation('winner');
       }, 300);
+    } else if (animationType === 'winner') {
+      // Show stars after winner animation
+      setTimeout(() => {
+        setShowStars(true);
+      }, 500);
     }
   };
 
@@ -96,13 +212,32 @@ const DragDropScreen = () => {
       ...prev,
       [zone]: [...(prev[zone] || []), { option, index }],
     }));
-    setScore(prev => prev + 1);
     
-    // Show success animation instead of alert
+    const newScore = score + 1;
+    setScore(newScore);
+    
+    // Update stats
+    setGameStats(prev => ({
+      ...prev,
+      totalAttempts: prev.totalAttempts + 1,
+    }));
+    
+    // Show success animation
     showFeedbackAnimation('success');
+    
+    // Debug log to check game completion
+    console.log(`Score: ${newScore}, Total: ${totalItems}, Complete: ${newScore === totalItems}`);
   };
 
   const handleIncorrectDrop = (zone: string, option: Option) => {
+    // Update stats
+    setGameStats(prev => ({
+      ...prev,
+      totalAttempts: prev.totalAttempts + 1,
+      errors: prev.errors + 1,
+      perfectRun: false,
+    }));
+    
     // Show error animation instead of alert
     showFeedbackAnimation('error');
   };
@@ -190,6 +325,41 @@ const DragDropScreen = () => {
     setCorrectlyPlaced(new Set());
     setZoneItems({});
     setScore(0);
+    setShowStars(false);
+    setGameCompleted(false);
+    setGameStats({
+      totalAttempts: 0,
+      errors: 0,
+      stars: 0,
+      completionTime: 0,
+      perfectRun: true,
+    });
+  };
+
+  const renderStars = (count: number) => {
+    return Array.from({ length: 3 }, (_, i) => (
+      <Animated.Text
+        key={i}
+        style={[
+          styles.star,
+          i < count ? styles.starFilled : styles.starEmpty,
+        ]}
+      >
+        ⭐
+      </Animated.Text>
+    ));
+  };
+
+  const getPerformanceMessage = (stars: number, perfectRun: boolean) => {
+    if (perfectRun && stars === 3) {
+      return "¡Perfecto! Sin errores 🏆";
+    } else if (stars === 3) {
+      return "¡Excelente trabajo! 🌟";
+    } else if (stars === 2) {
+      return "¡Muy bien! Sigue así 👏";
+    } else {
+      return "¡Completado! Puedes mejorar 💪";
+    }
   };
 
   const isGameComplete = score === totalItems;
@@ -204,6 +374,11 @@ const DragDropScreen = () => {
 
     return () => clearTimeout(timer);
   }, [zones]);
+
+  // Process achievement queue when it changes
+  useEffect(() => {
+    processAchievementQueue();
+  }, [achievementQueue, showAchievementNotification]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -220,6 +395,24 @@ const DragDropScreen = () => {
                 { width: `${(score / totalItems) * 100}%` }
               ]} 
             />
+          </View>
+          {/* Stats Display */}
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Intentos</Text>
+              <Text style={styles.statValue}>{gameStats.totalAttempts}</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Errores</Text>
+              <Text style={[styles.statValue, gameStats.errors > 0 && styles.errorText]}>
+                {gameStats.errors}
+              </Text>
+            </View>
+            {gameStats.perfectRun && score > 0 && (
+              <View style={styles.perfectBadge}>
+                <Text style={styles.perfectText}>🔥 Perfecto</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>
@@ -288,12 +481,44 @@ const DragDropScreen = () => {
         </View>
       </View>
 
-      {/* Game Complete Modal - Only show when winner animation is not showing */}
-      {isGameComplete && !showAnimation && (
+      {/* Game Complete Modal with Stars */}
+      {isGameComplete && !showAnimation && showStars && (
         <View style={styles.completionContainer}>
           <View style={styles.completionContent}>
             <Text style={styles.completionText}>🎉 ¡Felicitaciones!</Text>
-            <Text style={styles.completionSubtext}>Has completado la actividad perfectamente</Text>
+            
+            {/* Stars Display */}
+            <View style={styles.starsContainer}>
+              <Text style={styles.starsTitle}>Tu puntuación:</Text>
+              <View style={styles.starsRow}>
+                {renderStars(gameStats.stars)}
+              </View>
+              <Text style={styles.performanceMessage}>
+                {getPerformanceMessage(gameStats.stars, gameStats.perfectRun)}
+              </Text>
+            </View>
+
+            {/* Detailed Stats */}
+            <View style={styles.detailedStats}>
+              <View style={styles.statRow}>
+                <Text style={styles.statDetailLabel}>Tiempo:</Text>
+                <Text style={styles.statDetailValue}>
+                  {Math.round(gameStats.completionTime / 1000)}s
+                </Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={styles.statDetailLabel}>Precisión:</Text>
+                <Text style={styles.statDetailValue}>
+                  {Math.round(((gameStats.totalAttempts - gameStats.errors) / gameStats.totalAttempts) * 100)}%
+                </Text>
+              </View>
+              {gameStats.perfectRun && (
+                <View style={styles.bonusRow}>
+                  <Text style={styles.bonusText}>🏆 ¡Ejecución perfecta!</Text>
+                </View>
+              )}
+            </View>
+
             <View style={styles.completionButtons}>
               <TouchableOpacity style={styles.resetButton} onPress={resetGame}>
                 <Text style={styles.resetButtonText}>🔄 Jugar de nuevo</Text>
@@ -314,6 +539,15 @@ const DragDropScreen = () => {
         <FeedbackAnimation
           type={animationType}
           onFinish={handleAnimationFinish}
+        />
+      )}
+
+      {/* Achievement Notification */}
+      {newAchievement && (
+        <AchievementNotification
+          achievement={newAchievement}
+          visible={showAchievementNotification}
+          onHide={handleAchievementNotificationHide}
         />
       )}
 
@@ -377,11 +611,45 @@ const styles = StyleSheet.create({
     backgroundColor: '#e8f0fe',
     borderRadius: 4,
     overflow: 'hidden',
+    marginBottom: 16,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#4285f4',
     borderRadius: 4,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  errorText: {
+    color: '#ef4444',
+  },
+  perfectBadge: {
+    backgroundColor: '#fbbf24',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  perfectText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
   },
   zonesContainer: {
     flexDirection: 'row',
@@ -550,20 +818,78 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 16,
     elevation: 10,
+    maxWidth: 350,
   },
   completionText: {
     fontSize: 32,
     fontWeight: '800',
     color: '#1a1a1a',
-    marginBottom: 12,
+    marginBottom: 24,
     textAlign: 'center',
   },
-  completionSubtext: {
+  starsContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  starsTitle: {
     fontSize: 18,
+    fontWeight: '600',
     color: '#6b7280',
-    marginBottom: 32,
+    marginBottom: 12,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  star: {
+    fontSize: 40,
+  },
+  starFilled: {
+    opacity: 1,
+  },
+  starEmpty: {
+    opacity: 0.3,
+  },
+  performanceMessage: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4285f4',
     textAlign: 'center',
+  },
+  detailedStats: {
+    backgroundColor: '#f8faff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    width: '100%',
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  statDetailLabel: {
+    fontSize: 14,
+    color: '#6b7280',
     fontWeight: '500',
+  },
+  statDetailValue: {
+    fontSize: 14,
+    color: '#1a1a1a',
+    fontWeight: '700',
+  },
+  bonusRow: {
+    alignItems: 'center',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  bonusText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fbbf24',
   },
   completionButtons: {
     flexDirection: 'row',
