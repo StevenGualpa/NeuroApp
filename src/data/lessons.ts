@@ -38,49 +38,7 @@ export interface Lesson {
 
 export const LESSONS_DATA: Lesson[] = [
   {
-    id: 2,
-    title: "¿Qué haces primero al lavarte las manos?",
-    icon: "🧽",
-    category: "Higiene Personal",
-    completed: false,
-    steps: [
-      {
-        id: 1,
-        text: "Selecciona la opción correcta",
-        icon: "🤔",
-        completed: false,
-        activityType: "Selecciona la opción correcta",
-        options: [
-          { icon: "🧼", label: "Poner jabón", correct: false },
-          { icon: "🚿", label: "Abrir el grifo", correct: true }
-        ]
-      },
-      {
-        id: 2,
-        text: "¿Qué sigue después de abrir el grifo?",
-        icon: "💧",
-        completed: false,
-        activityType: "Selecciona la opción correcta",
-        options: [
-          { icon: "🧻", label: "Secarse las manos", correct: false },
-          { icon: "💧", label: "Mojar las manos", correct: true }
-        ]
-      },
-      {
-        id: 3,
-        text: "¿Cuál es el último paso?",
-        icon: "🧴",
-        completed: false,
-        activityType: "Selecciona la opción correcta",
-        options: [
-          { icon: "🧴", label: "Aplicar jabón", correct: false },
-          { icon: "🏺", label: "Secar con toalla", correct: true }
-        ]
-      }
-    ]
-  },
-  {
-    id: 3,
+    id: 1,
     title: "Evitar tocar enchufes",
     icon: "⚡",
     category: "Seguridad en el hogar",
@@ -100,7 +58,7 @@ export const LESSONS_DATA: Lesson[] = [
     ]
   },
   {
-    id: 4,
+    id: 2,
     title: "Evitar tocar enchufes (Sí / No)",
     icon: "⚠️",
     category: "Seguridad en el hogar",
@@ -111,7 +69,7 @@ export const LESSONS_DATA: Lesson[] = [
         text: "¿Está bien tocar un enchufe con las manos mojadas?",
         icon: "💦⚡",
         completed: false,
-        activityType: "Sí / No",
+        activityType: "Selecciona la opción correcta",
         options: [
           { icon: "✅", label: "Sí", correct: false },
           { icon: "❌", label: "No", correct: true }
@@ -120,7 +78,7 @@ export const LESSONS_DATA: Lesson[] = [
     ]
   },
   {
-    id: 5,
+    id: 3,
     title: "Cruzar la calle correctamente",
     icon: "🚶‍♂️",
     category: "Normas Viales y Transporte",
@@ -137,8 +95,17 @@ export const LESSONS_DATA: Lesson[] = [
           { icon: "⚫⚪⚫", label: "En el paso de cebra", correct: true }
         ]
       },
+    ]
+  },
+    {
+    id: 4,
+    title: "Cruzar la calle correctamente",
+    icon: "🚶‍♂️",
+    category: "Normas Viales y Transporte",
+    completed: false,
+    steps: [
       {
-        id: 2,
+        id: 1,
         text: "¿Qué color debe tener el semáforo para cruzar?",
         icon: "🚥",
         completed: false,
@@ -448,33 +415,36 @@ export const LESSONS_DATA: Lesson[] = [
         completed: false,
         activityType: "Arrastra y suelta",
         options: [
-          { icon: "🧃", label: "Jugo", correctZone: "recyclable" },
-          { icon: "🍕", label: "Pizza", correctZone: "nonRecyclable" },
-          { icon: "📰", label: "Periódico", correctZone: "recyclable" },
-          { icon: "🍔", label: "Hamburguesa", correctZone: "nonRecyclable" }
+          { icon: "🧃", label: "Jugo", correctZone: "Reciclaje" },
+          { icon: "🍕", label: "Pizza", correctZone: "No Reciclaje" },
+          { icon: "📰", label: "Periódico", correctZone: "Reciclaje" },
+          { icon: "🍔", label: "Hamburguesa", correctZone: "No Reciclaje" }
         ]
       }
     ]
   },
-  {
-    id: 21,
-    title: "Rutina de la mañana",
-    icon: "🌞",
-    category: "Higiene Personal",
-    completed: false,
-    steps: [
-      {
-        id: 1,
-        text: "Ordena los pasos para cepillarse los dientes correctamente.",
-        icon: "🦷",
-        completed: false,
-        activityType: "Ordena los pasos",
-        options: [
-          { icon: "🚿", label: "Mojar el cepillo", correct: true, order: 1 },
-          { icon: "🧴", label: "Colocar la pasta dental", correct: true, order: 2 },
-          { icon: "🪥", label: "Cepillar durante 2 minutos", correct: true, order: 3 }
-        ]
-      }
-    ]
-  }
+{
+  id: 31,
+  title: "Separa lo que va al refrigerador",
+  icon: "🧊",
+  category: "Alimentación Saludable",
+  completed: false,
+  steps: [
+    {
+      id: 1,
+      text: "Arrastra los alimentos a donde deben guardarse.",
+      icon: "🥛",
+      completed: false,
+      activityType: "Arrastra y suelta",
+      options: [
+        { icon: "🥛", label: "Leche", correctZone: "Refrigerador" },
+        { icon: "🍞", label: "Pan", correctZone: "Despensa" },
+        { icon: "🧀", label: "Queso", correctZone: "Refrigerador" },
+        { icon: "🍪", label: "Galletas", correctZone: "Despensa" },
+        { icon: "🥩", label: "Carne", correctZone: "Refrigerador" },
+        { icon: "🍝", label: "Pasta", correctZone: "Despensa" }
+      ]
+    }
+  ]
+},  
 ];
