@@ -25,19 +25,16 @@ interface Option {
   label: string;
   correctZone: string;
 }
-
 interface PlacedItem {
   option: Option;
   index: number;
 }
-
 interface ZoneBounds {
   x: number;
   y: number;
   width: number;
   height: number;
 }
-
 interface GameStats {
   totalAttempts: number;
   errors: number;
@@ -45,25 +42,20 @@ interface GameStats {
   completionTime: number;
   perfectRun: boolean;
 }
-
 const DragDropScreen = () => {
   const route = useRoute<DragDropRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
-
   const [correctlyPlaced, setCorrectlyPlaced] = useState<Set<number>>(new Set());
   const [zoneItems, setZoneItems] = useState<{ [key: string]: PlacedItem[] }>({});
   const [score, setScore] = useState(0);
-  
   // Animation states
   const [showAnimation, setShowAnimation] = useState(false);
   const [animationType, setAnimationType] = useState<'success' | 'error' | 'winner' | 'loser'>('success');
-
   // Achievement states
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
   const [showAchievementNotification, setShowAchievementNotification] = useState(false);
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
-
   // Gamification states
   const [gameStats, setGameStats] = useState<GameStats>({
     totalAttempts: 0,
@@ -75,19 +67,15 @@ const DragDropScreen = () => {
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
-
   const zones = Array.from(new Set(step.options?.map(o => o.correctZone) || []));
   const totalItems = step.options?.length || 0;
-
   // Refs for zone positions - using absolute coordinates
   const zoneRefs = useRef<{ [key: string]: View | null }>({});
   const zoneBounds = useRef<{ [key: string]: ZoneBounds }>({});
-
   // Initialize achievements service
   useEffect(() => {
     AchievementService.initializeAchievements();
   }, []);
-
   // Update zone bounds when layout changes
   const updateZoneBounds = (zone: string) => {
     const zoneRef = zoneRefs.current[zone];
@@ -97,19 +85,17 @@ const DragDropScreen = () => {
       });
     }
   };
-
   const handleZoneLayout = (zone: string) => {
     // Small delay to ensure the layout is complete
     setTimeout(() => {
       updateZoneBounds(zone);
     }, 100);
   };
-
   // Calculate stars based on performance
   const calculateStars = (errors: number, totalItems: number, completionTime: number): number => {
     const maxTime = totalItems * 10000; // 10 seconds per item as baseline
     const timeBonus = completionTime < maxTime * 0.5 ? 1 : 0;
-    
+  
     if (errors === 0) {
       return 3; // Perfect performance
     } else if (errors <= Math.ceil(totalItems * 0.2)) {
@@ -190,10 +176,8 @@ const DragDropScreen = () => {
         stars: calculateStars(gameStats.errors, totalItems, completionTime),
       };
       setGameStats(finalStats);
-      
       // Record game completion for achievements
       recordGameCompletion(finalStats);
-      
       // Small delay before showing winner animation
       setTimeout(() => {
         showFeedbackAnimation('winner');
@@ -205,26 +189,21 @@ const DragDropScreen = () => {
       }, 500);
     }
   };
-
   const handleCorrectDrop = (zone: string, option: Option, index: number) => {
     setCorrectlyPlaced(prev => new Set([...prev, index]));
     setZoneItems(prev => ({
       ...prev,
       [zone]: [...(prev[zone] || []), { option, index }],
     }));
-    
     const newScore = score + 1;
     setScore(newScore);
-    
     // Update stats
     setGameStats(prev => ({
       ...prev,
       totalAttempts: prev.totalAttempts + 1,
     }));
-    
     // Show success animation
     showFeedbackAnimation('success');
-    
     // Debug log to check game completion
     console.log(`Score: ${newScore}, Total: ${totalItems}, Complete: ${newScore === totalItems}`);
   };
@@ -237,7 +216,6 @@ const DragDropScreen = () => {
       errors: prev.errors + 1,
       perfectRun: false,
     }));
-    
     // Show error animation instead of alert
     showFeedbackAnimation('error');
   };
@@ -258,13 +236,12 @@ const DragDropScreen = () => {
 
   const createPanHandlers = (option: Option, index: number) => {
     const pan = useRef(new Animated.ValueXY()).current;
-    
+
     return {
       pan,
       panResponder: PanResponder.create({
         onStartShouldSetPanResponder: () => !correctlyPlaced.has(index),
         onMoveShouldSetPanResponder: () => !correctlyPlaced.has(index),
-        
         onPanResponderGrant: () => {
           // Reset any existing offset
           pan.setOffset({
@@ -281,7 +258,6 @@ const DragDropScreen = () => {
         onPanResponderRelease: (_, gesture) => {
           // Flatten the offset
           pan.flattenOffset();
-          
           const targetZone = checkCollision(gesture.moveX, gesture.moveY);
           
           if (targetZone) {
@@ -299,7 +275,6 @@ const DragDropScreen = () => {
             } else {
               // Incorrect drop - return to original position
               handleIncorrectDrop(targetZone, option);
-              
               Animated.spring(pan, {
                 toValue: { x: 0, y: 0 },
                 useNativeDriver: false,

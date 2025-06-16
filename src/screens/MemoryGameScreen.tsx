@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,14 @@ import {
   SafeAreaView,
   Dimensions,
   ScrollView,
+  Vibration,
 } from 'react-native';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
-import type { RootStackParamList } from './navigation/AppNavigator';
+import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import FeedbackAnimation from '../components/FeedbackAnimation';
+import AchievementNotification from '../components/AchievementNotification';
+import { AchievementService, Achievement } from '../services/AchievementService';
 
 type MemoryGameRouteProp = RouteProp<RootStackParamList, 'memoryGame'>;
 
@@ -25,6 +29,16 @@ interface Card {
   animation: Animated.Value;
 }
 
+interface GameStats {
+  totalAttempts: number;
+  errors: number;
+  stars: number;
+  completionTime: number;
+  perfectRun: boolean;
+  matchesFound: number;
+  flipCount: number;
+}
+
 const { width } = Dimensions.get('window');
 const CARD_SIZE = (width - 80) / 4;
 
@@ -33,15 +47,55 @@ const MemoryGameScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
 
+  // Game state
   const [cards, setCards] = useState<Card[]>([]);
   const [selected, setSelected] = useState<Card[]>([]);
   const [matchedCount, setMatchedCount] = useState(0);
   const [gameStarted, setGameStarted] = useState(false);
   const [showingCards, setShowingCards] = useState(true);
+  const [gameCompleted, setGameCompleted] = useState(false);
 
+  // Animation states
+  const [showAnimation, setShowAnimation] = useState(false);
+  const [animationType, setAnimationType] = useState<'success' | 'error' | 'winner' | 'loser'>('success');
+
+  // Achievement states
+  const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
+  const [showAchievementNotification, setShowAchievementNotification] = useState(false);
+  const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
+
+  // Gamification states
+  const [gameStats, setGameStats] = useState<GameStats>({
+    totalAttempts: 0,
+    errors: 0,
+    stars: 0,
+    completionTime: 0,
+    perfectRun: true,
+    matchesFound: 0,
+    flipCount: 0,
+  });
+  const [startTime] = useState<number>(Date.now());
+  const [showStars, setShowStars] = useState(false);
+
+  // Animation refs
   const headerAnimation = useRef(new Animated.Value(0)).current;
   const instructionAnimation = useRef(new Animated.Value(0)).current;
   const progressAnimation = useRef(new Animated.Value(0)).current;
+
+  // Memoized values
+  const totalPairs = useMemo(() => step.options?.length || 0, [step.options]);
+
+  // Initialize achievements service
+  useEffect(() => {
+    const initAchievements = async () => {
+      try {
+        await AchievementService.initializeAchievements();
+      } catch (error) {
+        console.error('Error initializing achievements:', error);
+      }
+    };
+    initAchievements();
+  }, []);
 
   useEffect(() => {
     // Animaciones de entrada
@@ -67,25 +121,25 @@ const MemoryGameScreen = () => {
         animation: new Animated.Value(180),
       })) ?? [];
 
-    // ✅ CORREGIDO: Crear instancias únicas de Animated.Value para cada carta
+    // Create unique Animated.Value instances for each card
     const shuffled = [...duplicated]
       .flatMap((card) => [
         { 
           ...card, 
           id: card.id * 2,
-          animation: new Animated.Value(180) // ← Nueva instancia para la primera copia
+          animation: new Animated.Value(180)
         },
         { 
           ...card, 
           id: card.id * 2 + 1,
-          animation: new Animated.Value(180) // ← Nueva instancia para la segunda copia
+          animation: new Animated.Value(180)
         },
       ])
       .sort(() => Math.random() - 0.5);
 
     setCards(shuffled);
 
-    // Mostrar cartas por 5 segundos
+    // Show cards for 5 seconds
     setTimeout(() => {
       setShowingCards(false);
       const reset = shuffled.map((c) => ({
@@ -106,9 +160,116 @@ const MemoryGameScreen = () => {
     }, 5000);
   }, []);
 
+  // Calculate stars based on performance
+  const calculateStars = useCallback((errors: number, flipCount: number, completionTime: number, totalPairs: number): number => {
+    const maxTime = totalPairs * 15000; // 15 seconds per pair as baseline
+    const minFlips = totalPairs * 2; // Minimum flips needed (perfect memory)
+    
+    const timeBonus = completionTime < maxTime * 0.5 ? 1 : 0;
+    const memoryBonus = flipCount <= minFlips * 1.5 ? 1 : 0; // Bonus for good memory
+
+    if (errors === 0 && flipCount <= minFlips * 1.2) {
+      return 3; // Perfect performance - excellent memory
+    } else if (errors <= 2 && flipCount <= minFlips * 1.5) {
+      return 2 + timeBonus; // Good performance
+    } else if (errors <= 4) {
+      return 1 + memoryBonus; // Acceptable performance
+    } else {
+      return 1; // Minimum star for completion
+    }
+  }, []);
+
+  const showFeedbackAnimation = useCallback((type: 'success' | 'error' | 'winner' | 'loser') => {
+    setAnimationType(type);
+    setShowAnimation(true);
+    
+    // Add haptic feedback
+    if (type === 'success') {
+      Vibration.vibrate(50);
+    } else if (type === 'error') {
+      Vibration.vibrate([0, 100, 50, 100]);
+    } else if (type === 'winner') {
+      Vibration.vibrate([0, 100, 50, 100, 50, 100]);
+    }
+  }, []);
+
+  // Handle achievement notifications queue
+  const processAchievementQueue = useCallback(() => {
+    if (achievementQueue.length > 0 && !showAchievementNotification) {
+      const nextAchievement = achievementQueue[0];
+      setNewAchievement(nextAchievement);
+      setShowAchievementNotification(true);
+      setAchievementQueue(prev => prev.slice(1));
+    }
+  }, [achievementQueue, showAchievementNotification]);
+
+  const handleAchievementNotificationHide = useCallback(() => {
+    setShowAchievementNotification(false);
+    setNewAchievement(null);
+    
+    setTimeout(() => {
+      processAchievementQueue();
+    }, 1000);
+  }, [processAchievementQueue]);
+
+  // Record game completion and check for achievements
+  const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
+    try {
+      const gameData = {
+        stars: finalStats.stars,
+        isPerfect: finalStats.perfectRun,
+        completionTime: finalStats.completionTime,
+        errors: finalStats.errors,
+      };
+
+      const newlyUnlocked = await AchievementService.recordGameCompletion(gameData);
+      
+      if (newlyUnlocked.length > 0) {
+        setAchievementQueue(prev => [...prev, ...newlyUnlocked]);
+        
+        if (!showAchievementNotification) {
+          setTimeout(() => {
+            processAchievementQueue();
+          }, 2000);
+        }
+      }
+    } catch (error) {
+      console.error('Error recording game completion:', error);
+      Alert.alert(
+        'Error',
+        'No se pudieron guardar los logros. Tu progreso se ha guardado localmente.',
+        [{ text: 'OK' }]
+      );
+    }
+  }, [showAchievementNotification, processAchievementQueue]);
+
+  const handleAnimationFinish = useCallback(() => {
+    setShowAnimation(false);
+    
+    if (animationType === 'winner' && !gameCompleted) {
+      setGameCompleted(true);
+      
+      // Calculate final stats
+      const completionTime = Date.now() - startTime;
+      const finalStats = {
+        ...gameStats,
+        completionTime,
+        stars: calculateStars(gameStats.errors, gameStats.flipCount, completionTime, totalPairs),
+      };
+      setGameStats(finalStats);
+      
+      // Record game completion for achievements
+      recordGameCompletion(finalStats);
+      
+      // Show stars after a delay
+      setTimeout(() => {
+        setShowStars(true);
+      }, 500);
+    }
+  }, [animationType, gameCompleted, gameStats, startTime, calculateStars, totalPairs, recordGameCompletion]);
+
   useEffect(() => {
-    // Actualizar barra de progreso
-    const totalPairs = (step.options?.length || 0);
+    // Update progress bar
     const progress = totalPairs > 0 ? matchedCount / totalPairs : 0;
     
     Animated.timing(progressAnimation, {
@@ -117,27 +278,24 @@ const MemoryGameScreen = () => {
       useNativeDriver: false,
     }).start();
 
-    // Verificar si el juego terminó
-    if (matchedCount === totalPairs && totalPairs > 0) {
+    // Check if game is complete
+    if (matchedCount === totalPairs && totalPairs > 0 && !gameCompleted) {
       setTimeout(() => {
-        Alert.alert(
-          '🎉 ¡Felicitaciones!',
-          '¡Has completado el juego de memoria! ¡Excelente trabajo!',
-          [
-            {
-              text: '¡Continuar!',
-              onPress: () => navigation.goBack(),
-            }
-          ]
-        );
+        showFeedbackAnimation('winner');
       }, 1000);
     }
-  }, [matchedCount]);
+  }, [matchedCount, totalPairs, gameCompleted, showFeedbackAnimation]);
 
-  const flipCard = (card: Card) => {
+  const flipCard = useCallback((card: Card) => {
     if (card.flipped || card.matched || selected.length === 2 || !gameStarted) return;
 
-    // ✅ Animar solo la carta específica usando su propia instancia de animation
+    // Update flip count
+    setGameStats(prev => ({
+      ...prev,
+      flipCount: prev.flipCount + 1,
+    }));
+
+    // Animate the specific card
     Animated.timing(card.animation, {
       toValue: 180,
       duration: 400,
@@ -153,7 +311,15 @@ const MemoryGameScreen = () => {
 
     if (newSelected.length === 2) {
       const [first, second] = newSelected;
+      
+      // Update total attempts
+      setGameStats(prev => ({
+        ...prev,
+        totalAttempts: prev.totalAttempts + 1,
+      }));
+
       if (first.icon === second.icon) {
+        // Match found
         setTimeout(() => {
           setCards((prev) =>
             prev.map((c) =>
@@ -161,13 +327,23 @@ const MemoryGameScreen = () => {
             )
           );
           setMatchedCount((prev) => prev + 1);
-          Alert.alert('🎉 ¡Excelente!', '¡Encontraste una pareja! ¡Muy bien hecho!');
+          setGameStats(prev => ({
+            ...prev,
+            matchesFound: prev.matchesFound + 1,
+          }));
+          showFeedbackAnimation('success');
         }, 500);
       } else {
+        // No match
+        setGameStats(prev => ({
+          ...prev,
+          errors: prev.errors + 1,
+          perfectRun: false,
+        }));
+
         setTimeout(() => {
-          // ✅ Animar solo las cartas específicas que fueron seleccionadas
+          // Animate cards back
           [first, second].forEach((selectedCard) => {
-            // Encontrar la carta actual en el estado para usar su animation
             const currentCard = cards.find(c => c.id === selectedCard.id);
             if (currentCard) {
               Animated.timing(currentCard.animation, {
@@ -185,15 +361,125 @@ const MemoryGameScreen = () => {
                 : c
             )
           );
-          Alert.alert('🤔 ¡Sigue intentando!', '¡Tú puedes hacerlo! Inténtalo de nuevo.');
+          showFeedbackAnimation('error');
         }, 1000);
       }
 
       setTimeout(() => setSelected([]), 1200);
     }
-  };
+  }, [cards, selected, gameStarted, showFeedbackAnimation]);
 
-  const renderCard = (card: Card) => {
+  const resetGame = useCallback(() => {
+    setMatchedCount(0);
+    setSelected([]);
+    setGameCompleted(false);
+    setShowStars(false);
+    setGameStarted(false);
+    setShowingCards(true);
+    setGameStats({
+      totalAttempts: 0,
+      errors: 0,
+      stars: 0,
+      completionTime: 0,
+      perfectRun: true,
+      matchesFound: 0,
+      flipCount: 0,
+    });
+
+    // Reset cards
+    const duplicated: Card[] =
+      step.options?.map((option, index) => ({
+        id: index,
+        icon: option.icon,
+        flipped: true,
+        matched: false,
+        animation: new Animated.Value(180),
+      })) ?? [];
+
+    const shuffled = [...duplicated]
+      .flatMap((card) => [
+        { 
+          ...card, 
+          id: card.id * 2,
+          animation: new Animated.Value(180)
+        },
+        { 
+          ...card, 
+          id: card.id * 2 + 1,
+          animation: new Animated.Value(180)
+        },
+      ])
+      .sort(() => Math.random() - 0.5);
+
+    setCards(shuffled);
+
+    // Show cards again
+    setTimeout(() => {
+      setShowingCards(false);
+      const reset = shuffled.map((c) => ({
+        ...c,
+        flipped: false,
+      }));
+
+      reset.forEach((card) => {
+        Animated.timing(card.animation, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      });
+
+      setCards(reset);
+      setGameStarted(true);
+    }, 5000);
+  }, [step.options]);
+
+  const renderStars = useCallback((count: number) => {
+    return Array.from({ length: 3 }, (_, i) => (
+      <Animated.Text
+        key={i}
+        style={[
+          styles.star,
+          i < count ? styles.starFilled : styles.starEmpty,
+        ]}
+      >
+        ⭐
+      </Animated.Text>
+    ));
+  }, []);
+
+  const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, flipCount: number, totalPairs: number) => {
+    const minFlips = totalPairs * 2;
+    
+    if (perfectRun && stars === 3 && flipCount <= minFlips * 1.2) {
+      return "¡Memoria perfecta! Increíble 🧠🏆";
+    } else if (perfectRun && stars === 3) {
+      return "¡Excelente memoria! Sin errores 🌟";
+    } else if (stars === 3) {
+      return "¡Muy bien hecho! 👏";
+    } else if (stars === 2) {
+      return "¡Buen trabajo! Sigue practicando 💪";
+    } else {
+      return "¡Completado! Tu memoria mejorará 📈";
+    }
+  }, []);
+
+  const handleBackPress = useCallback(() => {
+    if (gameStats.totalAttempts > 0 && !gameCompleted) {
+      Alert.alert(
+        'Salir del juego',
+        '¿Estás seguro de que quieres salir? Perderás tu progreso actual.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Salir', style: 'destructive', onPress: () => navigation.goBack() }
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
+  }, [gameStats.totalAttempts, gameCompleted, navigation]);
+
+  const renderCard = useCallback((card: Card) => {
     const rotateY = card.animation.interpolate({
       inputRange: [0, 180],
       outputRange: ['0deg', '180deg'],
@@ -238,9 +524,12 @@ const MemoryGameScreen = () => {
         </View>
       </TouchableWithoutFeedback>
     );
-  };
+  }, [flipCard]);
 
-  const totalPairs = step.options?.length || 0;
+  // Process achievement queue when it changes
+  useEffect(() => {
+    processAchievementQueue();
+  }, [processAchievementQueue]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -267,6 +556,31 @@ const MemoryGameScreen = () => {
           <View style={styles.activityBadge}>
             <Text style={styles.activityText}>🧠 Juego de Memoria</Text>
           </View>
+
+          {/* Stats Display */}
+          {gameStarted && (
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Intentos</Text>
+                <Text style={styles.statValue}>{gameStats.totalAttempts}</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Errores</Text>
+                <Text style={[styles.statValue, gameStats.errors > 0 && styles.errorText]}>
+                  {gameStats.errors}
+                </Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Volteos</Text>
+                <Text style={styles.statValue}>{gameStats.flipCount}</Text>
+              </View>
+              {gameStats.perfectRun && gameStats.totalAttempts > 0 && (
+                <View style={styles.perfectBadge}>
+                  <Text style={styles.perfectText}>🔥 Perfecto</Text>
+                </View>
+              )}
+            </View>
+          )}
         </Animated.View>
 
         {/* Instrucciones */}
@@ -340,11 +654,98 @@ const MemoryGameScreen = () => {
         </View>
       </ScrollView>
 
+      {/* Game Complete Modal with Stars */}
+      {gameCompleted && !showAnimation && showStars && (
+        <View style={styles.completionContainer}>
+          <View style={styles.completionContent}>
+            <Text style={styles.completionText}>🎉 ¡Felicitaciones!</Text>
+            
+            {/* Stars Display */}
+            <View style={styles.starsContainer}>
+              <Text style={styles.starsTitle}>Tu puntuación:</Text>
+              <View style={styles.starsRow}>
+                {renderStars(gameStats.stars)}
+              </View>
+              <Text style={styles.performanceMessage}>
+                {getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.flipCount, totalPairs)}
+              </Text>
+            </View>
+
+            {/* Detailed Stats */}
+            <View style={styles.detailedStats}>
+              <View style={styles.statRow}>
+                <Text style={styles.statDetailLabel}>Tiempo:</Text>
+                <Text style={styles.statDetailValue}>
+                  {Math.round(gameStats.completionTime / 1000)}s
+                </Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={styles.statDetailLabel}>Precisión:</Text>
+                <Text style={styles.statDetailValue}>
+                  {gameStats.totalAttempts > 0 
+                    ? Math.round(((gameStats.totalAttempts - gameStats.errors) / gameStats.totalAttempts) * 100)
+                    : 100}%
+                </Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={styles.statDetailLabel}>Volteos totales:</Text>
+                <Text style={styles.statDetailValue}>{gameStats.flipCount}</Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={styles.statDetailLabel}>Eficiencia:</Text>
+                <Text style={styles.statDetailValue}>
+                  {totalPairs > 0 
+                    ? Math.round((totalPairs * 2 / gameStats.flipCount) * 100)
+                    : 100}%
+                </Text>
+              </View>
+              {gameStats.perfectRun && gameStats.flipCount <= totalPairs * 2.4 && (
+                <View style={styles.bonusRow}>
+                  <Text style={styles.bonusText}>🧠 ¡Memoria excepcional!</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.completionButtons}>
+              <TouchableOpacity style={styles.resetButton} onPress={resetGame}>
+                <Text style={styles.resetButtonText}>🔄 Jugar de nuevo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.continueButton} 
+                onPress={() => navigation.goBack()}
+              >
+                <Text style={styles.continueButtonText}>✨ Continuar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Feedback Animation */}
+      {showAnimation && (
+        <FeedbackAnimation
+          type={animationType}
+          onFinish={handleAnimationFinish}
+        />
+      )}
+
+      {/* Achievement Notification */}
+      {newAchievement && (
+        <AchievementNotification
+          achievement={newAchievement}
+          visible={showAchievementNotification}
+          onHide={handleAchievementNotificationHide}
+        />
+      )}
+
       {/* Back Button */}
       <View style={styles.backButtonContainer}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={handleBackPress}
+          accessible={true}
+          accessibilityLabel="Volver a la pantalla anterior"
+          accessibilityRole="button"
         >
           <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
@@ -352,6 +753,8 @@ const MemoryGameScreen = () => {
     </SafeAreaView>
   );
 };
+
+export default MemoryGameScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -361,7 +764,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 20,
-    paddingBottom: 80, // Espacio para el botón de volver
+    paddingBottom: 80,
   },
   header: {
     alignItems: 'center',
@@ -401,6 +804,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
+    marginBottom: 15,
   },
   activityText: {
     color: 'white',
@@ -410,11 +814,54 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    marginTop: 15,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  errorText: {
+    color: '#ef4444',
+  },
+  perfectBadge: {
+    backgroundColor: '#fbbf24',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  perfectText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
   instructionCard: {
     backgroundColor: 'white',
     borderRadius: 20,
     padding: 25,
-    marginBottom: 20,
+    marginVertical: 20,
     shadowColor: '#4285f4',
     shadowOffset: {
       width: 0,
@@ -466,7 +913,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   progressTitle: {
     fontSize: 18,
@@ -498,98 +945,234 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
+    gap: 12,
     maxWidth: width - 40,
   },
   cardWrapper: {
     width: CARD_SIZE,
     height: CARD_SIZE,
-    margin: 8,
+    margin: 4,
   },
   card: {
-    width: '100%',
-    height: '100%',
+    width: CARD_SIZE,
+    height: CARD_SIZE,
     borderRadius: 15,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 6,
-    borderWidth: 2,
-    borderColor: 'transparent',
   },
   front: {
-    backgroundColor: '#6b7280',
-    borderColor: '#4b5563',
+    backgroundColor: '#4285f4',
+    borderWidth: 3,
+    borderColor: '#ffffff',
   },
   back: {
-    backgroundColor: '#4285f4',
-    borderColor: '#1976d2',
+    backgroundColor: '#ffffff',
+    borderWidth: 3,
+    borderColor: '#e8f0fe',
   },
   matchedCard: {
-    backgroundColor: '#4caf50',
-    borderColor: '#2e7d32',
+    backgroundColor: '#e8f5e8',
+    borderColor: '#4caf50',
     shadowColor: '#4caf50',
-    shadowOpacity: 0.3,
   },
   cardQuestionText: {
-    fontSize: 28,
+    fontSize: 32,
+    color: 'white',
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
   cardIcon: {
-    fontSize: 32,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    fontSize: 36,
   },
   footer: {
     alignItems: 'center',
-    paddingTop: 20,
+    paddingVertical: 20,
   },
   motivationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(66, 133, 244, 0.1)',
-    paddingHorizontal: 25,
-    paddingVertical: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     borderRadius: 25,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 2,
   },
   motivationIcon: {
     fontSize: 20,
     marginHorizontal: 8,
   },
   footerText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#4285f4',
-    textAlign: 'center',
-  },
-  backButtonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#f8faff',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    paddingTop: 10,
-  },
-  backButton: {
-    backgroundColor: '#6b7280',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignSelf: 'flex-start',
-  },
-  backButtonText: {
-    color: '#ffffff',
     fontSize: 16,
     fontWeight: '600',
+    color: '#1a1a1a',
+    textAlign: 'center',
+  },
+  // Game Complete Modal Styles
+  completionContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  completionContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 30,
+    padding: 30,
+    alignItems: 'center',
+    maxWidth: 350,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
+  },
+  completionText: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#1a1a1a',
+    textAlign: 'center',
+    marginBottom: 25,
+  },
+  starsContainer: {
+    alignItems: 'center',
+    marginBottom: 25,
+  },
+  starsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#6b7280',
+    marginBottom: 15,
+  },
+  starsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  star: {
+    fontSize: 40,
+    marginHorizontal: 5,
+  },
+  starFilled: {
+    opacity: 1,
+  },
+  starEmpty: {
+    opacity: 0.3,
+  },
+  performanceMessage: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4285f4',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  detailedStats: {
+    backgroundColor: '#f8faff',
+    borderRadius: 15,
+    padding: 20,
+    width: '100%',
+    marginBottom: 25,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  statDetailLabel: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
+  },
+  statDetailValue: {
+    fontSize: 16,
+    color: '#1a1a1a',
+    fontWeight: '700',
+  },
+  bonusRow: {
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#e8f0fe',
+  },
+  bonusText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fbbf24',
+    textAlign: 'center',
+  },
+  completionButtons: {
+    flexDirection: 'row',
+    gap: 15,
+    width: '100%',
+  },
+  resetButton: {
+    flex: 1,
+    backgroundColor: '#6b7280',
+    paddingVertical: 15,
+    borderRadius: 15,
+    alignItems: 'center',
+  },
+  resetButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  continueButton: {
+    flex: 1,
+    backgroundColor: '#4285f4',
+    paddingVertical: 15,
+    borderRadius: 15,
+    alignItems: 'center',
+  },
+  continueButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  // Back Button Styles
+  backButtonContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+  },
+  backButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingVertical: 15,
+    paddingHorizontal: 25,
+    borderRadius: 25,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 2,
+    borderColor: '#4285f4',
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4285f4',
   },
 });
-
-export default MemoryGameScreen;
