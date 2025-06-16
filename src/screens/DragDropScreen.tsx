@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,17 @@ import {
   Animated,
   Dimensions,
   TouchableOpacity,
+  Alert,
+  Vibration,
+  ScrollView,
 } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
 import AchievementNotification from '../components/AchievementNotification';
+import { GameStatsDisplay } from '../components/GameStatsDisplay';
+import { GameCompletionModal } from '../components/GameCompletionModal';
 import { AchievementService, Achievement } from '../services/AchievementService';
 
 const { width, height } = Dimensions.get('window');
@@ -25,37 +30,49 @@ interface Option {
   label: string;
   correctZone: string;
 }
+
 interface PlacedItem {
   option: Option;
   index: number;
 }
+
 interface ZoneBounds {
   x: number;
   y: number;
   width: number;
   height: number;
 }
+
 interface GameStats {
   totalAttempts: number;
   errors: number;
   stars: number;
   completionTime: number;
   perfectRun: boolean;
+  dragCount: number;
+  efficiency: number;
 }
+
 const DragDropScreen = () => {
   const route = useRoute<DragDropRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
+
+  // Game state
   const [correctlyPlaced, setCorrectlyPlaced] = useState<Set<number>>(new Set());
   const [zoneItems, setZoneItems] = useState<{ [key: string]: PlacedItem[] }>({});
   const [score, setScore] = useState(0);
+  const [gameCompleted, setGameCompleted] = useState(false);
+
   // Animation states
   const [showAnimation, setShowAnimation] = useState(false);
   const [animationType, setAnimationType] = useState<'success' | 'error' | 'winner' | 'loser'>('success');
+
   // Achievement states
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
   const [showAchievementNotification, setShowAchievementNotification] = useState(false);
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
+
   // Gamification states
   const [gameStats, setGameStats] = useState<GameStats>({
     totalAttempts: 0,
@@ -63,77 +80,100 @@ const DragDropScreen = () => {
     stars: 0,
     completionTime: 0,
     perfectRun: true,
+    dragCount: 0,
+    efficiency: 100,
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
-  const [gameCompleted, setGameCompleted] = useState(false);
-  const zones = Array.from(new Set(step.options?.map(o => o.correctZone) || []));
-  const totalItems = step.options?.length || 0;
-  // Refs for zone positions - using absolute coordinates
+
+  // Memoized values
+  const zones = useMemo(() => Array.from(new Set(step.options?.map(o => o.correctZone) || [])), [step.options]);
+  const totalItems = useMemo(() => step.options?.length || 0, [step.options]);
+
+  // Refs for zone positions
   const zoneRefs = useRef<{ [key: string]: View | null }>({});
   const zoneBounds = useRef<{ [key: string]: ZoneBounds }>({});
+  const scrollViewRef = useRef<ScrollView>(null);
+
   // Initialize achievements service
   useEffect(() => {
-    AchievementService.initializeAchievements();
+    const initAchievements = async () => {
+      try {
+        await AchievementService.initializeAchievements();
+      } catch (error) {
+        console.error('Error initializing achievements:', error);
+      }
+    };
+    initAchievements();
   }, []);
+
   // Update zone bounds when layout changes
-  const updateZoneBounds = (zone: string) => {
+  const updateZoneBounds = useCallback((zone: string) => {
     const zoneRef = zoneRefs.current[zone];
-    if (zoneRef) {
+    if (zoneRef && scrollViewRef.current) {
       zoneRef.measureInWindow((x, y, width, height) => {
         zoneBounds.current[zone] = { x, y, width, height };
       });
     }
-  };
-  const handleZoneLayout = (zone: string) => {
-    // Small delay to ensure the layout is complete
+  }, []);
+
+  const handleZoneLayout = useCallback((zone: string) => {
     setTimeout(() => {
       updateZoneBounds(zone);
     }, 100);
-  };
-  // Calculate stars based on performance
-  const calculateStars = (errors: number, totalItems: number, completionTime: number): number => {
-    const maxTime = totalItems * 10000; // 10 seconds per item as baseline
-    const timeBonus = completionTime < maxTime * 0.5 ? 1 : 0;
-  
-    if (errors === 0) {
-      return 3; // Perfect performance
-    } else if (errors <= Math.ceil(totalItems * 0.2)) {
-      return 2 + timeBonus; // Good performance (max 20% errors)
-    } else if (errors <= Math.ceil(totalItems * 0.5)) {
-      return 1 + timeBonus; // Acceptable performance (max 50% errors)
-    } else {
-      return 1; // Minimum star for completion
-    }
-  };
+  }, [updateZoneBounds]);
 
-  const showFeedbackAnimation = (type: 'success' | 'error' | 'winner' | 'loser') => {
+  // Calculate stars based on performance
+  const calculateStars = useCallback((errors: number, totalItems: number, completionTime: number, dragCount: number): number => {
+    const maxTime = totalItems * 8000; // 8 seconds per item
+    const timeBonus = completionTime < maxTime * 0.6 ? 1 : 0;
+    const efficiencyBonus = dragCount <= totalItems * 1.3 ? 1 : 0;
+
+    if (errors === 0 && dragCount <= totalItems) {
+      return 3;
+    } else if (errors === 0) {
+      return 2 + timeBonus;
+    } else if (errors <= Math.ceil(totalItems * 0.25)) {
+      return 1 + timeBonus + efficiencyBonus;
+    } else {
+      return 1;
+    }
+  }, []);
+
+  const showFeedbackAnimation = useCallback((type: 'success' | 'error' | 'winner' | 'loser') => {
     setAnimationType(type);
     setShowAnimation(true);
-  };
+    
+    if (type === 'success') {
+      Vibration.vibrate(50);
+    } else if (type === 'error') {
+      Vibration.vibrate([0, 100, 50, 100]);
+    } else if (type === 'winner') {
+      Vibration.vibrate([0, 100, 50, 100, 50, 100]);
+    }
+  }, []);
 
   // Handle achievement notifications queue
-  const processAchievementQueue = () => {
+  const processAchievementQueue = useCallback(() => {
     if (achievementQueue.length > 0 && !showAchievementNotification) {
       const nextAchievement = achievementQueue[0];
       setNewAchievement(nextAchievement);
       setShowAchievementNotification(true);
       setAchievementQueue(prev => prev.slice(1));
     }
-  };
+  }, [achievementQueue, showAchievementNotification]);
 
-  const handleAchievementNotificationHide = () => {
+  const handleAchievementNotificationHide = useCallback(() => {
     setShowAchievementNotification(false);
     setNewAchievement(null);
     
-    // Process next achievement in queue after a delay
     setTimeout(() => {
       processAchievementQueue();
     }, 1000);
-  };
+  }, [processAchievementQueue]);
 
   // Record game completion and check for achievements
-  const recordGameCompletion = async (finalStats: GameStats) => {
+  const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
       const gameData = {
         stars: finalStats.stars,
@@ -145,51 +185,53 @@ const DragDropScreen = () => {
       const newlyUnlocked = await AchievementService.recordGameCompletion(gameData);
       
       if (newlyUnlocked.length > 0) {
-        // Add achievements to queue
         setAchievementQueue(prev => [...prev, ...newlyUnlocked]);
         
-        // Start processing queue if not already showing notification
         if (!showAchievementNotification) {
           setTimeout(() => {
             processAchievementQueue();
-          }, 2000); // Wait 2 seconds after game completion
+          }, 2000);
         }
       }
     } catch (error) {
       console.error('Error recording game completion:', error);
+      Alert.alert(
+        'Error',
+        'No se pudieron guardar los logros. Tu progreso se ha guardado localmente.',
+        [{ text: 'OK' }]
+      );
     }
-  };
+  }, [showAchievementNotification, processAchievementQueue]);
 
-  const handleAnimationFinish = () => {
+  const handleAnimationFinish = useCallback(() => {
     setShowAnimation(false);
     
-    // Check if game is complete after success animation
     if (animationType === 'success' && score === totalItems && !gameCompleted) {
-      // Mark game as completed to prevent multiple triggers
       setGameCompleted(true);
       
-      // Calculate final stats
       const completionTime = Date.now() - startTime;
+      const efficiency = Math.round((totalItems / (gameStats.dragCount || 1)) * 100);
       const finalStats = {
         ...gameStats,
         completionTime,
-        stars: calculateStars(gameStats.errors, totalItems, completionTime),
+        efficiency,
+        stars: calculateStars(gameStats.errors, totalItems, completionTime, gameStats.dragCount),
       };
       setGameStats(finalStats);
-      // Record game completion for achievements
+      
       recordGameCompletion(finalStats);
-      // Small delay before showing winner animation
+      
       setTimeout(() => {
         showFeedbackAnimation('winner');
       }, 300);
     } else if (animationType === 'winner') {
-      // Show stars after winner animation
       setTimeout(() => {
         setShowStars(true);
       }, 500);
     }
-  };
-  const handleCorrectDrop = (zone: string, option: Option, index: number) => {
+  }, [animationType, score, totalItems, gameCompleted, startTime, gameStats, calculateStars, recordGameCompletion, showFeedbackAnimation]);
+
+  const handleCorrectDrop = useCallback((zone: string, option: Option, index: number) => {
     setCorrectlyPlaced(prev => new Set([...prev, index]));
     setZoneItems(prev => ({
       ...prev,
@@ -197,30 +239,27 @@ const DragDropScreen = () => {
     }));
     const newScore = score + 1;
     setScore(newScore);
-    // Update stats
+
     setGameStats(prev => ({
       ...prev,
       totalAttempts: prev.totalAttempts + 1,
     }));
-    // Show success animation
-    showFeedbackAnimation('success');
-    // Debug log to check game completion
-    console.log(`Score: ${newScore}, Total: ${totalItems}, Complete: ${newScore === totalItems}`);
-  };
 
-  const handleIncorrectDrop = (zone: string, option: Option) => {
-    // Update stats
+    showFeedbackAnimation('success');
+  }, [score, showFeedbackAnimation]);
+
+  const handleIncorrectDrop = useCallback((zone: string, option: Option) => {
     setGameStats(prev => ({
       ...prev,
       totalAttempts: prev.totalAttempts + 1,
       errors: prev.errors + 1,
       perfectRun: false,
     }));
-    // Show error animation instead of alert
-    showFeedbackAnimation('error');
-  };
 
-  const checkCollision = (gestureX: number, gestureY: number): string | null => {
+    showFeedbackAnimation('error');
+  }, [showFeedbackAnimation]);
+
+  const checkCollision = useCallback((gestureX: number, gestureY: number): string | null => {
     for (const [zone, bounds] of Object.entries(zoneBounds.current)) {
       if (
         gestureX >= bounds.x &&
@@ -232,9 +271,9 @@ const DragDropScreen = () => {
       }
     }
     return null;
-  };
+  }, []);
 
-  const createPanHandlers = (option: Option, index: number) => {
+  const createPanHandlers = useCallback((option: Option, index: number) => {
     const pan = useRef(new Animated.ValueXY()).current;
 
     return {
@@ -243,7 +282,11 @@ const DragDropScreen = () => {
         onStartShouldSetPanResponder: () => !correctlyPlaced.has(index),
         onMoveShouldSetPanResponder: () => !correctlyPlaced.has(index),
         onPanResponderGrant: () => {
-          // Reset any existing offset
+          setGameStats(prev => ({
+            ...prev,
+            dragCount: prev.dragCount + 1,
+          }));
+
           pan.setOffset({
             x: pan.x._value,
             y: pan.y._value,
@@ -256,16 +299,13 @@ const DragDropScreen = () => {
         }),
 
         onPanResponderRelease: (_, gesture) => {
-          // Flatten the offset
           pan.flattenOffset();
           const targetZone = checkCollision(gesture.moveX, gesture.moveY);
           
           if (targetZone) {
             if (option.correctZone === targetZone) {
-              // Correct drop - animate to zone center and lock
               handleCorrectDrop(targetZone, option, index);
               
-              // Animate back to original position (since item will be shown in zone)
               Animated.spring(pan, {
                 toValue: { x: 0, y: 0 },
                 useNativeDriver: false,
@@ -273,7 +313,6 @@ const DragDropScreen = () => {
                 friction: 8,
               }).start();
             } else {
-              // Incorrect drop - return to original position
               handleIncorrectDrop(targetZone, option);
               Animated.spring(pan, {
                 toValue: { x: 0, y: 0 },
@@ -283,7 +322,6 @@ const DragDropScreen = () => {
               }).start();
             }
           } else {
-            // No collision - return to original position
             Animated.spring(pan, {
               toValue: { x: 0, y: 0 },
               useNativeDriver: false,
@@ -294,9 +332,9 @@ const DragDropScreen = () => {
         },
       })
     };
-  };
+  }, [correctlyPlaced, checkCollision, handleCorrectDrop, handleIncorrectDrop]);
 
-  const resetGame = () => {
+  const resetGame = useCallback(() => {
     setCorrectlyPlaced(new Set());
     setZoneItems({});
     setScore(0);
@@ -308,38 +346,41 @@ const DragDropScreen = () => {
       stars: 0,
       completionTime: 0,
       perfectRun: true,
+      dragCount: 0,
+      efficiency: 100,
     });
-  };
+  }, []);
 
-  const renderStars = (count: number) => {
-    return Array.from({ length: 3 }, (_, i) => (
-      <Animated.Text
-        key={i}
-        style={[
-          styles.star,
-          i < count ? styles.starFilled : styles.starEmpty,
-        ]}
-      >
-        ⭐
-      </Animated.Text>
-    ));
-  };
-
-  const getPerformanceMessage = (stars: number, perfectRun: boolean) => {
-    if (perfectRun && stars === 3) {
-      return "¡Perfecto! Sin errores 🏆";
+  const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, efficiency: number) => {
+    if (perfectRun && stars === 3 && efficiency >= 100) {
+      return "¡Perfecto! Arrastre eficiente sin errores 🏆";
+    } else if (perfectRun && stars === 3) {
+      return "¡Excelente! Sin errores 🌟";
     } else if (stars === 3) {
-      return "¡Excelente trabajo! 🌟";
+      return "¡Muy bien hecho! 👏";
     } else if (stars === 2) {
-      return "¡Muy bien! Sigue así 👏";
+      return "¡Buen trabajo! Sigue practicando 💪";
     } else {
-      return "¡Completado! Puedes mejorar 💪";
+      return "¡Completado! Puedes mejorar la precisión 📈";
     }
-  };
+  }, []);
 
-  const isGameComplete = score === totalItems;
+  const handleBackPress = useCallback(() => {
+    if (gameStats.totalAttempts > 0 && !gameCompleted) {
+      Alert.alert(
+        'Salir del juego',
+        '¿Estás seguro de que quieres salir? Perderás tu progreso actual.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Salir', style: 'destructive', onPress: () => navigation.goBack() }
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
+  }, [gameStats.totalAttempts, gameCompleted, navigation]);
 
-  // Update zone bounds when component mounts and when layout changes
+  // Update zone bounds when component mounts
   useEffect(() => {
     const timer = setTimeout(() => {
       zones.forEach(zone => {
@@ -348,21 +389,38 @@ const DragDropScreen = () => {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [zones]);
+  }, [zones, updateZoneBounds]);
 
   // Process achievement queue when it changes
   useEffect(() => {
     processAchievementQueue();
-  }, [achievementQueue, showAchievementNotification]);
+  }, [processAchievementQueue]);
+
+  const isGameComplete = score === totalItems;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Compact Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>{lessonTitle}</Text>
-        <Text style={styles.subtitle}>Arrastra cada elemento a su zona correcta</Text>
-        <View style={styles.scoreContainer}>
-          <Text style={styles.scoreText}>Progreso: {score}/{totalItems}</Text>
+        <View style={styles.headerTop}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleBackPress}
+          >
+            <Text style={styles.backButtonText}>← Volver</Text>
+          </TouchableOpacity>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>{lessonTitle}</Text>
+          </View>
+          <View style={styles.placeholder} />
+        </View>
+        
+        <View style={styles.activityBadge}>
+          <Text style={styles.activityText}>🎯 Arrastrar y Soltar</Text>
+        </View>
+        
+        <View style={styles.progressContainer}>
+          <Text style={styles.progressText}>{score}/{totalItems}</Text>
           <View style={styles.progressBar}>
             <View 
               style={[
@@ -371,143 +429,119 @@ const DragDropScreen = () => {
               ]} 
             />
           </View>
-          {/* Stats Display */}
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Intentos</Text>
-              <Text style={styles.statValue}>{gameStats.totalAttempts}</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Errores</Text>
-              <Text style={[styles.statValue, gameStats.errors > 0 && styles.errorText]}>
-                {gameStats.errors}
-              </Text>
-            </View>
-            {gameStats.perfectRun && score > 0 && (
-              <View style={styles.perfectBadge}>
-                <Text style={styles.perfectText}>🔥 Perfecto</Text>
-              </View>
-            )}
-          </View>
         </View>
+
+        {/* Compact Stats Display */}
+        {gameStats.totalAttempts > 0 && (
+          <GameStatsDisplay 
+            stats={gameStats}
+            showPerfectBadge={true}
+            layout="horizontal"
+          />
+        )}
       </View>
 
-      {/* Drop Zones */}
-      <View style={styles.zonesContainer}>
-        {zones.map(zone => (
-          <View 
-            key={zone} 
-            ref={(ref) => {
-              zoneRefs.current[zone] = ref;
-            }}
-            style={styles.zone}
-            onLayout={() => handleZoneLayout(zone)}
-          >
-            <Text style={styles.zoneTitle}>{zone}</Text>
-            <View style={styles.zoneContent}>
-              {(zoneItems[zone] || []).map((placedItem, i) => (
-                <View key={i} style={styles.placedItem}>
-                  <Text style={styles.placedIcon}>{placedItem.option.icon}</Text>
-                  <Text style={styles.placedLabel}>{placedItem.option.label}</Text>
-                </View>
-              ))}
-              {(zoneItems[zone] || []).length === 0 && (
-                <Text style={styles.emptyZoneText}>Suelta aquí</Text>
-              )}
-            </View>
-          </View>
-        ))}
-      </View>
+      {/* Scrollable Content */}
+      <ScrollView 
+        ref={scrollViewRef}
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
+        {/* Instructions */}
+        <View style={styles.instructionCard}>
+          <Text style={styles.instructionText}>
+            Arrastra cada elemento a su zona correcta
+          </Text>
+        </View>
 
-      {/* Draggable Options */}
-      <View style={styles.optionsContainer}>
-        <Text style={styles.optionsTitle}>Elementos para arrastrar:</Text>
-        <View style={styles.optionsGrid}>
-          {step.options?.map((option, idx) => {
-            const { pan, panResponder } = createPanHandlers(option, idx);
-            const isPlaced = correctlyPlaced.has(idx);
-
-            return (
-              <Animated.View
-                key={idx}
-                {...panResponder.panHandlers}
-                style={[
-                  styles.draggable,
-                  isPlaced && styles.draggablePlaced,
-                  {
-                    transform: pan.getTranslateTransform(),
-                  },
-                ]}
+        {/* Compact Drop Zones */}
+        <View style={styles.zonesContainer}>
+          <Text style={styles.sectionTitle}>Zonas de destino:</Text>
+          <View style={styles.zonesGrid}>
+            {zones.map(zone => (
+              <View 
+                key={zone} 
+                ref={(ref) => {
+                  zoneRefs.current[zone] = ref;
+                }}
+                style={styles.zone}
+                onLayout={() => handleZoneLayout(zone)}
               >
-                <Text style={[styles.optionIcon, isPlaced && styles.placedIcon]}>
-                  {option.icon}
-                </Text>
-                <Text style={[styles.optionLabel, isPlaced && styles.placedLabel]}>
-                  {option.label}
-                </Text>
-                {isPlaced && (
-                  <View style={styles.checkmark}>
-                    <Text style={styles.checkmarkText}>✓</Text>
-                  </View>
-                )}
-              </Animated.View>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Game Complete Modal with Stars */}
-      {isGameComplete && !showAnimation && showStars && (
-        <View style={styles.completionContainer}>
-          <View style={styles.completionContent}>
-            <Text style={styles.completionText}>🎉 ¡Felicitaciones!</Text>
-            
-            {/* Stars Display */}
-            <View style={styles.starsContainer}>
-              <Text style={styles.starsTitle}>Tu puntuación:</Text>
-              <View style={styles.starsRow}>
-                {renderStars(gameStats.stars)}
-              </View>
-              <Text style={styles.performanceMessage}>
-                {getPerformanceMessage(gameStats.stars, gameStats.perfectRun)}
-              </Text>
-            </View>
-
-            {/* Detailed Stats */}
-            <View style={styles.detailedStats}>
-              <View style={styles.statRow}>
-                <Text style={styles.statDetailLabel}>Tiempo:</Text>
-                <Text style={styles.statDetailValue}>
-                  {Math.round(gameStats.completionTime / 1000)}s
-                </Text>
-              </View>
-              <View style={styles.statRow}>
-                <Text style={styles.statDetailLabel}>Precisión:</Text>
-                <Text style={styles.statDetailValue}>
-                  {Math.round(((gameStats.totalAttempts - gameStats.errors) / gameStats.totalAttempts) * 100)}%
-                </Text>
-              </View>
-              {gameStats.perfectRun && (
-                <View style={styles.bonusRow}>
-                  <Text style={styles.bonusText}>🏆 ¡Ejecución perfecta!</Text>
+                <Text style={styles.zoneTitle}>{zone}</Text>
+                <View style={styles.zoneContent}>
+                  {(zoneItems[zone] || []).map((placedItem, i) => (
+                    <View key={i} style={styles.placedItem}>
+                      <Text style={styles.placedIcon}>{placedItem.option.icon}</Text>
+                      <Text style={styles.placedLabel}>{placedItem.option.label}</Text>
+                    </View>
+                  ))}
+                  {(zoneItems[zone] || []).length === 0 && (
+                    <Text style={styles.emptyZoneText}>Suelta aquí</Text>
+                  )}
                 </View>
-              )}
-            </View>
-
-            <View style={styles.completionButtons}>
-              <TouchableOpacity style={styles.resetButton} onPress={resetGame}>
-                <Text style={styles.resetButtonText}>🔄 Jugar de nuevo</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.continueButton} 
-                onPress={() => navigation.goBack()}
-              >
-                <Text style={styles.continueButtonText}>✨ Continuar</Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+            ))}
           </View>
         </View>
-      )}
+
+        {/* Compact Draggable Options */}
+        <View style={styles.optionsContainer}>
+          <Text style={styles.sectionTitle}>Elementos para arrastrar:</Text>
+          <View style={styles.optionsGrid}>
+            {step.options?.map((option, idx) => {
+              const { pan, panResponder } = createPanHandlers(option, idx);
+              const isPlaced = correctlyPlaced.has(idx);
+
+              return (
+                <Animated.View
+                  key={idx}
+                  {...panResponder.panHandlers}
+                  style={[
+                    styles.draggable,
+                    isPlaced && styles.draggablePlaced,
+                    {
+                      transform: pan.getTranslateTransform(),
+                    },
+                  ]}
+                >
+                  <Text style={[styles.optionIcon, isPlaced && styles.placedIconStyle]}>
+                    {option.icon}
+                  </Text>
+                  <Text style={[styles.optionLabel, isPlaced && styles.placedLabelStyle]}>
+                    {option.label}
+                  </Text>
+                  {isPlaced && (
+                    <View style={styles.checkmark}>
+                      <Text style={styles.checkmarkText}>✓</Text>
+                    </View>
+                  )}
+                </Animated.View>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Bottom Spacing */}
+        <View style={styles.bottomSpacing} />
+      </ScrollView>
+
+      {/* Game Complete Modal */}
+      <GameCompletionModal
+        visible={isGameComplete && !showAnimation && showStars}
+        stats={gameStats}
+        onReset={resetGame}
+        onContinue={() => navigation.goBack()}
+        performanceMessage={getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.efficiency)}
+        gameType="dragdrop"
+        showEfficiency={true}
+        customStats={[
+          { label: 'Arrastres totales', value: gameStats.dragCount },
+          { label: 'Elementos colocados', value: `${score}/${totalItems}` }
+        ]}
+        bonusMessage={gameStats.perfectRun && gameStats.efficiency >= 100 ? "🎯 ¡Arrastre perfecto!" : undefined}
+      />
 
       {/* Feedback Animation */}
       {showAnimation && (
@@ -525,16 +559,6 @@ const DragDropScreen = () => {
           onHide={handleAchievementNotificationHide}
         />
       )}
-
-      {/* Back Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>← Volver</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -546,115 +570,149 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.08,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 4,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    textAlign: 'center',
-    color: '#1a1a1a',
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  subtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#6b7280',
-    marginBottom: 20,
-    fontWeight: '500',
+  backButton: {
+    backgroundColor: '#f0f4ff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4285f4',
   },
-  scoreContainer: {
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4285f4',
+  },
+  titleContainer: {
+    flex: 1,
     alignItems: 'center',
   },
-  scoreText: {
+  title: {
     fontSize: 18,
     fontWeight: '700',
+    textAlign: 'center',
+    color: '#1a1a1a',
+  },
+  placeholder: {
+    width: 60, // Same width as back button for centering
+  },
+  activityBadge: {
+    backgroundColor: '#4285f4',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'center',
+    marginBottom: 8,
+  },
+  activityText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  progressText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#4285f4',
-    marginBottom: 12,
+    minWidth: 40,
   },
   progressBar: {
-    width: '80%',
-    height: 8,
+    flex: 1,
+    height: 6,
     backgroundColor: '#e8f0fe',
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
-    marginBottom: 16,
+    maxWidth: 120,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#4285f4',
-    borderRadius: 4,
+    borderRadius: 3,
   },
-  statsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
+  scrollView: {
+    flex: 1,
   },
-  statItem: {
-    alignItems: 'center',
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
-  statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '500',
+  instructionCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  statValue: {
+  instructionText: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#1a1a1a',
+    fontWeight: '600',
+  },
+  sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
-  },
-  errorText: {
-    color: '#ef4444',
-  },
-  perfectBadge: {
-    backgroundColor: '#fbbf24',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  perfectText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
+    marginBottom: 12,
+    textAlign: 'center',
   },
   zonesContainer: {
+    marginBottom: 20,
+  },
+  zonesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    padding: 20,
-    paddingBottom: 10,
+    justifyContent: 'space-between',
+    gap: 12,
   },
   zone: {
     backgroundColor: '#ffffff',
-    width: width / 2.3,
-    minHeight: 140,
-    borderRadius: 20,
-    padding: 16,
-    marginVertical: 8,
-    borderWidth: 3,
+    width: (width - 44) / 2, // Account for padding and gap
+    minHeight: 100,
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 2,
     borderColor: '#e8f0fe',
     borderStyle: 'dashed',
     shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
   },
   zoneTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
     color: '#1a1a1a',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   zoneContent: {
     flex: 1,
@@ -662,7 +720,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyZoneText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#9ca3af',
     fontStyle: 'italic',
     textAlign: 'center',
@@ -670,42 +728,26 @@ const styles = StyleSheet.create({
   },
   placedItem: {
     alignItems: 'center',
-    marginVertical: 4,
-    padding: 10,
+    marginVertical: 2,
+    padding: 8,
     backgroundColor: '#e8f5e8',
-    borderRadius: 12,
-    borderWidth: 2,
+    borderRadius: 10,
+    borderWidth: 1,
     borderColor: '#4caf50',
-    minWidth: 80,
+    minWidth: 60,
   },
   placedIcon: {
-    fontSize: 28,
-    marginBottom: 4,
+    fontSize: 20,
+    marginBottom: 2,
   },
   placedLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#2e7d32',
     textAlign: 'center',
     fontWeight: '600',
   },
   optionsContainer: {
-    backgroundColor: '#ffffff',
-    margin: 20,
-    marginTop: 10,
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  optionsTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 16,
-    textAlign: 'center',
+    marginBottom: 20,
   },
   optionsGrid: {
     flexDirection: 'row',
@@ -714,17 +756,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   draggable: {
-    width: 90,
-    height: 90,
+    width: 70,
+    height: 70,
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
     borderWidth: 2,
     borderColor: '#e8f0fe',
     position: 'relative',
@@ -736,29 +778,29 @@ const styles = StyleSheet.create({
     shadowColor: '#4caf50',
   },
   optionIcon: {
-    fontSize: 32,
-    marginBottom: 4,
+    fontSize: 24,
+    marginBottom: 2,
   },
   optionLabel: {
-    fontSize: 12,
+    fontSize: 10,
     textAlign: 'center',
     color: '#1a1a1a',
     fontWeight: '600',
   },
-  placedIcon: {
+  placedIconStyle: {
     opacity: 0.7,
   },
-  placedLabel: {
+  placedLabelStyle: {
     color: '#6b7280',
   },
   checkmark: {
     position: 'absolute',
-    top: -8,
-    right: -8,
-    width: 28,
-    height: 28,
+    top: -6,
+    right: -6,
+    width: 20,
+    height: 20,
     backgroundColor: '#4caf50',
-    borderRadius: 14,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#4caf50',
@@ -769,155 +811,11 @@ const styles = StyleSheet.create({
   },
   checkmarkText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: 'bold',
   },
-  completionContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  completionContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    padding: 32,
-    alignItems: 'center',
-    marginHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
-    maxWidth: 350,
-  },
-  completionText: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  starsContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  starsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: 12,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  star: {
-    fontSize: 40,
-  },
-  starFilled: {
-    opacity: 1,
-  },
-  starEmpty: {
-    opacity: 0.3,
-  },
-  performanceMessage: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4285f4',
-    textAlign: 'center',
-  },
-  detailedStats: {
-    backgroundColor: '#f8faff',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 24,
-    width: '100%',
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  statDetailLabel: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  statDetailValue: {
-    fontSize: 14,
-    color: '#1a1a1a',
-    fontWeight: '700',
-  },
-  bonusRow: {
-    alignItems: 'center',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  bonusText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#fbbf24',
-  },
-  completionButtons: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  resetButton: {
-    backgroundColor: '#6b7280',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    shadowColor: '#6b7280',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  resetButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  continueButton: {
-    backgroundColor: '#4285f4',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  continueButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  footer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    paddingTop: 10,
-  },
-  backButton: {
-    backgroundColor: '#6b7280',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignSelf: 'flex-start',
-  },
-  backButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
+  bottomSpacing: {
+    height: 20,
   },
 });
 

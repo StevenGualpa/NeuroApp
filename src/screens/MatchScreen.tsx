@@ -16,6 +16,8 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
 import AchievementNotification from '../components/AchievementNotification';
+import { GameStatsDisplay } from '../components/GameStatsDisplay';
+import { GameCompletionModal } from '../components/GameCompletionModal';
 import { AchievementService, Achievement } from '../services/AchievementService';
 
 const { width } = Dimensions.get('window');
@@ -276,20 +278,6 @@ const MatchScreen = () => {
     });
   }, []);
 
-  const renderStars = useCallback((count: number) => {
-    return Array.from({ length: 3 }, (_, i) => (
-      <Animated.Text
-        key={i}
-        style={[
-          styles.star,
-          i < count ? styles.starFilled : styles.starEmpty,
-        ]}
-      >
-        ⭐
-      </Animated.Text>
-    ));
-  }, []);
-
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, firstTry: boolean) => {
     if (perfectRun && stars === 3 && firstTry) {
       return "¡Perfecto! Primera vez sin errores 🏆";
@@ -336,56 +324,42 @@ const MatchScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header mejorado */}
-        <Animated.View 
-          style={[
-            styles.header,
-            {
-              opacity: headerAnimation,
-              transform: [{
-                translateY: headerAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-20, 0],
-                })
-              }]
-            }
-          ]}
-        >
+      {/* Compact Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleBackPress}
+          >
+            <Text style={styles.backButtonText}>← Volver</Text>
+          </TouchableOpacity>
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{lessonTitle}</Text>
-            <View style={styles.titleUnderline} />
           </View>
-          <View style={styles.activityBadge}>
-            <Text style={styles.activityText}>🎯 Selección Múltiple</Text>
-          </View>
+          <View style={styles.placeholder} />
+        </View>
+        
+        <View style={styles.activityBadge}>
+          <Text style={styles.activityText}>🎯 Emparejar</Text>
+        </View>
 
-          {/* Stats Display */}
-          {gameStats.totalAttempts > 0 && (
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Intentos</Text>
-                <Text style={styles.statValue}>{gameStats.totalAttempts}</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Errores</Text>
-                <Text style={[styles.statValue, gameStats.errors > 0 && styles.errorText]}>
-                  {gameStats.errors}
-                </Text>
-              </View>
-              {gameStats.perfectRun && gameStats.totalAttempts > 0 && (
-                <View style={styles.perfectBadge}>
-                  <Text style={styles.perfectText}>🔥 Perfecto</Text>
-                </View>
-              )}
-            </View>
-          )}
+        {/* Compact Stats Display usando componente reutilizable */}
+        {gameStats.totalAttempts > 0 && (
+          <GameStatsDisplay 
+            stats={gameStats}
+            showPerfectBadge={true}
+            layout="horizontal"
+          />
+        )}
+      </View>
 
-          <View style={styles.progressBar}>
-            <View style={styles.progressFill} />
-          </View>
-        </Animated.View>
-
+      {/* Scrollable Content */}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
         {/* Question Container */}
         <Animated.View 
           style={[
@@ -409,63 +383,66 @@ const MatchScreen = () => {
           <Text style={styles.instructionText}>Selecciona la opción correcta</Text>
         </Animated.View>
 
-        {/* Options Container */}
+        {/* Compact Options Container */}
         <View style={styles.optionsContainer}>
-          {step.options?.map((option, idx) => (
-            <Animated.View
-              key={idx}
-              style={[
-                styles.optionWrapper,
-                {
-                  opacity: optionAnimations[idx],
-                  transform: [{
-                    translateY: optionAnimations[idx].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [30, 0],
-                    })
-                  }, {
-                    scale: optionAnimations[idx]
-                  }]
-                }
-              ]}
-            >
-              <TouchableOpacity
-                style={getOptionStyle(idx, option.correct)}
-                onPress={() => handleOptionPress(option.correct, idx)}
-                activeOpacity={0.8}
-                disabled={isAnswered}
+          <Text style={styles.sectionTitle}>Opciones disponibles:</Text>
+          <View style={styles.optionsGrid}>
+            {step.options?.map((option, idx) => (
+              <Animated.View
+                key={idx}
+                style={[
+                  styles.optionWrapper,
+                  {
+                    opacity: optionAnimations[idx],
+                    transform: [{
+                      translateY: optionAnimations[idx].interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [30, 0],
+                      })
+                    }, {
+                      scale: optionAnimations[idx]
+                    }]
+                  }
+                ]}
               >
-                <View style={styles.optionContent}>
-                  <View style={[
-                    styles.iconContainer,
-                    isAnswered && selectedOption === idx && option.correct && styles.iconContainerCorrect,
-                    isAnswered && selectedOption === idx && !option.correct && styles.iconContainerIncorrect,
-                  ]}>
-                    <Text style={styles.icon}>{option.icon}</Text>
-                  </View>
-                  <Text style={[
-                    styles.label,
-                    isAnswered && selectedOption === idx && option.correct && styles.labelCorrect,
-                    isAnswered && selectedOption === idx && !option.correct && styles.labelIncorrect,
-                  ]}>{option.label}</Text>
-                </View>
-                
-                {isAnswered && selectedOption === idx && (
-                  <View style={[
-                    styles.resultIndicator,
-                    option.correct ? styles.resultIndicatorCorrect : styles.resultIndicatorIncorrect
-                  ]}>
-                    <Text style={[
-                      styles.resultIcon,
-                      option.correct ? styles.resultIconCorrect : styles.resultIconIncorrect
+                <TouchableOpacity
+                  style={getOptionStyle(idx, option.correct)}
+                  onPress={() => handleOptionPress(option.correct, idx)}
+                  activeOpacity={0.8}
+                  disabled={isAnswered}
+                >
+                  <View style={styles.optionContent}>
+                    <View style={[
+                      styles.iconContainer,
+                      isAnswered && selectedOption === idx && option.correct && styles.iconContainerCorrect,
+                      isAnswered && selectedOption === idx && !option.correct && styles.iconContainerIncorrect,
                     ]}>
-                      {option.correct ? '✓' : '✗'}
-                    </Text>
+                      <Text style={styles.icon}>{option.icon}</Text>
+                    </View>
+                    <Text style={[
+                      styles.label,
+                      isAnswered && selectedOption === idx && option.correct && styles.labelCorrect,
+                      isAnswered && selectedOption === idx && !option.correct && styles.labelIncorrect,
+                    ]}>{option.label}</Text>
                   </View>
-                )}
-              </TouchableOpacity>
-            </Animated.View>
-          ))}
+                  
+                  {isAnswered && selectedOption === idx && (
+                    <View style={[
+                      styles.resultIndicator,
+                      option.correct ? styles.resultIndicatorCorrect : styles.resultIndicatorIncorrect
+                    ]}>
+                      <Text style={[
+                        styles.resultIcon,
+                        option.correct ? styles.resultIconCorrect : styles.resultIconIncorrect
+                      ]}>
+                        {option.correct ? '✓' : '✗'}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
+          </View>
         </View>
 
         {/* Footer motivacional */}
@@ -476,66 +453,21 @@ const MatchScreen = () => {
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
         </View>
+
+        {/* Bottom Spacing */}
+        <View style={styles.bottomSpacing} />
       </ScrollView>
 
-      {/* Game Complete Modal with Stars */}
-      {gameCompleted && !showAnimation && showStars && (
-        <View style={styles.completionContainer}>
-          <View style={styles.completionContent}>
-            <Text style={styles.completionText}>🎉 ¡Felicitaciones!</Text>
-            
-            {/* Stars Display */}
-            <View style={styles.starsContainer}>
-              <Text style={styles.starsTitle}>Tu puntuación:</Text>
-              <View style={styles.starsRow}>
-                {renderStars(gameStats.stars)}
-              </View>
-              <Text style={styles.performanceMessage}>
-                {getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.firstTrySuccess)}
-              </Text>
-            </View>
-
-            {/* Detailed Stats */}
-            <View style={styles.detailedStats}>
-              <View style={styles.statRow}>
-                <Text style={styles.statDetailLabel}>Tiempo:</Text>
-                <Text style={styles.statDetailValue}>
-                  {Math.round(gameStats.completionTime / 1000)}s
-                </Text>
-              </View>
-              <View style={styles.statRow}>
-                <Text style={styles.statDetailLabel}>Precisión:</Text>
-                <Text style={styles.statDetailValue}>
-                  {gameStats.totalAttempts > 0 
-                    ? Math.round(((gameStats.totalAttempts - gameStats.errors) / gameStats.totalAttempts) * 100)
-                    : 100}%
-                </Text>
-              </View>
-              <View style={styles.statRow}>
-                <Text style={styles.statDetailLabel}>Intentos:</Text>
-                <Text style={styles.statDetailValue}>{gameStats.totalAttempts}</Text>
-              </View>
-              {gameStats.firstTrySuccess && (
-                <View style={styles.bonusRow}>
-                  <Text style={styles.bonusText}>🎯 ¡Primera vez perfecto!</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.completionButtons}>
-              <TouchableOpacity style={styles.resetButton} onPress={resetGame}>
-                <Text style={styles.resetButtonText}>🔄 Jugar de nuevo</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.continueButton} 
-                onPress={() => navigation.goBack()}
-              >
-                <Text style={styles.continueButtonText}>✨ Continuar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
+      {/* Game Complete Modal usando componente reutilizable */}
+      <GameCompletionModal
+        visible={gameCompleted && !showAnimation && showStars}
+        stats={gameStats}
+        onReset={resetGame}
+        onContinue={() => navigation.goBack()}
+        performanceMessage={getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.firstTrySuccess)}
+        gameType="match"
+        bonusMessage={gameStats.firstTrySuccess ? "🎯 ¡Primera vez perfecto!" : undefined}
+      />
 
       {/* Feedback Animation */}
       {showAnimation && (
@@ -553,221 +485,154 @@ const MatchScreen = () => {
           onHide={handleAchievementNotificationHide}
         />
       )}
-
-      {/* Back Button */}
-      <View style={styles.backButtonContainer}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleBackPress}
-          accessible={true}
-          accessibilityLabel="Volver a la pantalla anterior"
-          accessibilityRole="button"
-        >
-          <Text style={styles.backButtonText}>← Volver</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
 
-export default MatchScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8faff',
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 80,
-  },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 25,
-    paddingBottom: 20,
     backgroundColor: '#ffffff',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  backButton: {
+    backgroundColor: '#f0f4ff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4285f4',
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4285f4',
   },
   titleContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginBottom: 15,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
     textAlign: 'center',
     color: '#1a1a1a',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
   },
-  titleUnderline: {
+  placeholder: {
     width: 60,
-    height: 4,
-    backgroundColor: '#4285f4',
-    borderRadius: 2,
   },
   activityBadge: {
     backgroundColor: '#4285f4',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: '#4285f4',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-    marginBottom: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
     alignSelf: 'center',
+    marginBottom: 8,
   },
   activityText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    fontSize: 14,
+    fontWeight: '600',
   },
-  statsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    marginBottom: 15,
+  scrollView: {
+    flex: 1,
   },
-  statItem: {
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1a1a1a',
-  },
-  errorText: {
-    color: '#ef4444',
-  },
-  perfectBadge: {
-    backgroundColor: '#fbbf24',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  perfectText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#e8f0fe',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    width: '100%',
-    backgroundColor: '#4285f4',
-    borderRadius: 4,
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   questionContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 25,
-    marginHorizontal: 20,
-    marginTop: 25,
-    marginBottom: 25,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
     shadowColor: '#4285f4',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderLeftWidth: 5,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    borderLeftWidth: 4,
     borderLeftColor: '#4285f4',
   },
   questionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   questionIcon: {
-    fontSize: 24,
-    marginRight: 10,
+    fontSize: 20,
+    marginRight: 8,
   },
   questionTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
   },
   questionText: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     textAlign: 'center',
     color: '#1a1a1a',
-    lineHeight: 28,
-    marginBottom: 12,
+    lineHeight: 24,
+    marginBottom: 8,
   },
   instructionText: {
-    fontSize: 16,
+    fontSize: 14,
     textAlign: 'center',
     color: '#6b7280',
     fontWeight: '500',
   },
   optionsContainer: {
-    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 16,
+    gap: 12,
   },
   optionWrapper: {
-    width: (width - 56) / 2,
+    width: (width - 44) / 2,
   },
   optionButton: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 20,
-    minHeight: 160,
+    borderRadius: 16,
+    padding: 16,
+    minHeight: 120,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#4285f4',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 2,
     borderColor: '#e8f0fe',
     position: 'relative',
   },
@@ -775,13 +640,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#e8f5e8',
     borderColor: '#4caf50',
     shadowColor: '#4caf50',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
   },
   optionButtonIncorrect: {
     backgroundColor: '#ffeaea',
     borderColor: '#f44336',
     shadowColor: '#f44336',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
   },
   optionButtonDisabled: {
     backgroundColor: '#f5f5f5',
@@ -794,12 +659,12 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     backgroundColor: 'rgba(66, 133, 244, 0.1)',
-    borderRadius: 50,
-    width: 80,
-    height: 80,
+    borderRadius: 30,
+    width: 60,
+    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   iconContainerCorrect: {
     backgroundColor: 'rgba(76, 175, 80, 0.2)',
@@ -812,14 +677,14 @@ const styles = StyleSheet.create({
     borderColor: '#f44336',
   },
   icon: {
-    fontSize: 40,
+    fontSize: 28,
   },
   label: {
-    fontSize: 16,
+    fontSize: 12,
     textAlign: 'center',
     color: '#1a1a1a',
     fontWeight: '600',
-    lineHeight: 22,
+    lineHeight: 16,
   },
   labelCorrect: {
     color: '#2e7d32',
@@ -831,11 +696,11 @@ const styles = StyleSheet.create({
   },
   resultIndicator: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    borderRadius: 16,
-    width: 32,
-    height: 32,
+    top: -6,
+    right: -6,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -851,7 +716,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f44336',
   },
   resultIcon: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   resultIconCorrect: {
@@ -862,185 +727,34 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+    paddingVertical: 20,
   },
   motivationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 25,
-    paddingVertical: 15,
-    borderRadius: 25,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  motivationIcon: {
-    fontSize: 20,
-    marginHorizontal: 8,
-  },
-  footerText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    textAlign: 'center',
-  },
-  // Game Complete Modal Styles
-  completionContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingHorizontal: 20,
-  },
-  completionContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 30,
-    padding: 30,
-    alignItems: 'center',
-    maxWidth: 350,
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 15,
-  },
-  completionText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 25,
-  },
-  starsContainer: {
-    alignItems: 'center',
-    marginBottom: 25,
-  },
-  starsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: 15,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  star: {
-    fontSize: 40,
-    marginHorizontal: 5,
-  },
-  starFilled: {
-    opacity: 1,
-  },
-  starEmpty: {
-    opacity: 0.3,
-  },
-  performanceMessage: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4285f4',
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  detailedStats: {
-    backgroundColor: '#f8faff',
-    borderRadius: 15,
-    padding: 20,
-    width: '100%',
-    marginBottom: 25,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  statDetailLabel: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  statDetailValue: {
-    fontSize: 16,
-    color: '#1a1a1a',
-    fontWeight: '700',
-  },
-  bonusRow: {
-    alignItems: 'center',
-    marginTop: 10,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#e8f0fe',
-  },
-  bonusText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#fbbf24',
-    textAlign: 'center',
-  },
-  completionButtons: {
-    flexDirection: 'row',
-    gap: 15,
-    width: '100%',
-  },
-  resetButton: {
-    flex: 1,
-    backgroundColor: '#6b7280',
-    paddingVertical: 15,
-    borderRadius: 15,
-    alignItems: 'center',
-  },
-  resetButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  continueButton: {
-    flex: 1,
-    backgroundColor: '#4285f4',
-    paddingVertical: 15,
-    borderRadius: 15,
-    alignItems: 'center',
-  },
-  continueButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  // Back Button Styles
-  backButtonContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-  },
-  backButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 25,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    paddingVertical: 12,
+    borderRadius: 20,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 2,
-    borderColor: '#4285f4',
+    elevation: 3,
   },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4285f4',
+  motivationIcon: {
+    fontSize: 18,
+    marginHorizontal: 6,
+  },
+  footerText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    textAlign: 'center',
+  },
+  bottomSpacing: {
+    height: 20,
   },
 });
+
+export default MatchScreen;

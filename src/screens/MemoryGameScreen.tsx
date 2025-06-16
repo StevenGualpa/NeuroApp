@@ -17,6 +17,8 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
 import AchievementNotification from '../components/AchievementNotification';
+import { GameStatsDisplay } from '../components/GameStatsDisplay';
+import { GameCompletionModal } from '../components/GameCompletionModal';
 import { AchievementService, Achievement } from '../services/AchievementService';
 
 type MemoryGameRouteProp = RouteProp<RootStackParamList, 'memoryGame'>;
@@ -37,10 +39,11 @@ interface GameStats {
   perfectRun: boolean;
   matchesFound: number;
   flipCount: number;
+  efficiency: number;
 }
 
 const { width } = Dimensions.get('window');
-const CARD_SIZE = (width - 80) / 4;
+const CARD_SIZE = (width - 60) / 4; // Reduced for better fit
 
 const MemoryGameScreen = () => {
   const route = useRoute<MemoryGameRouteProp>();
@@ -73,13 +76,12 @@ const MemoryGameScreen = () => {
     perfectRun: true,
     matchesFound: 0,
     flipCount: 0,
+    efficiency: 100,
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
 
   // Animation refs
-  const headerAnimation = useRef(new Animated.Value(0)).current;
-  const instructionAnimation = useRef(new Animated.Value(0)).current;
   const progressAnimation = useRef(new Animated.Value(0)).current;
 
   // Memoized values
@@ -98,20 +100,6 @@ const MemoryGameScreen = () => {
   }, []);
 
   useEffect(() => {
-    // Animaciones de entrada
-    Animated.sequence([
-      Animated.timing(headerAnimation, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(instructionAnimation, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
     const duplicated: Card[] =
       step.options?.map((option, index) => ({
         id: index,
@@ -139,7 +127,7 @@ const MemoryGameScreen = () => {
 
     setCards(shuffled);
 
-    // Show cards for 5 seconds
+    // Show cards for 4 seconds (reduced)
     setTimeout(() => {
       setShowingCards(false);
       const reset = shuffled.map((c) => ({
@@ -157,25 +145,25 @@ const MemoryGameScreen = () => {
 
       setCards(reset);
       setGameStarted(true);
-    }, 5000);
+    }, 4000);
   }, []);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, flipCount: number, completionTime: number, totalPairs: number): number => {
-    const maxTime = totalPairs * 15000; // 15 seconds per pair as baseline
-    const minFlips = totalPairs * 2; // Minimum flips needed (perfect memory)
+    const maxTime = totalPairs * 12000; // 12 seconds per pair
+    const minFlips = totalPairs * 2;
     
-    const timeBonus = completionTime < maxTime * 0.5 ? 1 : 0;
-    const memoryBonus = flipCount <= minFlips * 1.5 ? 1 : 0; // Bonus for good memory
+    const timeBonus = completionTime < maxTime * 0.6 ? 1 : 0;
+    const memoryBonus = flipCount <= minFlips * 1.4 ? 1 : 0;
 
     if (errors === 0 && flipCount <= minFlips * 1.2) {
-      return 3; // Perfect performance - excellent memory
+      return 3; // Perfect performance
     } else if (errors <= 2 && flipCount <= minFlips * 1.5) {
-      return 2 + timeBonus; // Good performance
+      return 2 + timeBonus;
     } else if (errors <= 4) {
-      return 1 + memoryBonus; // Acceptable performance
+      return 1 + memoryBonus;
     } else {
-      return 1; // Minimum star for completion
+      return 1;
     }
   }, []);
 
@@ -183,7 +171,6 @@ const MemoryGameScreen = () => {
     setAnimationType(type);
     setShowAnimation(true);
     
-    // Add haptic feedback
     if (type === 'success') {
       Vibration.vibrate(50);
     } else if (type === 'error') {
@@ -251,9 +238,11 @@ const MemoryGameScreen = () => {
       
       // Calculate final stats
       const completionTime = Date.now() - startTime;
+      const efficiency = Math.round((totalPairs * 2 / gameStats.flipCount) * 100);
       const finalStats = {
         ...gameStats,
         completionTime,
+        efficiency,
         stars: calculateStars(gameStats.errors, gameStats.flipCount, completionTime, totalPairs),
       };
       setGameStats(finalStats);
@@ -384,6 +373,7 @@ const MemoryGameScreen = () => {
       perfectRun: true,
       matchesFound: 0,
       flipCount: 0,
+      efficiency: 100,
     });
 
     // Reset cards
@@ -431,22 +421,8 @@ const MemoryGameScreen = () => {
 
       setCards(reset);
       setGameStarted(true);
-    }, 5000);
+    }, 4000);
   }, [step.options]);
-
-  const renderStars = useCallback((count: number) => {
-    return Array.from({ length: 3 }, (_, i) => (
-      <Animated.Text
-        key={i}
-        style={[
-          styles.star,
-          i < count ? styles.starFilled : styles.starEmpty,
-        ]}
-      >
-        ⭐
-      </Animated.Text>
-    ));
-  }, []);
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, flipCount: number, totalPairs: number) => {
     const minFlips = totalPairs * 2;
@@ -533,96 +509,33 @@ const MemoryGameScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header mejorado */}
-        <Animated.View 
-          style={[
-            styles.header,
-            {
-              opacity: headerAnimation,
-              transform: [{
-                translateY: headerAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-20, 0],
-                })
-              }]
-            }
-          ]}
-        >
+      {/* Compact Header */}
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handleBackPress}
+          >
+            <Text style={styles.backButtonText}>← Volver</Text>
+          </TouchableOpacity>
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{lessonTitle}</Text>
-            <View style={styles.titleUnderline} />
           </View>
-          <View style={styles.activityBadge}>
-            <Text style={styles.activityText}>🧠 Juego de Memoria</Text>
-          </View>
+          <View style={styles.placeholder} />
+        </View>
+        
+        <View style={styles.activityBadge}>
+          <Text style={styles.activityText}>🧠 Juego de Memoria</Text>
+        </View>
 
-          {/* Stats Display */}
-          {gameStarted && (
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Intentos</Text>
-                <Text style={styles.statValue}>{gameStats.totalAttempts}</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Errores</Text>
-                <Text style={[styles.statValue, gameStats.errors > 0 && styles.errorText]}>
-                  {gameStats.errors}
-                </Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statLabel}>Volteos</Text>
-                <Text style={styles.statValue}>{gameStats.flipCount}</Text>
-              </View>
-              {gameStats.perfectRun && gameStats.totalAttempts > 0 && (
-                <View style={styles.perfectBadge}>
-                  <Text style={styles.perfectText}>🔥 Perfecto</Text>
-                </View>
-              )}
-            </View>
-          )}
-        </Animated.View>
-
-        {/* Instrucciones */}
-        <Animated.View 
-          style={[
-            styles.instructionCard,
-            {
-              opacity: instructionAnimation,
-              transform: [{
-                scale: instructionAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.9, 1],
-                })
-              }]
-            }
-          ]}
-        >
-          <View style={styles.instructionHeader}>
-            <Text style={styles.instructionIcon}>👀</Text>
-            <Text style={styles.instructionTitle}>
-              {showingCards ? '¡Memoriza las cartas!' : '¡Encuentra las parejas!'}
-            </Text>
-          </View>
-          <Text style={styles.instruction}>
-            {showingCards 
-              ? 'Observa bien las cartas y recuerda dónde están'
-              : 'Toca las cartas para voltearlas y encuentra las parejas iguales'
-            }
-          </Text>
-        </Animated.View>
-
-        {/* Barra de progreso */}
+        {/* Progress Bar */}
         {gameStarted && (
           <View style={styles.progressContainer}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressTitle}>🎯 Progreso</Text>
-              <Text style={styles.progressText}>{matchedCount} / {totalPairs}</Text>
-            </View>
-            <View style={styles.progressBarContainer}>
+            <Text style={styles.progressText}>{matchedCount}/{totalPairs}</Text>
+            <View style={styles.progressBar}>
               <Animated.View 
                 style={[
-                  styles.progressBar,
+                  styles.progressFill,
                   {
                     width: progressAnimation.interpolate({
                       inputRange: [0, 1],
@@ -635,7 +548,40 @@ const MemoryGameScreen = () => {
           </View>
         )}
 
-        {/* Grid de cartas */}
+        {/* Compact Stats Display usando componente reutilizable */}
+        {gameStarted && gameStats.totalAttempts > 0 && (
+          <GameStatsDisplay 
+            stats={gameStats}
+            showPerfectBadge={true}
+            layout="horizontal"
+          />
+        )}
+      </View>
+
+      {/* Scrollable Content */}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
+        {/* Instructions */}
+        <View style={styles.instructionCard}>
+          <View style={styles.instructionHeader}>
+            <Text style={styles.instructionIcon}>👀</Text>
+            <Text style={styles.instructionTitle}>
+              {showingCards ? '¡Memoriza!' : '¡Encuentra parejas!'}
+            </Text>
+          </View>
+          <Text style={styles.instructionText}>
+            {showingCards 
+              ? 'Observa bien las cartas y recuerda dónde están'
+              : 'Toca las cartas para voltearlas y encuentra las parejas iguales'
+            }
+          </Text>
+        </View>
+
+        {/* Compact Grid de cartas */}
         <View style={styles.gameContainer}>
           <View style={styles.grid}>
             {cards.map(renderCard)}
@@ -652,74 +598,26 @@ const MemoryGameScreen = () => {
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
         </View>
+
+        {/* Bottom Spacing */}
+        <View style={styles.bottomSpacing} />
       </ScrollView>
 
-      {/* Game Complete Modal with Stars */}
-      {gameCompleted && !showAnimation && showStars && (
-        <View style={styles.completionContainer}>
-          <View style={styles.completionContent}>
-            <Text style={styles.completionText}>🎉 ¡Felicitaciones!</Text>
-            
-            {/* Stars Display */}
-            <View style={styles.starsContainer}>
-              <Text style={styles.starsTitle}>Tu puntuación:</Text>
-              <View style={styles.starsRow}>
-                {renderStars(gameStats.stars)}
-              </View>
-              <Text style={styles.performanceMessage}>
-                {getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.flipCount, totalPairs)}
-              </Text>
-            </View>
-
-            {/* Detailed Stats */}
-            <View style={styles.detailedStats}>
-              <View style={styles.statRow}>
-                <Text style={styles.statDetailLabel}>Tiempo:</Text>
-                <Text style={styles.statDetailValue}>
-                  {Math.round(gameStats.completionTime / 1000)}s
-                </Text>
-              </View>
-              <View style={styles.statRow}>
-                <Text style={styles.statDetailLabel}>Precisión:</Text>
-                <Text style={styles.statDetailValue}>
-                  {gameStats.totalAttempts > 0 
-                    ? Math.round(((gameStats.totalAttempts - gameStats.errors) / gameStats.totalAttempts) * 100)
-                    : 100}%
-                </Text>
-              </View>
-              <View style={styles.statRow}>
-                <Text style={styles.statDetailLabel}>Volteos totales:</Text>
-                <Text style={styles.statDetailValue}>{gameStats.flipCount}</Text>
-              </View>
-              <View style={styles.statRow}>
-                <Text style={styles.statDetailLabel}>Eficiencia:</Text>
-                <Text style={styles.statDetailValue}>
-                  {totalPairs > 0 
-                    ? Math.round((totalPairs * 2 / gameStats.flipCount) * 100)
-                    : 100}%
-                </Text>
-              </View>
-              {gameStats.perfectRun && gameStats.flipCount <= totalPairs * 2.4 && (
-                <View style={styles.bonusRow}>
-                  <Text style={styles.bonusText}>🧠 ¡Memoria excepcional!</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.completionButtons}>
-              <TouchableOpacity style={styles.resetButton} onPress={resetGame}>
-                <Text style={styles.resetButtonText}>🔄 Jugar de nuevo</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.continueButton} 
-                onPress={() => navigation.goBack()}
-              >
-                <Text style={styles.continueButtonText}>✨ Continuar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
+      {/* Game Complete Modal usando componente reutilizable */}
+      <GameCompletionModal
+        visible={gameCompleted && !showAnimation && showStars}
+        stats={gameStats}
+        onReset={resetGame}
+        onContinue={() => navigation.goBack()}
+        performanceMessage={getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.flipCount, totalPairs)}
+        gameType="memory"
+        showEfficiency={true}
+        customStats={[
+          { label: 'Volteos totales', value: gameStats.flipCount },
+          { label: 'Parejas encontradas', value: `${gameStats.matchesFound}/${totalPairs}` }
+        ]}
+        bonusMessage={gameStats.perfectRun && gameStats.flipCount <= totalPairs * 2.4 ? "🧠 ¡Memoria excepcional!" : undefined}
+      />
 
       {/* Feedback Animation */}
       {showAnimation && (
@@ -737,19 +635,6 @@ const MemoryGameScreen = () => {
           onHide={handleAchievementNotificationHide}
         />
       )}
-
-      {/* Back Button */}
-      <View style={styles.backButtonContainer}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleBackPress}
-          accessible={true}
-          accessibilityLabel="Volver a la pantalla anterior"
-          accessibilityRole="button"
-        >
-          <Text style={styles.backButtonText}>← Volver</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -761,116 +646,108 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8faff',
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 80,
-  },
   header: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  headerTop: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 25,
-    paddingBottom: 20,
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  backButton: {
+    backgroundColor: '#f0f4ff',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4285f4',
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4285f4',
   },
   titleContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginBottom: 15,
   },
   title: {
-    fontSize: 26,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
     textAlign: 'center',
     color: '#1a1a1a',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
   },
-  titleUnderline: {
+  placeholder: {
     width: 60,
-    height: 4,
-    backgroundColor: '#4285f4',
-    borderRadius: 2,
   },
   activityBadge: {
     backgroundColor: '#4285f4',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: '#4285f4',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-    marginBottom: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'center',
+    marginBottom: 8,
   },
   activityText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    fontSize: 14,
+    fontWeight: '600',
   },
-  statsContainer: {
+  progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    marginTop: 15,
+    gap: 12,
+    marginBottom: 8,
   },
-  statItem: {
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  statValue: {
+  progressText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: '#4285f4',
+    minWidth: 40,
   },
-  errorText: {
-    color: '#ef4444',
+  progressBar: {
+    flex: 1,
+    height: 6,
+    backgroundColor: '#e8f0fe',
+    borderRadius: 3,
+    overflow: 'hidden',
+    maxWidth: 120,
   },
-  perfectBadge: {
-    backgroundColor: '#fbbf24',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4285f4',
+    borderRadius: 3,
   },
-  perfectText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   instructionCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 25,
-    marginVertical: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
     shadowColor: '#4285f4',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
     shadowRadius: 8,
-    elevation: 5,
-    borderLeftWidth: 5,
+    elevation: 4,
+    borderLeftWidth: 4,
     borderLeftColor: '#4285f4',
   },
   instructionHeader: {
@@ -884,60 +761,18 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   instructionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1a1a1a',
   },
-  instruction: {
+  instructionText: {
     fontSize: 16,
     textAlign: 'center',
     color: '#6b7280',
     fontWeight: '500',
     lineHeight: 22,
   },
-  progressContainer: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  progressTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1a1a1a',
-  },
-  progressText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4285f4',
-  },
-  progressBarContainer: {
-    height: 8,
-    backgroundColor: '#e8f0fe',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#4285f4',
-    borderRadius: 4,
-  },
   gameContainer: {
-    flex: 1,
     alignItems: 'center',
     marginBottom: 20,
   },
@@ -945,37 +780,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 12,
-    maxWidth: width - 40,
+    gap: 8,
+    maxWidth: width - 32,
   },
   cardWrapper: {
     width: CARD_SIZE,
     height: CARD_SIZE,
-    margin: 4,
+    margin: 2,
   },
   card: {
     width: CARD_SIZE,
     height: CARD_SIZE,
-    borderRadius: 15,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
   },
   front: {
     backgroundColor: '#4285f4',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: '#ffffff',
   },
   back: {
     backgroundColor: '#ffffff',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: '#e8f0fe',
   },
   matchedCard: {
@@ -984,14 +816,14 @@ const styles = StyleSheet.create({
     shadowColor: '#4caf50',
   },
   cardQuestionText: {
-    fontSize: 32,
+    fontSize: 24,
     color: 'white',
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
   cardIcon: {
-    fontSize: 36,
+    fontSize: 28,
   },
   footer: {
     alignItems: 'center',
@@ -1000,179 +832,27 @@ const styles = StyleSheet.create({
   motivationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 25,
+    borderRadius: 20,
     shadowColor: '#4285f4',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 2,
+    elevation: 3,
   },
   motivationIcon: {
-    fontSize: 20,
-    marginHorizontal: 8,
+    fontSize: 18,
+    marginHorizontal: 6,
   },
   footerText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    textAlign: 'center',
-  },
-  // Game Complete Modal Styles
-  completionContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  completionContent: {
-    backgroundColor: '#ffffff',
-    borderRadius: 30,
-    padding: 30,
-    alignItems: 'center',
-    maxWidth: 350,
-    width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 15,
-  },
-  completionText: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 25,
-  },
-  starsContainer: {
-    alignItems: 'center',
-    marginBottom: 25,
-  },
-  starsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: 15,
-  },
-  starsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  star: {
-    fontSize: 40,
-    marginHorizontal: 5,
-  },
-  starFilled: {
-    opacity: 1,
-  },
-  starEmpty: {
-    opacity: 0.3,
-  },
-  performanceMessage: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4285f4',
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  detailedStats: {
-    backgroundColor: '#f8faff',
-    borderRadius: 15,
-    padding: 20,
-    width: '100%',
-    marginBottom: 25,
-  },
-  statRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  statDetailLabel: {
     fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  statDetailValue: {
-    fontSize: 16,
+    fontWeight: '600',
     color: '#1a1a1a',
-    fontWeight: '700',
-  },
-  bonusRow: {
-    alignItems: 'center',
-    marginTop: 10,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#e8f0fe',
-  },
-  bonusText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#fbbf24',
     textAlign: 'center',
   },
-  completionButtons: {
-    flexDirection: 'row',
-    gap: 15,
-    width: '100%',
-  },
-  resetButton: {
-    flex: 1,
-    backgroundColor: '#6b7280',
-    paddingVertical: 15,
-    borderRadius: 15,
-    alignItems: 'center',
-  },
-  resetButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  continueButton: {
-    flex: 1,
-    backgroundColor: '#4285f4',
-    paddingVertical: 15,
-    borderRadius: 15,
-    alignItems: 'center',
-  },
-  continueButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  // Back Button Styles
-  backButtonContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-  },
-  backButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 25,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 2,
-    borderColor: '#4285f4',
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4285f4',
+  bottomSpacing: {
+    height: 20,
   },
 });
