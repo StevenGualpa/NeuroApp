@@ -19,9 +19,10 @@ import FeedbackAnimation from '../components/FeedbackAnimation';
 import AchievementNotification from '../components/AchievementNotification';
 import { GameStatsDisplay } from '../components/GameStatsDisplay';
 import { GameCompletionModal } from '../components/GameCompletionModal';
+import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 type DragDropRouteProp = RouteProp<RootStackParamList, 'dragDrop'>;
 
@@ -63,6 +64,7 @@ const DragDropScreen = () => {
   const [zoneItems, setZoneItems] = useState<{ [key: string]: PlacedItem[] }>({});
   const [score, setScore] = useState(0);
   const [gameCompleted, setGameCompleted] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   // Animation states
   const [showAnimation, setShowAnimation] = useState(false);
@@ -110,9 +112,15 @@ const DragDropScreen = () => {
   // Update zone bounds when layout changes
   const updateZoneBounds = useCallback((zone: string) => {
     const zoneRef = zoneRefs.current[zone];
-    if (zoneRef && scrollViewRef.current) {
-      zoneRef.measureInWindow((x, y, width, height) => {
-        zoneBounds.current[zone] = { x, y, width, height };
+    if (zoneRef) {
+      zoneRef.measure((x, y, width, height, pageX, pageY) => {
+        zoneBounds.current[zone] = { 
+          x: pageX, 
+          y: pageY, 
+          width, 
+          height 
+        };
+        console.log(`Zone ${zone} bounds updated:`, { x: pageX, y: pageY, width, height });
       });
     }
   }, []);
@@ -120,7 +128,7 @@ const DragDropScreen = () => {
   const handleZoneLayout = useCallback((zone: string) => {
     setTimeout(() => {
       updateZoneBounds(zone);
-    }, 100);
+    }, 300);
   }, [updateZoneBounds]);
 
   // Calculate stars based on performance
@@ -180,6 +188,10 @@ const DragDropScreen = () => {
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
         errors: finalStats.errors,
+        activityType: 'Arrastra y suelta',
+        showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
+        usedHelp: false,
+        tookTime: finalStats.completionTime > 60000,
       };
 
       const newlyUnlocked = await AchievementService.recordGameCompletion(gameData);
@@ -248,7 +260,7 @@ const DragDropScreen = () => {
     showFeedbackAnimation('success');
   }, [score, showFeedbackAnimation]);
 
-  const handleIncorrectDrop = useCallback((zone: string, option: Option) => {
+  const handleIncorrectDrop = useCallback(() => {
     setGameStats(prev => ({
       ...prev,
       totalAttempts: prev.totalAttempts + 1,
@@ -260,16 +272,25 @@ const DragDropScreen = () => {
   }, [showFeedbackAnimation]);
 
   const checkCollision = useCallback((gestureX: number, gestureY: number): string | null => {
+    console.log('Checking collision at:', { gestureX, gestureY });
+    console.log('Available zones:', Object.keys(zoneBounds.current));
+    
     for (const [zone, bounds] of Object.entries(zoneBounds.current)) {
+      console.log(`Checking zone ${zone}:`, bounds);
+      
+      // Add some tolerance for easier dropping
+      const tolerance = 20;
       if (
-        gestureX >= bounds.x &&
-        gestureX <= bounds.x + bounds.width &&
-        gestureY >= bounds.y &&
-        gestureY <= bounds.y + bounds.height
+        gestureX >= bounds.x - tolerance &&
+        gestureX <= bounds.x + bounds.width + tolerance &&
+        gestureY >= bounds.y - tolerance &&
+        gestureY <= bounds.y + bounds.height + tolerance
       ) {
+        console.log(`Collision detected with zone: ${zone}`);
         return zone;
       }
     }
+    console.log('No collision detected');
     return null;
   }, []);
 
@@ -282,6 +303,7 @@ const DragDropScreen = () => {
         onStartShouldSetPanResponder: () => !correctlyPlaced.has(index),
         onMoveShouldSetPanResponder: () => !correctlyPlaced.has(index),
         onPanResponderGrant: () => {
+          setIsDragging(true);
           setGameStats(prev => ({
             ...prev,
             dragCount: prev.dragCount + 1,
@@ -299,6 +321,7 @@ const DragDropScreen = () => {
         }),
 
         onPanResponderRelease: (_, gesture) => {
+          setIsDragging(false);
           pan.flattenOffset();
           const targetZone = checkCollision(gesture.moveX, gesture.moveY);
           
@@ -313,7 +336,7 @@ const DragDropScreen = () => {
                 friction: 8,
               }).start();
             } else {
-              handleIncorrectDrop(targetZone, option);
+              handleIncorrectDrop();
               Animated.spring(pan, {
                 toValue: { x: 0, y: 0 },
                 useNativeDriver: false,
@@ -330,7 +353,7 @@ const DragDropScreen = () => {
             }).start();
           }
         },
-      })
+      }),
     };
   }, [correctlyPlaced, checkCollision, handleCorrectDrop, handleIncorrectDrop]);
 
@@ -353,15 +376,15 @@ const DragDropScreen = () => {
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, efficiency: number) => {
     if (perfectRun && stars === 3 && efficiency >= 100) {
-      return "¡Perfecto! Arrastre eficiente sin errores 🏆";
+      return '¡Perfecto! Arrastre eficiente sin errores 🏆';
     } else if (perfectRun && stars === 3) {
-      return "¡Excelente! Sin errores 🌟";
+      return '¡Excelente! Sin errores 🌟';
     } else if (stars === 3) {
-      return "¡Muy bien hecho! 👏";
+      return '¡Muy bien hecho! 👏';
     } else if (stars === 2) {
-      return "¡Buen trabajo! Sigue practicando 💪";
+      return '¡Buen trabajo! Sigue practicando 💪';
     } else {
-      return "¡Completado! Puedes mejorar la precisión 📈";
+      return '¡Completado! Puedes mejorar la precisión 📈';
     }
   }, []);
 
@@ -372,7 +395,7 @@ const DragDropScreen = () => {
         '¿Estás seguro de que quieres salir? Perderás tu progreso actual.',
         [
           { text: 'Cancelar', style: 'cancel' },
-          { text: 'Salir', style: 'destructive', onPress: () => navigation.goBack() }
+          { text: 'Salir', style: 'destructive', onPress: () => navigation.goBack() },
         ]
       );
     } else {
@@ -380,15 +403,26 @@ const DragDropScreen = () => {
     }
   }, [gameStats.totalAttempts, gameCompleted, navigation]);
 
-  // Update zone bounds when component mounts
+  // Update zone bounds when component mounts and when layout changes
   useEffect(() => {
     const timer = setTimeout(() => {
       zones.forEach(zone => {
         updateZoneBounds(zone);
       });
-    }, 500);
+    }, 1000);
 
     return () => clearTimeout(timer);
+  }, [zones, updateZoneBounds]);
+
+  // Also update bounds when scroll view layout changes
+  useEffect(() => {
+    const intervalTimer = setInterval(() => {
+      zones.forEach(zone => {
+        updateZoneBounds(zone);
+      });
+    }, 2000);
+
+    return () => clearInterval(intervalTimer);
   }, [zones, updateZoneBounds]);
 
   // Process achievement queue when it changes
@@ -400,48 +434,17 @@ const DragDropScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Compact Header */}
+      {/* Header simplificado */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={handleBackPress}
-          >
-            <Text style={styles.backButtonText}>← Volver</Text>
-          </TouchableOpacity>
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>{lessonTitle}</Text>
-          </View>
-          <View style={styles.placeholder} />
-        </View>
-        
-        <View style={styles.activityBadge}>
-          <Text style={styles.activityText}>🎯 Arrastrar y Soltar</Text>
-        </View>
-        
-        <View style={styles.progressContainer}>
-          <Text style={styles.progressText}>{score}/{totalItems}</Text>
-          <View style={styles.progressBar}>
-            <View 
-              style={[
-                styles.progressFill, 
-                { width: `${(score / totalItems) * 100}%` }
-              ]} 
-            />
-          </View>
-        </View>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleBackPress}
+        >
+          <Text style={styles.backButtonText}>← Volver</Text>
+        </TouchableOpacity>
+              </View>
 
-        {/* Compact Stats Display */}
-        {gameStats.totalAttempts > 0 && (
-          <GameStatsDisplay 
-            stats={gameStats}
-            showPerfectBadge={true}
-            layout="horizontal"
-          />
-        )}
-      </View>
-
-      {/* Scrollable Content */}
+      {/* Contenido Scrollable */}
       <ScrollView 
         ref={scrollViewRef}
         style={styles.scrollView}
@@ -449,14 +452,44 @@ const DragDropScreen = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
-        {/* Instructions */}
+        {/* Tarjeta principal con título, actividad e instrucciones */}
         <View style={styles.instructionCard}>
+          {/* Título de la lección */}
+          <View style={styles.lessonHeader}>
+            <Text style={styles.lessonTitle}>{lessonTitle}</Text>
+          </View>
+          
+          {/* Instrucciones */}
+          <View style={styles.instructionHeader}>
+            <Text style={styles.instructionIcon}>👆</Text>
+            <Text style={styles.instructionTitle}>¿Cómo jugar?</Text>
+          </View>
+          
           <Text style={styles.instructionText}>
-            Arrastra cada elemento a su zona correcta
+            1. 👀 Mira los elementos de abajo
           </Text>
+          <Text style={styles.instructionText}>
+            2. 👆 Toca y arrastra cada uno
+          </Text>
+          <Text style={styles.instructionText}>
+            3. 🎯 Suéltalo en su lugar correcto
+          </Text>
+          
+          <View style={styles.instructionTip}>
+            <Text style={styles.instructionTipText}>
+              💡 ¡Piensa bien dónde va cada cosa!
+            </Text>
+          </View>
         </View>
 
-        {/* Compact Drop Zones */}
+        {/* Progreso del juego */}
+        <ProgressSection 
+          score={score}
+          totalItems={totalItems}
+          gameStats={gameStats}
+        />
+
+        {/* Zonas de Destino - Altura Fija */}
         <View style={styles.zonesContainer}>
           <Text style={styles.sectionTitle}>Zonas de destino:</Text>
           <View style={styles.zonesGrid}>
@@ -466,19 +499,24 @@ const DragDropScreen = () => {
                 ref={(ref) => {
                   zoneRefs.current[zone] = ref;
                 }}
-                style={styles.zone}
+                style={[
+                  styles.zone,
+                  isDragging && styles.zoneHighlighted
+                ]}
                 onLayout={() => handleZoneLayout(zone)}
               >
                 <Text style={styles.zoneTitle}>{zone}</Text>
                 <View style={styles.zoneContent}>
-                  {(zoneItems[zone] || []).map((placedItem, i) => (
-                    <View key={i} style={styles.placedItem}>
-                      <Text style={styles.placedIcon}>{placedItem.option.icon}</Text>
-                      <Text style={styles.placedLabel}>{placedItem.option.label}</Text>
-                    </View>
-                  ))}
-                  {(zoneItems[zone] || []).length === 0 && (
+                  {(zoneItems[zone] || []).length === 0 ? (
                     <Text style={styles.emptyZoneText}>Suelta aquí</Text>
+                  ) : (
+                    <View style={styles.placedItemsContainer}>
+                      {(zoneItems[zone] || []).map((placedItem, i) => (
+                        <View key={i} style={styles.placedItem}>
+                          <Text style={styles.placedIcon}>{placedItem.option.icon}</Text>
+                        </View>
+                      ))}
+                    </View>
                   )}
                 </View>
               </View>
@@ -486,7 +524,7 @@ const DragDropScreen = () => {
           </View>
         </View>
 
-        {/* Compact Draggable Options */}
+        {/* Elementos Arrastrables */}
         <View style={styles.optionsContainer}>
           <Text style={styles.sectionTitle}>Elementos para arrastrar:</Text>
           <View style={styles.optionsGrid}>
@@ -523,7 +561,26 @@ const DragDropScreen = () => {
           </View>
         </View>
 
-        {/* Bottom Spacing */}
+        {/* Footer motivacional como en otras actividades */}
+        <View style={styles.footer}>
+          <View style={styles.motivationContainer}>
+            <Text style={styles.motivationIcon}>⭐</Text>
+            <Text style={styles.footerText}>
+              {score === 0 ? '¡Tú puedes hacerlo! Empieza arrastrando' :
+               score === totalItems ? '¡Increíble! Lo lograste' :
+               '¡Excelente! Sigue así, casi terminas'}
+            </Text>
+            <Text style={styles.motivationIcon}>⭐</Text>
+          </View>
+          
+          {/* Mensaje adicional de ánimo */}
+          <View style={styles.encouragementFooter}>
+            <Text style={styles.encouragementFooterText}>
+              🌟 Cada intento te hace más inteligente 🧠
+            </Text>
+          </View>
+        </View>
+
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
@@ -538,9 +595,9 @@ const DragDropScreen = () => {
         showEfficiency={true}
         customStats={[
           { label: 'Arrastres totales', value: gameStats.dragCount },
-          { label: 'Elementos colocados', value: `${score}/${totalItems}` }
+          { label: 'Elementos colocados', value: `${score}/${totalItems}` },
         ]}
-        bonusMessage={gameStats.perfectRun && gameStats.efficiency >= 100 ? "🎯 ¡Arrastre perfecto!" : undefined}
+        bonusMessage={gameStats.perfectRun && gameStats.efficiency >= 100 ? '🎯 ¡Arrastre perfecto!' : undefined}
       />
 
       {/* Feedback Animation */}
@@ -569,112 +626,116 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8faff',
   },
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8faff',
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 12,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  headerTop: {
+    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
   },
   backButton: {
-    backgroundColor: '#f0f4ff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 12,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#4285f4',
+    borderColor: '#e8f0fe',
   },
   backButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#4285f4',
   },
-  titleContainer: {
-    flex: 1,
+  // Nuevos estilos para la sección de lección
+  lessonHeader: {
     alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8f0fe',
   },
-  title: {
+  lessonTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     textAlign: 'center',
     color: '#1a1a1a',
-  },
-  placeholder: {
-    width: 60, // Same width as back button for centering
   },
   activityBadge: {
     backgroundColor: '#4285f4',
     paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 16,
-    alignSelf: 'center',
-    marginBottom: 8,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   activityText: {
     color: 'white',
     fontSize: 14,
     fontWeight: '600',
   },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  progressText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4285f4',
-    minWidth: 40,
-  },
-  progressBar: {
-    flex: 1,
-    height: 6,
-    backgroundColor: '#e8f0fe',
-    borderRadius: 3,
-    overflow: 'hidden',
-    maxWidth: 120,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#4285f4',
-    borderRadius: 3,
-  },
-  scrollView: {
+    scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 8,
   },
   instructionCard: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    marginBottom: 12,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4285f4',
+  },
+  instructionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  instructionIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  instructionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
   },
   instructionText: {
-    fontSize: 16,
-    textAlign: 'center',
+    fontSize: 14,
     color: '#1a1a1a',
     fontWeight: '600',
+    marginBottom: 6,
+    paddingLeft: 6,
+  },
+  instructionTip: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  instructionTipText: {
+    fontSize: 12,
+    color: '#1e40af',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 16,
@@ -684,7 +745,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   zonesContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   zonesGrid: {
     flexDirection: 'row',
@@ -694,8 +755,9 @@ const styles = StyleSheet.create({
   },
   zone: {
     backgroundColor: '#ffffff',
-    width: (width - 44) / 2, // Account for padding and gap
-    minHeight: 100,
+    width: (width - 44) / 2,
+    // Altura fija para evitar expansión
+    height: 120,
     borderRadius: 16,
     padding: 12,
     borderWidth: 2,
@@ -706,6 +768,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
+  },
+  zoneHighlighted: {
+    borderColor: '#4285f4',
+    backgroundColor: '#f0f9ff',
+    shadowOpacity: 0.15,
+    elevation: 5,
   },
   zoneTitle: {
     fontSize: 14,
@@ -726,28 +794,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
   },
+  placedItemsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 4,
+  },
   placedItem: {
     alignItems: 'center',
-    marginVertical: 2,
-    padding: 8,
+    justifyContent: 'center',
+    padding: 6,
     backgroundColor: '#e8f5e8',
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#4caf50',
-    minWidth: 60,
+    minWidth: 32,
+    minHeight: 32,
   },
   placedIcon: {
-    fontSize: 20,
-    marginBottom: 2,
-  },
-  placedLabel: {
-    fontSize: 10,
-    color: '#2e7d32',
-    textAlign: 'center',
-    fontWeight: '600',
+    fontSize: 16,
   },
   optionsContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   optionsGrid: {
     flexDirection: 'row',
@@ -813,6 +881,51 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  // Estilos para footer motivacional
+  footer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+  },
+  motivationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    marginBottom: 12,
+  },
+  motivationIcon: {
+    fontSize: 18,
+    marginHorizontal: 6,
+  },
+  footerText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    textAlign: 'center',
+    flex: 1,
+  },
+  encouragementFooter: {
+    backgroundColor: '#f0f9ff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  encouragementFooterText: {
+    fontSize: 12,
+    color: '#1e40af',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   bottomSpacing: {
     height: 20,

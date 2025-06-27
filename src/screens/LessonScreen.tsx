@@ -59,7 +59,9 @@ const LessonScreen = () => {
     } else if (step.activityType === 'Selecciona la opción correcta') {
       navigation.replace('selectOption', { step, lessonTitle: lesson.title });
     } else if (step.activityType === 'Ordena los pasos') {
-      navigation.replace('orderSteps', { step, lessonTitle: lesson.title }); // ✅ nuevo caso
+      navigation.replace('orderSteps', { step, lessonTitle: lesson.title });
+    } else if (step.activityType === 'Reconocimiento de patrones') {
+      navigation.replace('patternRecognition', { step, lessonTitle: lesson.title });
     }
   }, [step, navigation, lesson.title]);
 

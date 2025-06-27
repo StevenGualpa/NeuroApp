@@ -7,7 +7,6 @@ import {
   ScrollView,
   SafeAreaView,
   Animated,
-  Dimensions,
   StatusBar,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -16,11 +15,9 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import { LESSONS_DATA } from '../data/lessons';
 import type { RouteProp } from '@react-navigation/native';
 
-const { width } = Dimensions.get('window');
-
-const HomeScreen = () => {
-  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'home'>>();
-  const route = useRoute<RouteProp<RootStackParamList, 'home'>>();
+const CategoryMenuScreen = () => {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'categoryMenu'>>();
   const activityType = route.params?.activityType;
 
   // Animation refs
@@ -28,8 +25,8 @@ const HomeScreen = () => {
   const cardsAnimation = useRef(new Animated.Value(0)).current;
   const progressAnimation = useRef(new Animated.Value(0)).current;
 
-  // Filtrar categorías según el tipo de actividad (si se recibió)
-  const categories = Array.from(
+  // Filtrar categorías según el tipo de actividad
+  const categories = useMemo(() => Array.from(
     new Set(
       LESSONS_DATA
         .filter(lesson =>
@@ -39,74 +36,75 @@ const HomeScreen = () => {
         )
         .map(lesson => lesson.category)
     )
-  );
+  ), [activityType]);
 
-  // Calculate overall progress
+  // Calculate overall progress (solo para modo general)
   const overallProgress = useMemo(() => {
+    if (activityType) return 0; // No mostrar en modo filtrado
     const totalLessons = LESSONS_DATA.length;
     const completedLessons = LESSONS_DATA.filter(lesson => lesson.completed).length;
     return totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
-  }, []);
+  }, [activityType]);
 
-  const getCategoryStats = (category: string) => {
-    const categoryLessons = LESSONS_DATA.filter(lesson => lesson.category === category);
-    const completedLessons = categoryLessons.filter(lesson => lesson.completed).length;
-    return {
-      total: categoryLessons.length,
-      completed: completedLessons,
-      percentage: categoryLessons.length > 0 ? (completedLessons / categoryLessons.length) * 100 : 0
+  // Función optimizada para calcular estadísticas de categoría
+  const getCategoryStats = useMemo(() => {
+    return (category: string) => {
+      const categoryLessons = LESSONS_DATA.filter(lesson => {
+        if (lesson.category !== category) return false;
+        if (activityType) {
+          return lesson.steps.some(step => step.activityType === activityType);
+        }
+        return true;
+      });
+      
+      const completedLessons = categoryLessons.filter(lesson => lesson.completed).length;
+      return {
+        total: categoryLessons.length,
+        completed: completedLessons,
+        percentage: categoryLessons.length > 0 ? (completedLessons / categoryLessons.length) * 100 : 0,
+      };
     };
-  };
+  }, [activityType]);
 
-  const getCategoryIcon = (category: string) => {
-    const iconMap: { [key: string]: string } = {
-      'Higiene Personal': '🧼',
-      'Seguridad en el hogar': '🏠',
-      'Normas Viales y Transporte': '🚦',
-      'Actividades Escolares': '📚',
-      'Alimentación Saludable': '🥗',
-      'Socialización': '👥',
-      'Transporte y Movilidad': '🚌',
-      'Emociones': '😊',
-      'Objetos Escolares': '✏️',
-      'Lenguaje y Comunicación': '🗣️',
-      'Medio Ambiente': '🌱',
-    };
-    return iconMap[category] || '📘';
-  };
+  // Configuración centralizada de categorías
+  const CATEGORY_CONFIG = useMemo(() => ({
+    'Higiene Personal': { icon: '🧼', color: '#4ECDC4' },
+    'Seguridad en el hogar': { icon: '🏠', color: '#FF6B6B' },
+    'Normas Viales y Transporte': { icon: '🚦', color: '#4285f4' },
+    'Actividades Escolares': { icon: '📚', color: '#9B59B6' },
+    'Alimentación Saludable': { icon: '🥗', color: '#2ECC71' },
+    'Socialización': { icon: '👥', color: '#F39C12' },
+    'Transporte y Movilidad': { icon: '🚌', color: '#3498DB' },
+    'Emociones': { icon: '😊', color: '#E74C3C' },
+    'Objetos Escolares': { icon: '✏️', color: '#1ABC9C' },
+    'Lenguaje y Comunicación': { icon: '🗣️', color: '#8E44AD' },
+    'Medio Ambiente': { icon: '🌱', color: '#27AE60' },
+    'Habilidades Cognitivas': { icon: '🧠', color: '#FF9800' },
+  }), []);
 
-  const getCategoryColor = (category: string) => {
-    const colorMap: { [key: string]: string } = {
-      'Higiene Personal': '#4ECDC4',
-      'Seguridad en el hogar': '#FF6B6B',
-      'Normas Viales y Transporte': '#4285f4',
-      'Actividades Escolares': '#9B59B6',
-      'Alimentación Saludable': '#2ECC71',
-      'Socialización': '#F39C12',
-      'Transporte y Movilidad': '#3498DB',
-      'Emociones': '#E74C3C',
-      'Objetos Escolares': '#1ABC9C',
-      'Lenguaje y Comunicación': '#8E44AD',
-      'Medio Ambiente': '#27AE60',
-    };
-    return colorMap[category] || '#4285f4';
-  };
+  const ACTIVITY_TYPE_ICONS = useMemo(() => ({
+    'Selecciona la opción correcta': '🎯',
+    'Sí / No': '✅',
+    'Asocia elementos': '🔗',
+    'Memoria visual': '🧠',
+    'Repetir sonidos': '🎵',
+    'Arrastra y suelta': '🎯',
+    'Ordena los pasos': '🔢',
+    'Reconocimiento de patrones': '🔍',
+  }), []);
 
-  const getActivityTypeIcon = (activityType?: string) => {
-    const iconMap: { [key: string]: string } = {
-      'Selecciona la opción correcta': '🎯',
-      'Sí / No': '✅',
-      'Asocia elementos': '🔗',
-      'Memoria visual': '🧠',
-      'Repetir sonidos': '🎵',
-      'Arrastra y suelta': '🎯',
-      'Ordena los pasos': '🔢',
-    };
-    return iconMap[activityType || ''] || '🌟';
-  };
+  // Funciones helper optimizadas
+  const getCategoryIcon = (category: string) => 
+    CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG]?.icon || '📘';
 
+  const getCategoryColor = (category: string) => 
+    CATEGORY_CONFIG[category as keyof typeof CATEGORY_CONFIG]?.color || '#4285f4';
+
+  const getActivityTypeIcon = (activityType?: string) => 
+    ACTIVITY_TYPE_ICONS[activityType as keyof typeof ACTIVITY_TYPE_ICONS] || '🌟';
+
+  // Animaciones de entrada
   useEffect(() => {
-    // Entrance animations
     Animated.sequence([
       Animated.timing(headerAnimation, {
         toValue: 1,
@@ -124,10 +122,10 @@ const HomeScreen = () => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+  }, [headerAnimation, progressAnimation, cardsAnimation]);
 
   const goToCategory = (category: string) => {
-    navigation.navigate('sublessonList', { category });
+    navigation.navigate('sublessonList', { category, activityType });
   };
 
   const renderCategoryCard = (category: string, index: number) => {
@@ -140,26 +138,30 @@ const HomeScreen = () => {
       <Animated.View
         key={index}
         style={[
+          styles.animatedCard,
           {
             opacity: cardsAnimation,
-            transform: [{
-              translateY: cardsAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [50, 0],
-              })
-            }, {
-              scale: cardsAnimation.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0.9, 1],
-              })
-            }]
-          }
+            transform: [
+              {
+                translateY: cardsAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [50, 0],
+                }),
+              },
+              {
+                scale: cardsAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.9, 1],
+                }),
+              },
+            ],
+          },
         ]}
       >
         <TouchableOpacity
           style={[
             styles.categoryCard,
-            isCompleted && styles.categoryCardCompleted
+            isCompleted && styles.categoryCardCompleted,
           ]}
           onPress={() => goToCategory(category)}
           activeOpacity={0.8}
@@ -168,7 +170,7 @@ const HomeScreen = () => {
             <View style={[
               styles.categoryIconContainer,
               { backgroundColor: `${categoryColor}15` },
-              isCompleted && styles.categoryIconContainerCompleted
+              isCompleted && styles.categoryIconContainerCompleted,
             ]}>
               <Text style={styles.categoryIcon}>{categoryIcon}</Text>
             </View>
@@ -176,23 +178,27 @@ const HomeScreen = () => {
             <View style={styles.categoryInfo}>
               <Text style={[
                 styles.categoryTitle,
-                isCompleted && styles.categoryTitleCompleted
+                isCompleted && styles.categoryTitleCompleted,
               ]}>
                 {category}
               </Text>
               <Text style={styles.categoryStats}>
                 {stats.completed} de {stats.total} lecciones
               </Text>
+              {activityType && (
+                <Text style={styles.activityFilter}>
+                  🎯 {activityType}
+                </Text>
+              )}
               
-              {/* Mini progress bar */}
               <View style={styles.miniProgressBar}>
                 <View 
                   style={[
                     styles.miniProgressFill,
                     { 
                       width: `${stats.percentage}%`,
-                      backgroundColor: categoryColor
-                    }
+                      backgroundColor: categoryColor,
+                    },
                   ]} 
                 />
               </View>
@@ -205,7 +211,7 @@ const HomeScreen = () => {
                 </View>
               ) : (
                 <View style={styles.progressBadge}>
-                  <Text style={[styles.progressText, { color: categoryColor }]}>
+                  <Text style={[styles.progressBadgeText, { color: categoryColor }]}>
                     {Math.round(stats.percentage)}%
                   </Text>
                 </View>
@@ -224,11 +230,14 @@ const HomeScreen = () => {
     );
   };
 
+  // Estadísticas generales (solo para modo general)
+  const totalLessons = LESSONS_DATA.length;
+  const completedLessons = LESSONS_DATA.filter(l => l.completed).length;
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#4285f4" />
       
-      {/* Header mejorado */}
       <Animated.View 
         style={[
           styles.header,
@@ -238,29 +247,39 @@ const HomeScreen = () => {
               translateY: headerAnimation.interpolate({
                 inputRange: [0, 1],
                 outputRange: [-50, 0],
-              })
-            }]
-          }
+              }),
+            }],
+          },
         ]}
       >
-        <View style={styles.headerContent}>
-          <View style={styles.titleContainer}>
-            <Text style={styles.titleIcon}>
-              {getActivityTypeIcon(activityType)}
-            </Text>
-            <Text style={styles.title}>
-              {activityType ? activityType : 'Mis Normas Básicas'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {activityType 
-                ? `Actividades de ${activityType.toLowerCase()}`
-                : 'Aprende las normas básicas de convivencia'
-              }
-            </Text>
+        {/* Botón de regresar cuando hay activityType */}
+        {activityType && (
+          <View style={styles.headerTop}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.backButtonText}>← Volver</Text>
+            </TouchableOpacity>
           </View>
+        )}
+
+        <View style={styles.headerContent}>
+          <Text style={styles.titleIcon}>
+            {getActivityTypeIcon(activityType)}
+          </Text>
+          <Text style={styles.title}>
+            {activityType || 'Mis Normas Básicas'}
+          </Text>
+          <Text style={styles.subtitle}>
+            {activityType 
+              ? `Actividades de ${activityType.toLowerCase()}`
+              : 'Aprende las normas básicas de convivencia'
+            }
+          </Text>
         </View>
 
-        {/* Overall Progress Section */}
+        {/* Progreso general solo en modo general */}
         {!activityType && (
           <View style={styles.progressSection}>
             <View style={styles.progressHeader}>
@@ -276,20 +295,19 @@ const HomeScreen = () => {
                       width: progressAnimation.interpolate({
                         inputRange: [0, 1],
                         outputRange: ['0%', `${overallProgress}%`],
-                      })
-                    }
+                      }),
+                    },
                   ]} 
                 />
               </View>
               <Text style={styles.progressText}>
-                {LESSONS_DATA.filter(l => l.completed).length} de {LESSONS_DATA.length} lecciones completadas
+                {completedLessons} de {totalLessons} lecciones completadas
               </Text>
             </View>
           </View>
         )}
       </Animated.View>
 
-      {/* Content */}
       <View style={styles.contentContainer}>
         <ScrollView 
           contentContainerStyle={styles.scrollContent}
@@ -297,27 +315,40 @@ const HomeScreen = () => {
           bounces={true}
         >
           <Text style={styles.sectionTitle}>
-            {activityType ? 'Categorías Disponibles' : 'Explora por Categorías'}
+            {activityType 
+              ? `Categorías Disponibles (${categories.length})` 
+              : 'Explora por Categorías'
+            }
           </Text>
           
           {categories.length > 0 ? (
-            categories.map((category, index) => renderCategoryCard(category, index))
+            categories.map(renderCategoryCard)
           ) : (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateIcon}>🔍</Text>
               <Text style={styles.emptyStateTitle}>
-                No hay categorías disponibles
+                {activityType 
+                  ? 'No hay categorías para esta actividad'
+                  : 'No hay categorías disponibles'
+                }
               </Text>
               <Text style={styles.emptyStateText}>
                 {activityType 
-                  ? `No se encontraron categorías para "${activityType}"`
+                  ? `La actividad "${activityType}" aún no tiene lecciones disponibles. ¡Pronto agregaremos más contenido!`
                   : 'Pronto agregaremos más contenido'
                 }
               </Text>
+              {activityType && (
+                <TouchableOpacity 
+                  style={styles.emptyStateButton}
+                  onPress={() => navigation.goBack()}
+                >
+                  <Text style={styles.emptyStateButtonText}>← Volver a Actividades</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
-          {/* Bottom spacing */}
           <View style={styles.bottomSpacing} />
         </ScrollView>
       </View>
@@ -343,12 +374,26 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
+  headerTop: {
+    marginBottom: 15,
+    alignItems: 'flex-start',
+  },
+  backButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
   headerContent: {
     alignItems: 'center',
     marginBottom: 20,
-  },
-  titleContainer: {
-    alignItems: 'center',
   },
   titleIcon: {
     fontSize: 48,
@@ -428,10 +473,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
+  animatedCard: {
+    marginBottom: 16,
+  },
   categoryCard: {
     backgroundColor: 'white',
     borderRadius: 20,
-    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
@@ -481,7 +528,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6b7280',
     fontWeight: '500',
+    marginBottom: 4,
+  },
+  activityFilter: {
+    fontSize: 12,
+    color: '#4285f4',
+    fontWeight: '600',
     marginBottom: 8,
+    backgroundColor: '#e8f0fe',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
   },
   miniProgressBar: {
     width: '100%',
@@ -506,7 +564,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e8f0fe',
   },
-  progressText: {
+  progressBadgeText: {
     fontSize: 12,
     fontWeight: '700',
   },
@@ -569,10 +627,27 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 20,
+  },
+  emptyStateButton: {
+    backgroundColor: '#4285f4',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  emptyStateButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   bottomSpacing: {
     height: 40,
   },
 });
 
-export default HomeScreen;
+export default CategoryMenuScreen;

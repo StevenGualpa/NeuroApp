@@ -16,8 +16,8 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
 import AchievementNotification from '../components/AchievementNotification';
-import { GameStatsDisplay } from '../components/GameStatsDisplay';
 import { GameCompletionModal } from '../components/GameCompletionModal';
+import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
 
 const { width } = Dimensions.get('window');
@@ -29,6 +29,8 @@ interface GameStats {
   completionTime: number;
   perfectRun: boolean;
   firstTrySuccess: boolean;
+  dragCount: number;
+  efficiency: number;
 }
 
 const MatchScreen = () => {
@@ -40,6 +42,7 @@ const MatchScreen = () => {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
+  const [score, setScore] = useState(0);
 
   // Animation states
   const [showAnimation, setShowAnimation] = useState(false);
@@ -58,19 +61,20 @@ const MatchScreen = () => {
     completionTime: 0,
     perfectRun: true,
     firstTrySuccess: false,
+    dragCount: 0,
+    efficiency: 100,
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
 
   // Animation refs
-  const headerAnimation = useRef(new Animated.Value(0)).current;
-  const questionAnimation = useRef(new Animated.Value(0)).current;
   const optionAnimations = useRef(
     step.options?.map(() => new Animated.Value(0)) || []
   ).current;
 
   // Memoized values
   const totalOptions = useMemo(() => step.options?.length || 0, [step.options]);
+  const totalItems = 1; // Solo una respuesta correcta en asociar
 
   // Initialize achievements service
   useEffect(() => {
@@ -86,27 +90,15 @@ const MatchScreen = () => {
 
   useEffect(() => {
     // Entrance animations
-    Animated.sequence([
-      Animated.timing(headerAnimation, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(questionAnimation, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.stagger(150, 
-        optionAnimations.map(anim => 
-          Animated.timing(anim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: true,
-          })
-        )
-      ),
-    ]).start();
+    Animated.stagger(150, 
+      optionAnimations.map(anim => 
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        })
+      )
+    ).start();
   }, []);
 
   // Calculate stars based on performance
@@ -166,6 +158,10 @@ const MatchScreen = () => {
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
         errors: finalStats.errors,
+        activityType: 'Asocia elementos',
+        showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
+        usedHelp: false,
+        tookTime: finalStats.completionTime > 60000,
       };
 
       const newlyUnlocked = await AchievementService.recordGameCompletion(gameData);
@@ -233,6 +229,7 @@ const MatchScreen = () => {
       errors: correct ? prev.errors : prev.errors + 1,
       perfectRun: correct ? prev.perfectRun : false,
       firstTrySuccess: correct && isFirstAttempt,
+      dragCount: prev.dragCount + 1,
     }));
 
     // Animate selected option
@@ -252,6 +249,7 @@ const MatchScreen = () => {
 
     setTimeout(() => {
       if (correct) {
+        setScore(1);
         showFeedbackAnimation('success');
       } else {
         showFeedbackAnimation('error');
@@ -268,6 +266,7 @@ const MatchScreen = () => {
     setIsAnswered(false);
     setGameCompleted(false);
     setShowStars(false);
+    setScore(0);
     setGameStats({
       totalAttempts: 0,
       errors: 0,
@@ -275,6 +274,8 @@ const MatchScreen = () => {
       completionTime: 0,
       perfectRun: true,
       firstTrySuccess: false,
+      dragCount: 0,
+      efficiency: 100,
     });
   }, []);
 
@@ -324,66 +325,62 @@ const MatchScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Compact Header */}
+      {/* Header simplificado */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={handleBackPress}
-          >
-            <Text style={styles.backButtonText}>← Volver</Text>
-          </TouchableOpacity>
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>{lessonTitle}</Text>
-          </View>
-          <View style={styles.placeholder} />
-        </View>
-        
-        <View style={styles.activityBadge}>
-          <Text style={styles.activityText}>🎯 Emparejar</Text>
-        </View>
-
-        {/* Compact Stats Display usando componente reutilizable */}
-        {gameStats.totalAttempts > 0 && (
-          <GameStatsDisplay 
-            stats={gameStats}
-            showPerfectBadge={true}
-            layout="horizontal"
-          />
-        )}
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleBackPress}
+        >
+          <Text style={styles.backButtonText}>← Volver</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Scrollable Content */}
+      {/* Contenido Scrollable */}
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
-        {/* Question Container */}
-        <Animated.View 
-          style={[
-            styles.questionContainer,
-            {
-              opacity: questionAnimation,
-              transform: [{
-                scale: questionAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.9, 1],
-                })
-              }]
-            }
-          ]}
-        >
-          <View style={styles.questionHeader}>
-            <Text style={styles.questionIcon}>❓</Text>
-            <Text style={styles.questionTitle}>Pregunta</Text>
+        {/* Tarjeta principal con instrucciones */}
+        <View style={styles.instructionCard}>
+          {/* Instrucciones */}
+          <View style={styles.instructionHeader}>
+            <Text style={styles.instructionIcon}>🎯</Text>
+            <Text style={styles.instructionTitle}>¿Cómo jugar?</Text>
           </View>
-          <Text style={styles.questionText}>{step.text}</Text>
-          <Text style={styles.instructionText}>Selecciona la opción correcta</Text>
-        </Animated.View>
+          
+          <Text style={styles.instructionText}>
+            1. 👀 Lee la pregunta con atención
+          </Text>
+          <Text style={styles.instructionText}>
+            2. 🤔 Piensa cuál es la respuesta correcta
+          </Text>
+          <Text style={styles.instructionText}>
+            3. 👆 Toca la opción que crees correcta
+          </Text>
+          
+          <View style={styles.instructionTip}>
+            <Text style={styles.instructionTipText}>
+              💡 ¡Solo hay una respuesta correcta!
+            </Text>
+          </View>
+        </View>
 
-        {/* Compact Options Container */}
+        {/* Progreso del juego */}
+        <ProgressSection 
+          score={score}
+          totalItems={totalItems}
+          gameStats={gameStats}
+        />
+
+        {/* Pregunta */}
+        <View style={styles.questionContainer}>
+          <Text style={styles.sectionTitle}>Pregunta:</Text>
+          <Text style={styles.questionText}>{step.text}</Text>
+        </View>
+
+        {/* Opciones de respuesta */}
         <View style={styles.optionsContainer}>
           <Text style={styles.sectionTitle}>Opciones disponibles:</Text>
           <View style={styles.optionsGrid}>
@@ -406,8 +403,8 @@ const MatchScreen = () => {
                 ]}
               >
                 <TouchableOpacity
-                  style={getOptionStyle(idx, option.correct)}
-                  onPress={() => handleOptionPress(option.correct, idx)}
+                  style={getOptionStyle(idx, option.correct || false)}
+                  onPress={() => handleOptionPress(option.correct || false, idx)}
                   activeOpacity={0.8}
                   disabled={isAnswered}
                 >
@@ -445,16 +442,25 @@ const MatchScreen = () => {
           </View>
         </View>
 
-        {/* Footer motivacional */}
+        {/* Footer motivacional como en otras actividades */}
         <View style={styles.footer}>
           <View style={styles.motivationContainer}>
             <Text style={styles.motivationIcon}>⭐</Text>
-            <Text style={styles.footerText}>¡Piensa bien antes de elegir!</Text>
+            <Text style={styles.footerText}>
+              {score === 0 ? '¡Piensa bien antes de elegir!' :
+               '¡Increíble! Lo lograste'}
+            </Text>
             <Text style={styles.motivationIcon}>⭐</Text>
+          </View>
+          
+          {/* Mensaje adicional de ánimo */}
+          <View style={styles.encouragementFooter}>
+            <Text style={styles.encouragementFooterText}>
+              🧠 Cada respuesta te hace más inteligente ✨
+            </Text>
           </View>
         </View>
 
-        {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
@@ -466,6 +472,10 @@ const MatchScreen = () => {
         onContinue={() => navigation.goBack()}
         performanceMessage={getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.firstTrySuccess)}
         gameType="match"
+        customStats={[
+          { label: 'Intentos totales', value: gameStats.totalAttempts },
+          { label: 'Respuesta correcta', value: score === 1 ? 'Sí' : 'No' },
+        ]}
         bonusMessage={gameStats.firstTrySuccess ? "🎯 ¡Primera vez perfecto!" : undefined}
       />
 
@@ -495,121 +505,116 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8faff',
   },
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8faff',
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 12,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  headerTop: {
+    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
   },
   backButton: {
-    backgroundColor: '#f0f4ff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 12,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#4285f4',
+    borderColor: '#e8f0fe',
   },
   backButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#4285f4',
   },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-    color: '#1a1a1a',
-  },
-  placeholder: {
-    width: 60,
-  },
-  activityBadge: {
-    backgroundColor: '#4285f4',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'center',
-    marginBottom: 8,
-  },
-  activityText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 8,
   },
-  questionContainer: {
+  instructionCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
-    borderLeftWidth: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
     borderLeftColor: '#4285f4',
   },
-  questionHeader: {
+  instructionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
-  questionIcon: {
+  instructionIcon: {
     fontSize: 20,
     marginRight: 8,
   },
-  questionTitle: {
+  instructionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
   },
+  instructionText: {
+    fontSize: 14,
+    color: '#1a1a1a',
+    fontWeight: '600',
+    marginBottom: 6,
+    paddingLeft: 6,
+  },
+  instructionTip: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  instructionTipText: {
+    fontSize: 12,
+    color: '#1e40af',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  questionContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff9800',
+  },
   questionText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
     color: '#1a1a1a',
-    lineHeight: 24,
-    marginBottom: 8,
-  },
-  instructionText: {
-    fontSize: 14,
-    textAlign: 'center',
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  optionsContainer: {
-    marginBottom: 20,
+    lineHeight: 22,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: 16,
+    marginBottom: 12,
     textAlign: 'center',
+  },
+  optionsContainer: {
+    marginBottom: 16,
   },
   optionsGrid: {
     flexDirection: 'row',
@@ -728,6 +733,7 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
     paddingVertical: 20,
+    paddingHorizontal: 16,
   },
   motivationContainer: {
     flexDirection: 'row',
@@ -741,6 +747,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+    marginBottom: 12,
   },
   motivationIcon: {
     fontSize: 18,
@@ -750,6 +757,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#1a1a1a',
+    textAlign: 'center',
+    flex: 1,
+  },
+  encouragementFooter: {
+    backgroundColor: '#f0f9ff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  encouragementFooterText: {
+    fontSize: 12,
+    color: '#1e40af',
+    fontWeight: '600',
     textAlign: 'center',
   },
   bottomSpacing: {

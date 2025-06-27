@@ -16,8 +16,8 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
 import AchievementNotification from '../components/AchievementNotification';
-import { GameStatsDisplay } from '../components/GameStatsDisplay';
 import { GameCompletionModal } from '../components/GameCompletionModal';
+import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
 
 const { width } = Dimensions.get('window');
@@ -31,6 +31,8 @@ interface GameStats {
   completionTime: number;
   perfectRun: boolean;
   firstTrySuccess: boolean;
+  dragCount: number;
+  efficiency: number;
 }
 
 const SelectOptionScreen = () => {
@@ -42,6 +44,7 @@ const SelectOptionScreen = () => {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
+  const [score, setScore] = useState(0);
 
   // Animation states
   const [showAnimation, setShowAnimation] = useState(false);
@@ -60,6 +63,8 @@ const SelectOptionScreen = () => {
     completionTime: 0,
     perfectRun: true,
     firstTrySuccess: false,
+    dragCount: 0,
+    efficiency: 100,
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
@@ -68,12 +73,10 @@ const SelectOptionScreen = () => {
   const [optionScales] = useState(
     step.options?.map(() => new Animated.Value(1)) || []
   );
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const headerAnimation = useRef(new Animated.Value(0)).current;
-  const questionAnimation = useRef(new Animated.Value(0)).current;
 
   // Memoized values
   const totalOptions = useMemo(() => step.options?.length || 0, [step.options]);
+  const totalItems = 1; // Solo una respuesta correcta en selección
 
   // Initialize achievements service
   useEffect(() => {
@@ -85,27 +88,6 @@ const SelectOptionScreen = () => {
       }
     };
     initAchievements();
-  }, []);
-
-  useEffect(() => {
-    // Entrance animations
-    Animated.sequence([
-      Animated.timing(headerAnimation, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(questionAnimation, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-    ]).start();
   }, []);
 
   // Calculate stars based on performance
@@ -165,6 +147,10 @@ const SelectOptionScreen = () => {
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
         errors: finalStats.errors,
+        activityType: 'Selecciona la opción correcta',
+        showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
+        usedHelp: false,
+        tookTime: finalStats.completionTime > 60000,
       };
 
       const newlyUnlocked = await AchievementService.recordGameCompletion(gameData);
@@ -232,6 +218,7 @@ const SelectOptionScreen = () => {
       errors: correct ? prev.errors : prev.errors + 1,
       perfectRun: correct ? prev.perfectRun : false,
       firstTrySuccess: correct && isFirstAttempt,
+      dragCount: prev.dragCount + 1,
     }));
 
     // Animate the selected option
@@ -249,6 +236,7 @@ const SelectOptionScreen = () => {
 
     setTimeout(() => {
       if (correct) {
+        setScore(1);
         showFeedbackAnimation('success');
       } else {
         showFeedbackAnimation('error');
@@ -288,6 +276,7 @@ const SelectOptionScreen = () => {
     setIsAnswered(false);
     setGameCompleted(false);
     setShowStars(false);
+    setScore(0);
     setGameStats({
       totalAttempts: 0,
       errors: 0,
@@ -295,6 +284,8 @@ const SelectOptionScreen = () => {
       completionTime: 0,
       perfectRun: true,
       firstTrySuccess: false,
+      dragCount: 0,
+      efficiency: 100,
     });
 
     // Reset all animations
@@ -363,68 +354,64 @@ const SelectOptionScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header mejorado */}
-        <Animated.View 
-          style={[
-            styles.header,
-            {
-              opacity: headerAnimation,
-              transform: [{
-                translateY: headerAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-20, 0],
-                })
-              }]
-            }
-          ]}
+      {/* Header simplificado */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleBackPress}
         >
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>{lessonTitle}</Text>
-            <View style={styles.titleUnderline} />
-          </View>
-          <View style={styles.activityBadge}>
-            <Text style={styles.activityText}>🎯 Selección Múltiple</Text>
-          </View>
+          <Text style={styles.backButtonText}>← Volver</Text>
+        </TouchableOpacity>
+      </View>
 
-          {/* Stats Display usando componente reutilizable */}
-          {gameStats.totalAttempts > 0 && (
-            <GameStatsDisplay 
-              stats={gameStats}
-              showPerfectBadge={true}
-            />
-          )}
-
-          <View style={styles.progressBar}>
-            <View style={styles.progressFill} />
+      {/* Contenido Scrollable */}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
+        {/* Tarjeta principal con instrucciones */}
+        <View style={styles.instructionCard}>
+          {/* Instrucciones */}
+          <View style={styles.instructionHeader}>
+            <Text style={styles.instructionIcon}>🎯</Text>
+            <Text style={styles.instructionTitle}>¿Cómo jugar?</Text>
           </View>
-        </Animated.View>
-
-        {/* Question Container */}
-        <Animated.View 
-          style={[
-            styles.questionContainer,
-            {
-              opacity: questionAnimation,
-              transform: [{
-                scale: questionAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.9, 1],
-                })
-              }]
-            }
-          ]}
-        >
-          <View style={styles.questionHeader}>
-            <Text style={styles.questionIcon}>❓</Text>
-            <Text style={styles.questionTitle}>Pregunta</Text>
+          
+          <Text style={styles.instructionText}>
+            1. 👀 Lee la pregunta con atención
+          </Text>
+          <Text style={styles.instructionText}>
+            2. 🤔 Piensa cuál es la respuesta correcta
+          </Text>
+          <Text style={styles.instructionText}>
+            3. 👆 Toca la opción que crees correcta
+          </Text>
+          
+          <View style={styles.instructionTip}>
+            <Text style={styles.instructionTipText}>
+              💡 ¡Solo hay una respuesta correcta!
+            </Text>
           </View>
-          <Text style={styles.instruction}>{step.text}</Text>
-          <Text style={styles.instructionSubtext}>Selecciona la opción correcta</Text>
-        </Animated.View>
+        </View>
 
-        {/* Options Grid */}
-        <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        {/* Progreso del juego */}
+        <ProgressSection 
+          score={score}
+          totalItems={totalItems}
+          gameStats={gameStats}
+        />
+
+        {/* Pregunta */}
+        <View style={styles.questionContainer}>
+          <Text style={styles.sectionTitle}>Pregunta:</Text>
+          <Text style={styles.questionText}>{step.text}</Text>
+        </View>
+
+        {/* Opciones de respuesta */}
+        <View style={styles.optionsContainer}>
+          <Text style={styles.sectionTitle}>Opciones disponibles:</Text>
           <View style={styles.optionsGrid}>
             {step.options?.map((option, idx) => (
               <Animated.View
@@ -472,16 +459,28 @@ const SelectOptionScreen = () => {
               </Animated.View>
             ))}
           </View>
-        </Animated.View>
+        </View>
 
-        {/* Footer motivacional */}
+        {/* Footer motivacional como en otras actividades */}
         <View style={styles.footer}>
           <View style={styles.motivationContainer}>
             <Text style={styles.motivationIcon}>⭐</Text>
-            <Text style={styles.footerText}>¡Piensa bien antes de elegir!</Text>
+            <Text style={styles.footerText}>
+              {score === 0 ? '¡Piensa bien antes de elegir!' :
+               '¡Increíble! Lo lograste'}
+            </Text>
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
+          
+          {/* Mensaje adicional de ánimo */}
+          <View style={styles.encouragementFooter}>
+            <Text style={styles.encouragementFooterText}>
+              🧠 Cada decisión te hace más sabio ✨
+            </Text>
+          </View>
         </View>
+
+        <View style={styles.bottomSpacing} />
       </ScrollView>
 
       {/* Game Complete Modal usando componente reutilizable */}
@@ -492,6 +491,10 @@ const SelectOptionScreen = () => {
         onContinue={() => navigation.goBack()}
         performanceMessage={getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.firstTrySuccess)}
         gameType="selection"
+        customStats={[
+          { label: 'Intentos totales', value: gameStats.totalAttempts },
+          { label: 'Respuesta correcta', value: score === 1 ? 'Sí' : 'No' },
+        ]}
         bonusMessage={gameStats.firstTrySuccess ? "🎯 ¡Primera vez perfecto!" : undefined}
       />
 
@@ -511,19 +514,6 @@ const SelectOptionScreen = () => {
           onHide={handleAchievementNotificationHide}
         />
       )}
-
-      {/* Back Button */}
-      <View style={styles.backButtonContainer}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleBackPress}
-          accessible={true}
-          accessibilityLabel="Volver a la pantalla anterior"
-          accessibilityRole="button"
-        >
-          <Text style={styles.backButtonText}>← Volver</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -533,160 +523,140 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8faff',
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 80,
-  },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 25,
-    paddingBottom: 20,
-    backgroundColor: '#ffffff',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  titleContainer: {
+    backgroundColor: '#f8faff',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
   },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    textAlign: 'center',
-    color: '#1a1a1a',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  titleUnderline: {
-    width: 60,
-    height: 4,
-    backgroundColor: '#4285f4',
-    borderRadius: 2,
-  },
-  activityBadge: {
-    backgroundColor: '#4285f4',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: '#4285f4',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-    marginBottom: 15,
-    alignSelf: 'center',
-  },
-  activityText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#e8f0fe',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    width: '100%',
-    backgroundColor: '#4285f4',
-    borderRadius: 4,
-  },
-  questionContainer: {
+  backButton: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 25,
-    marginHorizontal: 20,
-    marginTop: 25,
-    marginBottom: 25,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
     shadowColor: '#4285f4',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderLeftWidth: 5,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e8f0fe',
+  },
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4285f4',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  instructionCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
     borderLeftColor: '#4285f4',
   },
-  questionHeader: {
+  instructionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 15,
+    marginBottom: 10,
   },
-  questionIcon: {
-    fontSize: 24,
-    marginRight: 10,
-  },
-  questionTitle: {
+  instructionIcon: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#1a1a1a',
+    marginRight: 8,
   },
-  instruction: {
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-    color: '#1a1a1a',
-    lineHeight: 28,
-    marginBottom: 12,
-  },
-  instructionSubtext: {
+  instructionTitle: {
     fontSize: 16,
-    textAlign: 'center',
-    color: '#6b7280',
-    fontWeight: '500',
+    fontWeight: '700',
+    color: '#1a1a1a',
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
+  instructionText: {
+    fontSize: 14,
+    color: '#1a1a1a',
+    fontWeight: '600',
+    marginBottom: 6,
+    paddingLeft: 6,
+  },
+  instructionTip: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  instructionTipText: {
+    fontSize: 12,
+    color: '#1e40af',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  questionContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff9800',
+  },
+  questionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#1a1a1a',
+    lineHeight: 22,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  optionsContainer: {
+    marginBottom: 16,
   },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: 16,
-    paddingBottom: 20,
+    gap: 12,
   },
   optionWrapper: {
-    width: (width - 56) / 2,
-    marginBottom: 16,
+    width: (width - 44) / 2,
   },
   optionButton: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 20,
-    minHeight: 160,
+    borderRadius: 16,
+    padding: 16,
+    minHeight: 120,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#4285f4',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 2,
     borderColor: '#e8f0fe',
     position: 'relative',
   },
@@ -694,13 +664,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#e8f5e8',
     borderColor: '#4caf50',
     shadowColor: '#4caf50',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
   },
   optionButtonIncorrect: {
     backgroundColor: '#ffeaea',
     borderColor: '#f44336',
     shadowColor: '#f44336',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
   },
   optionButtonDisabled: {
     backgroundColor: '#f5f5f5',
@@ -713,12 +683,12 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     backgroundColor: 'rgba(66, 133, 244, 0.1)',
-    borderRadius: 50,
-    width: 80,
-    height: 80,
+    borderRadius: 30,
+    width: 60,
+    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   iconContainerCorrect: {
     backgroundColor: 'rgba(76, 175, 80, 0.2)',
@@ -731,43 +701,43 @@ const styles = StyleSheet.create({
     borderColor: '#f44336',
   },
   optionIcon: {
-    fontSize: 40,
+    fontSize: 28,
   },
   optionLabel: {
-    fontSize: 16,
+    fontSize: 12,
     textAlign: 'center',
     color: '#1a1a1a',
     fontWeight: '600',
-    lineHeight: 22,
+    lineHeight: 16,
   },
   optionLabelCorrect: {
-    fontSize: 16,
+    fontSize: 12,
     textAlign: 'center',
     color: '#2e7d32',
     fontWeight: '700',
-    lineHeight: 22,
+    lineHeight: 16,
   },
   optionLabelIncorrect: {
-    fontSize: 16,
+    fontSize: 12,
     textAlign: 'center',
     color: '#c62828',
     fontWeight: '700',
-    lineHeight: 22,
+    lineHeight: 16,
   },
   optionLabelDisabled: {
-    fontSize: 16,
+    fontSize: 12,
     textAlign: 'center',
     color: '#9e9e9e',
     fontWeight: '600',
-    lineHeight: 22,
+    lineHeight: 16,
   },
   resultIndicator: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    borderRadius: 16,
-    width: 32,
-    height: 32,
+    top: -6,
+    right: -6,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -783,7 +753,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f44336',
   },
   resultIcon: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   resultIconCorrect: {
@@ -794,57 +764,50 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
   },
   motivationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 25,
-    paddingVertical: 15,
-    borderRadius: 25,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
     shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    marginBottom: 12,
   },
   motivationIcon: {
-    fontSize: 20,
-    marginHorizontal: 8,
+    fontSize: 18,
+    marginHorizontal: 6,
   },
   footerText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1a1a1a',
     textAlign: 'center',
+    flex: 1,
   },
-  // Back Button Styles
-  backButtonContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
+  encouragementFooter: {
+    backgroundColor: '#f0f9ff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
   },
-  backButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 25,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 2,
-    borderColor: '#4285f4',
+  encouragementFooterText: {
+    fontSize: 12,
+    color: '#1e40af',
+    fontWeight: '600',
+    textAlign: 'center',
   },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4285f4',
+  bottomSpacing: {
+    height: 20,
   },
 });
 

@@ -17,8 +17,8 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
 import AchievementNotification from '../components/AchievementNotification';
-import { GameStatsDisplay } from '../components/GameStatsDisplay';
 import { GameCompletionModal } from '../components/GameCompletionModal';
+import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
 
 type MemoryGameRouteProp = RouteProp<RootStackParamList, 'memoryGame'>;
@@ -40,6 +40,7 @@ interface GameStats {
   matchesFound: number;
   flipCount: number;
   efficiency: number;
+  dragCount: number;
 }
 
 const { width } = Dimensions.get('window');
@@ -57,6 +58,7 @@ const MemoryGameScreen = () => {
   const [gameStarted, setGameStarted] = useState(false);
   const [showingCards, setShowingCards] = useState(true);
   const [gameCompleted, setGameCompleted] = useState(false);
+  const [score, setScore] = useState(0);
 
   // Animation states
   const [showAnimation, setShowAnimation] = useState(false);
@@ -77,15 +79,14 @@ const MemoryGameScreen = () => {
     matchesFound: 0,
     flipCount: 0,
     efficiency: 100,
+    dragCount: 0,
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
 
-  // Animation refs
-  const progressAnimation = useRef(new Animated.Value(0)).current;
-
   // Memoized values
   const totalPairs = useMemo(() => step.options?.length || 0, [step.options]);
+  const totalItems = totalPairs; // Para compatibilidad con ProgressSection
 
   // Initialize achievements service
   useEffect(() => {
@@ -99,7 +100,7 @@ const MemoryGameScreen = () => {
     initAchievements();
   }, []);
 
-  useEffect(() => {
+  const initializeCards = useCallback(() => {
     const duplicated: Card[] =
       step.options?.map((option, index) => ({
         id: index,
@@ -115,12 +116,12 @@ const MemoryGameScreen = () => {
         { 
           ...card, 
           id: card.id * 2,
-          animation: new Animated.Value(180)
+          animation: new Animated.Value(180),
         },
         { 
           ...card, 
           id: card.id * 2 + 1,
-          animation: new Animated.Value(180)
+          animation: new Animated.Value(180),
         },
       ])
       .sort(() => Math.random() - 0.5);
@@ -128,7 +129,7 @@ const MemoryGameScreen = () => {
     setCards(shuffled);
 
     // Show cards for 4 seconds (reduced)
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setShowingCards(false);
       const reset = shuffled.map((c) => ({
         ...c,
@@ -146,7 +147,14 @@ const MemoryGameScreen = () => {
       setCards(reset);
       setGameStarted(true);
     }, 4000);
-  }, []);
+
+    return () => clearTimeout(timer);
+  }, [step.options]);
+
+  useEffect(() => {
+    const cleanup = initializeCards();
+    return cleanup;
+  }, [initializeCards]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, flipCount: number, completionTime: number, totalPairs: number): number => {
@@ -207,6 +215,10 @@ const MemoryGameScreen = () => {
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
         errors: finalStats.errors,
+        activityType: 'Memoria visual',
+        showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
+        usedHelp: false,
+        tookTime: finalStats.completionTime > 60000,
       };
 
       const newlyUnlocked = await AchievementService.recordGameCompletion(gameData);
@@ -258,30 +270,26 @@ const MemoryGameScreen = () => {
   }, [animationType, gameCompleted, gameStats, startTime, calculateStars, totalPairs, recordGameCompletion]);
 
   useEffect(() => {
-    // Update progress bar
-    const progress = totalPairs > 0 ? matchedCount / totalPairs : 0;
-    
-    Animated.timing(progressAnimation, {
-      toValue: progress,
-      duration: 500,
-      useNativeDriver: false,
-    }).start();
+    // Update score for ProgressSection
+    setScore(matchedCount);
 
     // Check if game is complete
     if (matchedCount === totalPairs && totalPairs > 0 && !gameCompleted) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         showFeedbackAnimation('winner');
       }, 1000);
+      return () => clearTimeout(timer);
     }
   }, [matchedCount, totalPairs, gameCompleted, showFeedbackAnimation]);
 
   const flipCard = useCallback((card: Card) => {
     if (card.flipped || card.matched || selected.length === 2 || !gameStarted) return;
 
-    // Update flip count
+    // Update flip count and drag count for ProgressSection compatibility
     setGameStats(prev => ({
       ...prev,
       flipCount: prev.flipCount + 1,
+      dragCount: prev.dragCount + 1,
     }));
 
     // Animate the specific card
@@ -360,6 +368,7 @@ const MemoryGameScreen = () => {
 
   const resetGame = useCallback(() => {
     setMatchedCount(0);
+    setScore(0);
     setSelected([]);
     setGameCompleted(false);
     setShowStars(false);
@@ -374,55 +383,12 @@ const MemoryGameScreen = () => {
       matchesFound: 0,
       flipCount: 0,
       efficiency: 100,
+      dragCount: 0,
     });
 
-    // Reset cards
-    const duplicated: Card[] =
-      step.options?.map((option, index) => ({
-        id: index,
-        icon: option.icon,
-        flipped: true,
-        matched: false,
-        animation: new Animated.Value(180),
-      })) ?? [];
-
-    const shuffled = [...duplicated]
-      .flatMap((card) => [
-        { 
-          ...card, 
-          id: card.id * 2,
-          animation: new Animated.Value(180)
-        },
-        { 
-          ...card, 
-          id: card.id * 2 + 1,
-          animation: new Animated.Value(180)
-        },
-      ])
-      .sort(() => Math.random() - 0.5);
-
-    setCards(shuffled);
-
-    // Show cards again
-    setTimeout(() => {
-      setShowingCards(false);
-      const reset = shuffled.map((c) => ({
-        ...c,
-        flipped: false,
-      }));
-
-      reset.forEach((card) => {
-        Animated.timing(card.animation, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-      });
-
-      setCards(reset);
-      setGameStarted(true);
-    }, 4000);
-  }, [step.options]);
+    // Reinitialize cards
+    initializeCards();
+  }, [initializeCards]);
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, flipCount: number, totalPairs: number) => {
     const minFlips = totalPairs * 2;
@@ -473,9 +439,9 @@ const MemoryGameScreen = () => {
             style={[
               styles.card,
               styles.front,
+              styles.cardFace,
               {
                 transform: [{ rotateY }],
-                backfaceVisibility: 'hidden',
               },
             ]}
           >
@@ -485,13 +451,10 @@ const MemoryGameScreen = () => {
             style={[
               styles.card,
               styles.back,
+              styles.cardFaceBack,
               card.matched && styles.matchedCard,
               {
                 transform: [{ rotateY: rotateYBack }],
-                backfaceVisibility: 'hidden',
-                position: 'absolute',
-                top: 0,
-                left: 0,
               },
             ]}
           >
@@ -509,71 +472,61 @@ const MemoryGameScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Compact Header */}
+      {/* Header simplificado */}
       <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={handleBackPress}
-          >
-            <Text style={styles.backButtonText}>← Volver</Text>
-          </TouchableOpacity>
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>{lessonTitle}</Text>
-          </View>
-          <View style={styles.placeholder} />
-        </View>
-        
-        <View style={styles.activityBadge}>
-          <Text style={styles.activityText}>🧠 Juego de Memoria</Text>
-        </View>
-
-        {/* Progress Bar */}
-        {gameStarted && (
-          <View style={styles.progressContainer}>
-            <Text style={styles.progressText}>{matchedCount}/{totalPairs}</Text>
-            <View style={styles.progressBar}>
-              <Animated.View 
-                style={[
-                  styles.progressFill,
-                  {
-                    width: progressAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0%', '100%'],
-                    })
-                  }
-                ]} 
-              />
-            </View>
-          </View>
-        )}
-
-        {/* Compact Stats Display usando componente reutilizable */}
-        {gameStarted && gameStats.totalAttempts > 0 && (
-          <GameStatsDisplay 
-            stats={gameStats}
-            showPerfectBadge={true}
-            layout="horizontal"
-          />
-        )}
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleBackPress}
+        >
+          <Text style={styles.backButtonText}>← Volver</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Scrollable Content */}
+      {/* Contenido Scrollable */}
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
-        {/* Instructions */}
+        {/* Tarjeta principal con instrucciones */}
         <View style={styles.instructionCard}>
+          {/* Instrucciones */}
           <View style={styles.instructionHeader}>
-            <Text style={styles.instructionIcon}>👀</Text>
-            <Text style={styles.instructionTitle}>
-              {showingCards ? '¡Memoriza!' : '¡Encuentra parejas!'}
+            <Text style={styles.instructionIcon}>🧠</Text>
+            <Text style={styles.instructionTitle}>¿Cómo jugar?</Text>
+          </View>
+          
+          <Text style={styles.instructionText}>
+            1. 👀 Observa bien las cartas al inicio
+          </Text>
+          <Text style={styles.instructionText}>
+            2. 🧠 Memoriza dónde están los pares
+          </Text>
+          <Text style={styles.instructionText}>
+            3. 👆 Toca las cartas para voltearlas
+          </Text>
+          
+          <View style={styles.instructionTip}>
+            <Text style={styles.instructionTipText}>
+              💡 ¡Encuentra todas las parejas iguales!
             </Text>
           </View>
-          <Text style={styles.instructionText}>
+        </View>
+
+        {/* Progreso del juego */}
+        <ProgressSection 
+          score={score}
+          totalItems={totalItems}
+          gameStats={gameStats}
+        />
+
+        {/* Estado del juego */}
+        <View style={styles.gameStateContainer}>
+          <Text style={styles.sectionTitle}>
+            {showingCards ? '👀 ¡Memoriza las cartas!' : '🧠 Encuentra las parejas:'}
+          </Text>
+          <Text style={styles.gameStateText}>
             {showingCards 
               ? 'Observa bien las cartas y recuerda dónde están'
               : 'Toca las cartas para voltearlas y encuentra las parejas iguales'
@@ -581,25 +534,34 @@ const MemoryGameScreen = () => {
           </Text>
         </View>
 
-        {/* Compact Grid de cartas */}
+        {/* Grid de cartas */}
         <View style={styles.gameContainer}>
           <View style={styles.grid}>
             {cards.map(renderCard)}
           </View>
         </View>
 
-        {/* Footer motivacional */}
+        {/* Footer motivacional como en otras actividades */}
         <View style={styles.footer}>
           <View style={styles.motivationContainer}>
             <Text style={styles.motivationIcon}>⭐</Text>
             <Text style={styles.footerText}>
-              {showingCards ? '¡Observa con atención!' : '¡Tú puedes hacerlo!'}
+              {showingCards ? '¡Observa con atención!' :
+               score === 0 ? '¡Usa tu memoria!' :
+               score === totalItems ? '¡Increíble! Lo lograste' :
+               '¡Excelente! Sigue así, casi terminas'}
             </Text>
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
+          
+          {/* Mensaje adicional de ánimo */}
+          <View style={styles.encouragementFooter}>
+            <Text style={styles.encouragementFooterText}>
+              🧠 Cada juego fortalece tu memoria ✨
+            </Text>
+          </View>
         </View>
 
-        {/* Bottom Spacing */}
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
@@ -647,134 +609,117 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8faff',
   },
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f8faff',
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 12,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  headerTop: {
+    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
   },
   backButton: {
-    backgroundColor: '#f0f4ff',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 12,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
     borderWidth: 1,
-    borderColor: '#4285f4',
+    borderColor: '#e8f0fe',
   },
   backButtonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#4285f4',
   },
-  titleContainer: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    textAlign: 'center',
-    color: '#1a1a1a',
-  },
-  placeholder: {
-    width: 60,
-  },
-  activityBadge: {
-    backgroundColor: '#4285f4',
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
-    alignSelf: 'center',
-    marginBottom: 8,
-  },
-  activityText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  progressContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    marginBottom: 8,
-  },
-  progressText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4285f4',
-    minWidth: 40,
-  },
-  progressBar: {
-    flex: 1,
-    height: 6,
-    backgroundColor: '#e8f0fe',
-    borderRadius: 3,
-    overflow: 'hidden',
-    maxWidth: 120,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#4285f4',
-    borderRadius: 3,
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 8,
   },
   instructionCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
-    borderLeftWidth: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
     borderLeftColor: '#4285f4',
   },
   instructionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   instructionIcon: {
-    fontSize: 24,
-    marginRight: 10,
+    fontSize: 20,
+    marginRight: 8,
   },
   instructionTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
   },
   instructionText: {
-    fontSize: 16,
+    fontSize: 14,
+    color: '#1a1a1a',
+    fontWeight: '600',
+    marginBottom: 6,
+    paddingLeft: 6,
+  },
+  instructionTip: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  instructionTipText: {
+    fontSize: 12,
+    color: '#1e40af',
+    fontWeight: '600',
     textAlign: 'center',
-    color: '#6b7280',
-    fontWeight: '500',
-    lineHeight: 22,
+  },
+  gameStateContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff9800',
+  },
+  gameStateText: {
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+    color: '#1a1a1a',
+    lineHeight: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 8,
+    textAlign: 'center',
   },
   gameContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   grid: {
     flexDirection: 'row',
@@ -825,9 +770,19 @@ const styles = StyleSheet.create({
   cardIcon: {
     fontSize: 28,
   },
+  cardFace: {
+    backfaceVisibility: 'hidden',
+  },
+  cardFaceBack: {
+    backfaceVisibility: 'hidden',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
   footer: {
     alignItems: 'center',
     paddingVertical: 20,
+    paddingHorizontal: 16,
   },
   motivationContainer: {
     flexDirection: 'row',
@@ -841,6 +796,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+    marginBottom: 12,
   },
   motivationIcon: {
     fontSize: 18,
@@ -850,6 +806,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#1a1a1a',
+    textAlign: 'center',
+    flex: 1,
+  },
+  encouragementFooter: {
+    backgroundColor: '#f0f9ff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  encouragementFooterText: {
+    fontSize: 12,
+    color: '#1e40af',
+    fontWeight: '600',
     textAlign: 'center',
   },
   bottomSpacing: {

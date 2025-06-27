@@ -24,6 +24,7 @@ const activityConfig = [
   { emoji: '🎨', color: '#FFA726', shadowColor: '#FF9800', gradient: ['#FFA726', '#FF9800'] },
   { emoji: '🎵', color: '#AB47BC', shadowColor: '#9C27B0', gradient: ['#AB47BC', '#9C27B0'] },
   { emoji: '🌟', color: '#66BB6A', shadowColor: '#4CAF50', gradient: ['#66BB6A', '#4CAF50'] },
+  { emoji: '🔍', color: '#FF9800', shadowColor: '#F57C00', gradient: ['#FF9800', '#F57C00'] },
 ];
 
 const activityTypes = [
@@ -75,6 +76,22 @@ const activityTypes = [
     difficulty: 'Fácil',
     estimatedTime: '2-4 min'
   },
+  {
+    id: 'pattern-recognition',
+    title: 'Reconocimiento de patrones',
+    shortTitle: 'Patrones',
+    description: 'Identifica secuencias y patrones',
+    difficulty: 'Medio',
+    estimatedTime: '3-4 min'
+  },
+  {
+    id: 'story-creation',
+    title: 'Creación de historias',
+    shortTitle: 'Historias',
+    description: 'Crea historias con pictogramas',
+    difficulty: 'Medio',
+    estimatedTime: '4-6 min'
+  },
 ] as const;
 
 const ActivityMenuScreen = () => {
@@ -124,7 +141,12 @@ const ActivityMenuScreen = () => {
   };
 
   const goToActivityCategory = (activityType: string) => {
-    navigation.navigate('home', { activityType });
+    // Navegación especial para Creación de historias
+    if (activityType === 'Creación de historias') {
+      navigation.navigate('storyCreation', {});
+    } else {
+      navigation.navigate('categoryMenu', { activityType });
+    }
   };
 
   const goToAchievements = () => {
@@ -344,15 +366,22 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backButton: {
-    backgroundColor: '#6b7280',
-    borderRadius: 12,
-    paddingVertical: 8,
+    backgroundColor: '#ffffff',
     paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e8f0fe',
   },
   backButtonText: {
-    color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
+    color: '#4285f4',
   },
   titleSection: {
     flex: 1,

@@ -1,5 +1,5 @@
 // components/GameCompletionModal.tsx
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -57,20 +57,111 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
   showEfficiency = false,
   bonusMessage,
 }) => {
+  // Animaciones para hacer la experiencia más suave y amigable
+  const scaleAnim = useRef(new Animated.Value(0)).current;
+  const starAnimations = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0)
+  ]).current;
+  const celebrationAnim = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Animación de entrada suave
+  useEffect(() => {
+    if (visible) {
+      // Animación de escala del modal
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 50,
+        friction: 8,
+        useNativeDriver: true,
+      }).start();
+
+      // Animación secuencial de estrellas
+      const starAnimationSequence = starAnimations.map((anim, index) =>
+        Animated.timing(anim, {
+          toValue: 1,
+          duration: 400,
+          delay: index * 200,
+          useNativeDriver: true,
+        })
+      );
+
+      Animated.sequence([
+        Animated.delay(300),
+        Animated.stagger(200, starAnimationSequence),
+      ]).start();
+
+      // Animación de celebración continua
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(celebrationAnim, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(celebrationAnim, {
+            toValue: 0,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+
+      // Pulso suave para botones
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.05,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      // Reset animaciones cuando se cierra
+      scaleAnim.setValue(0);
+      starAnimations.forEach(anim => anim.setValue(0));
+      celebrationAnim.setValue(0);
+      pulseAnim.setValue(1);
+    }
+  }, [visible]);
 
   const renderStars = useCallback((count: number) => {
-    return Array.from({ length: 3 }, (_, i) => (
-      <Animated.Text
-        key={i}
-        style={[
-          styles.star,
-          i < count ? styles.starFilled : styles.starEmpty,
-        ]}
-      >
-        ⭐
-      </Animated.Text>
-    ));
-  }, []);
+    return Array.from({ length: 3 }, (_, i) => {
+      const rotation = celebrationAnim.interpolate({
+        inputRange: [0, 1],
+        outputRange: ['0deg', '360deg'],
+      });
+
+      return (
+        <Animated.View
+          key={i}
+          style={{
+            transform: [
+              { scale: starAnimations[i] },
+              { rotate: i < count ? rotation : '0deg' }
+            ],
+          }}
+        >
+          <Text
+            style={[
+              styles.star,
+              i < count ? styles.starFilled : styles.starEmpty,
+            ]}
+          >
+            {i < count ? '⭐' : '☆'}
+          </Text>
+        </Animated.View>
+      );
+    });
+  }, [starAnimations, celebrationAnim]);
 
   const getDefaultStats = useCallback((): DetailedStat[] => {
     const defaultStats: DetailedStat[] = [
@@ -161,61 +252,89 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
     <Modal
       visible={visible}
       transparent={true}
-      animationType="fade"
+      animationType="none"
       statusBarTranslucent={true}
     >
       <View style={styles.completionContainer}>
-        <View style={styles.completionContent}>
-          <Text style={styles.completionText}>🎉 ¡Felicitaciones!</Text>
+        <Animated.View 
+          style={[
+            styles.completionContent,
+            {
+              transform: [{ scale: scaleAnim }]
+            }
+          ]}
+        >
+          {/* Título con emoji grande y amigable */}
+          <View style={styles.headerContainer}>
+            <Text style={styles.celebrationEmoji}>🎉</Text>
+            <Text style={styles.completionText}>¡Increíble!</Text>
+            <Text style={styles.completionSubtext}>Lo lograste</Text>
+          </View>
           
-          {/* Stars Display */}
+          {/* Stars Display con animación */}
           <View style={styles.starsContainer}>
-            <Text style={styles.starsTitle}>Tu puntuación:</Text>
+            <Text style={styles.starsTitle}>Tu resultado:</Text>
             <View style={styles.starsRow}>
               {renderStars(stats.stars)}
             </View>
-            <Text style={styles.performanceMessage}>
-              {performanceMessage}
-            </Text>
+            <View style={styles.messageContainer}>
+              <Text style={styles.performanceMessage}>
+                {performanceMessage}
+              </Text>
+            </View>
           </View>
 
-          {/* Detailed Stats */}
+          {/* Detailed Stats más compactas */}
           <View style={styles.detailedStats}>
-            {allStats.map((stat, index) => (
-              <View key={index} style={styles.statRow}>
-                <Text style={styles.statDetailLabel}>{stat.label}:</Text>
-                <Text style={styles.statDetailValue}>
-                  {stat.value}{stat.suffix || ''}
-                </Text>
-              </View>
-            ))}
+            <View style={styles.statsGrid}>
+              {allStats.slice(0, 4).map((stat, index) => (
+                <View key={index} style={styles.statItem}>
+                  <Text style={styles.statValue}>
+                    {stat.value}{stat.suffix || ''}
+                  </Text>
+                  <Text style={styles.statLabel}>{stat.label}</Text>
+                </View>
+              ))}
+            </View>
             
             {shouldShowBonus() && (
               <View style={styles.bonusRow}>
                 <Text style={styles.bonusText}>
-                  {getAutoBonusMessage()}
+                  🏆 {getAutoBonusMessage()}
                 </Text>
               </View>
             )}
           </View>
 
+          {/* Botones grandes y claros con animación */}
           <View style={styles.completionButtons}>
-            <TouchableOpacity 
-              style={styles.resetButton} 
-              onPress={onReset}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.resetButtonText}>🔄 Jugar de nuevo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.continueButton} 
-              onPress={onContinue}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.continueButtonText}>✨ Continuar</Text>
-            </TouchableOpacity>
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <TouchableOpacity 
+                style={styles.resetButton} 
+                onPress={onReset}
+                activeOpacity={0.7}
+              >
+                <View style={styles.buttonContent}>
+                  <Text style={styles.buttonEmoji}>🔄</Text>
+                  <Text style={styles.resetButtonText}>Jugar otra vez</Text>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
+            
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <TouchableOpacity 
+                style={styles.continueButton} 
+                onPress={onContinue}
+                activeOpacity={0.7}
+              >
+                <View style={styles.buttonContent}>
+                  <Text style={styles.buttonEmoji}>➡️</Text>
+                  <Text style={styles.continueButtonText}>Siguiente</Text>
+                </View>
+              </TouchableOpacity>
+            </Animated.View>
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -224,136 +343,199 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
 const styles = StyleSheet.create({
   completionContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(76, 175, 80, 0.15)', // Verde suave y calmante
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
   },
   completionContent: {
     backgroundColor: '#ffffff',
-    borderRadius: 30,
-    padding: 30,
+    borderRadius: 25,
+    padding: 20,
     alignItems: 'center',
-    maxWidth: 350,
-    width: '100%',
-    shadowColor: '#000',
+    maxWidth: 320,
+    width: '90%',
+    maxHeight: '85%', // Limitar altura máxima
+    shadowColor: '#4CAF50',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
+    shadowOpacity: 0.2,
+    shadowRadius: 15,
     elevation: 15,
+    borderWidth: 2,
+    borderColor: '#E8F5E8', // Borde verde muy suave
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  celebrationEmoji: {
+    fontSize: 40,
+    marginBottom: 5,
   },
   completionText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
-    color: '#1a1a1a',
+    color: '#2E7D32', // Verde oscuro amigable
     textAlign: 'center',
-    marginBottom: 25,
+    marginBottom: 3,
+    fontFamily: 'System', // Fuente del sistema para mejor legibilidad
+  },
+  completionSubtext: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#66BB6A', // Verde medio
+    textAlign: 'center',
   },
   starsContainer: {
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 15,
+    backgroundColor: '#F1F8E9', // Fondo verde muy claro
+    borderRadius: 15,
+    padding: 15,
+    width: '100%',
   },
   starsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginBottom: 15,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#388E3C',
+    marginBottom: 10,
+    textAlign: 'center',
   },
   starsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 10,
+    justifyContent: 'center',
   },
   star: {
-    fontSize: 40,
+    fontSize: 35, // Estrellas más pequeñas
     marginHorizontal: 5,
   },
   starFilled: {
     opacity: 1,
   },
   starEmpty: {
-    opacity: 0.3,
+    opacity: 0.25,
+  },
+  messageContainer: {
+    backgroundColor: '#E8F5E8',
+    borderRadius: 10,
+    padding: 8,
+    marginTop: 5,
   },
   performanceMessage: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4285f4',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2E7D32',
     textAlign: 'center',
-    marginTop: 10,
   },
   detailedStats: {
-    backgroundColor: '#f8faff',
-    borderRadius: 15,
-    padding: 20,
+    backgroundColor: '#F1F8E9', // Verde muy claro
+    borderRadius: 12,
+    padding: 12,
     width: '100%',
-    marginBottom: 25,
+    marginBottom: 15,
   },
-  statRow: {
+  statsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
+  },
+  statItem: {
+    width: '48%', // Dos columnas
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 8,
+    marginBottom: 6,
     alignItems: 'center',
-    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  statDetailLabel: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  statDetailValue: {
+  statValue: {
     fontSize: 16,
-    color: '#1a1a1a',
-    fontWeight: '700',
+    color: '#2E7D32',
+    fontWeight: '800',
+    marginBottom: 2,
+  },
+  statLabel: {
+    fontSize: 10,
+    color: '#424242',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   bonusRow: {
     alignItems: 'center',
-    marginTop: 10,
-    paddingTop: 15,
+    marginTop: 8,
+    paddingTop: 8,
     borderTopWidth: 1,
-    borderTopColor: '#e8f0fe',
+    borderTopColor: '#E8F5E8',
   },
   bonusText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#fbbf24',
+    color: '#F57C00', // Naranja cálido
     textAlign: 'center',
+    backgroundColor: '#FFF3E0',
+    borderRadius: 8,
+    padding: 6,
   },
   completionButtons: {
-    flexDirection: 'row',
-    gap: 15,
+    flexDirection: 'row', // Volver a fila para ahorrar espacio
+    gap: 10,
     width: '100%',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonEmoji: {
+    fontSize: 16,
+    marginRight: 6,
   },
   resetButton: {
     flex: 1,
-    backgroundColor: '#6b7280',
-    paddingVertical: 15,
+    backgroundColor: '#81C784', // Verde suave en lugar de gris
+    paddingVertical: 12,
+    paddingHorizontal: 15,
     borderRadius: 15,
     alignItems: 'center',
-    shadowColor: '#6b7280',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#A5D6A7',
+    minHeight: 45, // Altura reducida pero accesible
   },
   resetButtonText: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
   },
   continueButton: {
     flex: 1,
-    backgroundColor: '#4285f4',
-    paddingVertical: 15,
+    backgroundColor: '#42A5F5', // Azul más suave
+    paddingVertical: 12,
+    paddingHorizontal: 15,
     borderRadius: 15,
     alignItems: 'center',
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowColor: '#2196F3',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: '#90CAF9',
+    minHeight: 45, // Altura reducida pero accesible
   },
   continueButtonText: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });

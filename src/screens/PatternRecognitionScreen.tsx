@@ -1,17 +1,16 @@
-import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
   Animated,
   Dimensions,
+  SafeAreaView,
   ScrollView,
   Vibration,
 } from 'react-native';
-import Tts from 'react-native-tts';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,9 +20,7 @@ import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
 
-const { width } = Dimensions.get('window');
-
-type RepeatSoundRouteProp = RouteProp<RootStackParamList, 'repeatSound'>;
+type PatternRecognitionRouteProp = RouteProp<RootStackParamList, 'patternRecognition'>;
 
 interface GameStats {
   totalAttempts: number;
@@ -34,30 +31,29 @@ interface GameStats {
   firstTrySuccess: boolean;
   dragCount: number;
   efficiency: number;
-  audioPlays: number;
 }
 
-const RepeatSoundScreen = () => {
-  const route = useRoute<RepeatSoundRouteProp>();
+const { width } = Dimensions.get('window');
+
+const PatternRecognitionScreen = () => {
+  const route = useRoute<PatternRecognitionRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
-
-  // Audio and game state
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  // Game state
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [score, setScore] = useState(0);
-  
+
   // Animation states
   const [showAnimation, setShowAnimation] = useState(false);
   const [animationType, setAnimationType] = useState<'success' | 'error' | 'winner' | 'loser'>('success');
-  
+
   // Achievement states
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
   const [showAchievementNotification, setShowAchievementNotification] = useState(false);
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
-  
+
   // Gamification states
   const [gameStats, setGameStats] = useState<GameStats>({
     totalAttempts: 0,
@@ -68,21 +64,21 @@ const RepeatSoundScreen = () => {
     firstTrySuccess: false,
     dragCount: 0,
     efficiency: 100,
-    audioPlays: 0,
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
 
   // Animation refs
-  const speakerScale = useRef(new Animated.Value(1)).current;
+  const [animatedValues] = useState(
+    step.sequence?.map(() => new Animated.Value(0)) || []
+  );
+  const [pulseAnimation] = useState(new Animated.Value(1));
   const [optionScales] = useState(
     step.options?.map(() => new Animated.Value(1)) || []
   );
-  const pulseAnimation = useRef(new Animated.Value(1)).current;
 
   // Memoized values
-  const totalOptions = useMemo(() => step.options?.length || 0, [step.options]);
-  const totalItems = 1; // Solo una respuesta correcta en sonido
+  const totalItems = 1; // Solo una respuesta correcta en reconocimiento de patrones
 
   // Initialize achievements service
   useEffect(() => {
@@ -97,51 +93,52 @@ const RepeatSoundScreen = () => {
   }, []);
 
   useEffect(() => {
-    Tts.setDefaultLanguage('es-ES');
-    Tts.setDefaultRate(0.5);
+    // Animación de entrada para la secuencia
+    const animations = animatedValues.map((value, index) =>
+      Animated.timing(value, {
+        toValue: 1,
+        duration: 300,
+        delay: index * 200,
+        useNativeDriver: true,
+      })
+    );
 
-    // Auto-play after loading
-    setTimeout(() => {
-      playAudio();
-    }, 1000);
+    Animated.stagger(200, animations).start();
 
-    // Continuous pulse animation for audio button
-    const startPulse = () => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnimation, {
-            toValue: 1.05,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnimation, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    };
+    // Animación de pulso para el elemento faltante
+    const pulseAnimationLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnimation, {
+          toValue: 1.2,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnimation, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
 
-    startPulse();
+    pulseAnimationLoop.start();
 
     return () => {
-      Tts.stop();
+      pulseAnimationLoop.stop();
     };
   }, []);
 
   // Calculate stars based on performance
-  const calculateStars = useCallback((errors: number, audioPlays: number, completionTime: number, firstTry: boolean): number => {
+  const calculateStars = useCallback((errors: number, completionTime: number, firstTry: boolean): number => {
     const maxTime = 30000; // 30 seconds as baseline
     const timeBonus = completionTime < maxTime * 0.5 ? 1 : 0;
-    const audioBonus = audioPlays <= 2 ? 1 : 0;
 
-    if (firstTry && errors === 0 && audioPlays <= 1) {
-      return 3; // Perfect performance - first try, minimal audio
+    if (firstTry && errors === 0) {
+      return 3; // Perfect performance - first try success
     } else if (errors === 0) {
       return 2 + timeBonus; // Good performance - no errors
     } else if (errors <= 1) {
-      return 1 + audioBonus; // Acceptable performance - max 1 error
+      return 1 + timeBonus; // Acceptable performance - max 1 error
     } else {
       return 1; // Minimum star for completion
     }
@@ -188,9 +185,9 @@ const RepeatSoundScreen = () => {
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
         errors: finalStats.errors,
-        activityType: 'Repetir sonidos',
+        activityType: 'Reconocimiento de patrones',
         showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
-        usedHelp: finalStats.audioPlays > 3,
+        usedHelp: false,
         tookTime: finalStats.completionTime > 60000,
       };
 
@@ -226,7 +223,7 @@ const RepeatSoundScreen = () => {
       const finalStats = {
         ...gameStats,
         completionTime,
-        stars: calculateStars(gameStats.errors, gameStats.audioPlays, completionTime, gameStats.firstTrySuccess),
+        stars: calculateStars(gameStats.errors, completionTime, gameStats.firstTrySuccess),
       };
       setGameStats(finalStats);
       
@@ -245,45 +242,14 @@ const RepeatSoundScreen = () => {
     }
   }, [animationType, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation]);
 
-  const playAudio = useCallback(() => {
-    if (isPlaying || gameCompleted) return;
-    
-    setIsPlaying(true);
-    Tts.speak(step.audio);
-    
-    // Update audio play count
-    setGameStats(prev => ({
-      ...prev,
-      audioPlays: prev.audioPlays + 1,
-    }));
-    
-    // Audio button animation
-    Animated.sequence([
-      Animated.timing(speakerScale, {
-        toValue: 0.9,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(speakerScale, {
-        toValue: 1.1,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(speakerScale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setTimeout(() => setIsPlaying(false), 1000);
-    });
-  }, [step.audio, speakerScale, isPlaying, gameCompleted]);
-
-  const handlePress = useCallback((correct: boolean, index: number) => {
+  const handleAnswerSelect = useCallback((selectedIcon: string, index: number) => {
     if (isAnswered || gameCompleted) return;
 
-    setSelectedOption(index);
+    setSelectedAnswer(selectedIcon);
     setIsAnswered(true);
+
+    const correctOption = step.options?.find(option => option.correct);
+    const correct = selectedIcon === correctOption?.icon;
 
     // Update stats
     const isFirstAttempt = gameStats.totalAttempts === 0;
@@ -317,7 +283,7 @@ const RepeatSoundScreen = () => {
         showFeedbackAnimation('error');
         setTimeout(() => {
           setIsAnswered(false);
-          setSelectedOption(null);
+          setSelectedAnswer(null);
           // Reset animation
           Animated.timing(optionScales[index], {
             toValue: 1,
@@ -327,7 +293,7 @@ const RepeatSoundScreen = () => {
         }, 1500);
       }
     }, 600);
-  }, [isAnswered, gameCompleted, gameStats, optionScales, showFeedbackAnimation]);
+  }, [isAnswered, gameCompleted, gameStats, optionScales, showFeedbackAnimation, step.options]);
 
   const handleOptionPressIn = useCallback((index: number) => {
     if (isAnswered) return;
@@ -347,7 +313,7 @@ const RepeatSoundScreen = () => {
   }, [isAnswered, optionScales]);
 
   const resetGame = useCallback(() => {
-    setSelectedOption(null);
+    setSelectedAnswer(null);
     setIsAnswered(false);
     setGameCompleted(false);
     setShowStars(false);
@@ -361,7 +327,6 @@ const RepeatSoundScreen = () => {
       firstTrySuccess: false,
       dragCount: 0,
       efficiency: 100,
-      audioPlays: 0,
     });
 
     // Reset all animations
@@ -374,39 +339,110 @@ const RepeatSoundScreen = () => {
     });
   }, [optionScales]);
 
+  const getDifficultyColor = () => {
+    switch (step.difficulty) {
+      case 'easy':
+        return '#4CAF50';
+      case 'medium':
+        return '#FF9800';
+      case 'hard':
+        return '#F44336';
+      default:
+        return '#2196F3';
+    }
+  };
+
+  const getPatternTypeLabel = () => {
+    switch (step.patternType) {
+      case 'visual':
+        return 'Patrón Visual';
+      case 'auditory':
+        return 'Patrón Auditivo';
+      case 'conceptual':
+        return 'Patrón Conceptual';
+      case 'behavioral':
+        return 'Patrón de Comportamiento';
+      default:
+        return 'Patrón';
+    }
+  };
+
   const getOptionStyle = useCallback((index: number, correct: boolean) => {
     if (!isAnswered) return styles.optionButton;
     
-    if (selectedOption === index) {
+    if (selectedAnswer === step.options?.[index]?.icon) {
       return correct ? styles.optionButtonCorrect : styles.optionButtonIncorrect;
     }
     
     return styles.optionButtonDisabled;
-  }, [isAnswered, selectedOption]);
+  }, [isAnswered, selectedAnswer, step.options]);
 
   const getOptionTextStyle = useCallback((index: number, correct: boolean) => {
     if (!isAnswered) return styles.optionLabel;
     
-    if (selectedOption === index) {
+    if (selectedAnswer === step.options?.[index]?.icon) {
       return correct ? styles.optionLabelCorrect : styles.optionLabelIncorrect;
     }
     
     return styles.optionLabelDisabled;
-  }, [isAnswered, selectedOption]);
+  }, [isAnswered, selectedAnswer, step.options]);
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, firstTry: boolean) => {
     if (perfectRun && stars === 3 && firstTry) {
-      return "¡Perfecto! Primera vez sin errores 🏆";
+      return "¡Perfecto! Patrón identificado a la primera 🧠🏆";
     } else if (perfectRun && stars === 3) {
-      return "¡Excelente! Sin errores 🌟";
+      return "¡Excelente! Patrón identificado sin errores 🌟";
     } else if (stars === 3) {
       return "¡Muy bien hecho! 👏";
     } else if (stars === 2) {
-      return "¡Buen trabajo! Sigue así 💪";
+      return "¡Buen trabajo! Sigue practicando 💪";
     } else {
-      return "¡Completado! Puedes mejorar 📈";
+      return "¡Completado! Tu reconocimiento mejorará 📈";
     }
   }, []);
+
+  const renderSequenceItem = (item: string, index: number) => {
+    const isMissing = index === step.missingPosition;
+    
+    if (isMissing) {
+      return (
+        <Animated.View
+          key={index}
+          style={[
+            styles.sequenceItem,
+            styles.missingItem,
+            {
+              transform: [{ scale: pulseAnimation }],
+            },
+          ]}
+        >
+          <Text style={styles.missingText}>?</Text>
+        </Animated.View>
+      );
+    }
+
+    return (
+      <Animated.View
+        key={index}
+        style={[
+          styles.sequenceItem,
+          {
+            opacity: animatedValues[index],
+            transform: [
+              {
+                translateY: animatedValues[index].interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [50, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Text style={styles.sequenceIcon}>{item}</Text>
+      </Animated.View>
+    );
+  };
 
   const handleBackPress = useCallback(() => {
     if (gameStats.totalAttempts > 0 && !gameCompleted) {
@@ -449,25 +485,30 @@ const RepeatSoundScreen = () => {
       >
         {/* Tarjeta principal con instrucciones */}
         <View style={styles.instructionCard}>
-          {/* Instrucciones */}
+          {/* Header con dificultad y tipo */}
           <View style={styles.instructionHeader}>
-            <Text style={styles.instructionIcon}>👂</Text>
+            <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor() }]}>
+              <Text style={styles.difficultyText}>
+                {step.difficulty?.toUpperCase() || 'FÁCIL'}
+              </Text>
+            </View>
+            <Text style={styles.instructionIcon}>🔍</Text>
             <Text style={styles.instructionTitle}>¿Cómo jugar?</Text>
           </View>
           
           <Text style={styles.instructionText}>
-            1. 🎵 Presiona el botón para escuchar el sonido
+            1. 👀 Observa la secuencia del patrón
           </Text>
           <Text style={styles.instructionText}>
-            2. 🤔 Piensa qué representa ese sonido
+            2. 🧠 Identifica qué elemento falta
           </Text>
           <Text style={styles.instructionText}>
-            3. 👆 Toca la opción que crees correcta
+            3. 👆 Toca la opción que completa el patrón
           </Text>
           
           <View style={styles.instructionTip}>
             <Text style={styles.instructionTipText}>
-              💡 ¡Puedes escuchar el sonido las veces que necesites!
+              💡 {getPatternTypeLabel()} - ¡Busca la lógica!
             </Text>
           </View>
         </View>
@@ -479,80 +520,61 @@ const RepeatSoundScreen = () => {
           gameStats={gameStats}
         />
 
-        {/* Sección de Audio */}
-        <View style={styles.audioContainer}>
-          <Text style={styles.sectionTitle}>Escucha el sonido:</Text>
-          <Animated.View 
-            style={[
-              styles.audioButtonWrapper,
-              { 
-                transform: [
-                  { scale: speakerScale },
-                  { scale: pulseAnimation }
-                ] 
-              }
-            ]}
-          >
-            <TouchableOpacity 
-              style={[
-                styles.speakerButton,
-                isPlaying && styles.speakerButtonActive
-              ]} 
-              onPress={playAudio}
-              activeOpacity={0.8}
-              disabled={isAnswered && !gameCompleted}
-            >
-              <View style={styles.speakerIconContainer}>
-                <Text style={styles.speakerIcon}>
-                  {isPlaying ? '🔊' : '🎵'}
-                </Text>
-              </View>
-              <Text style={styles.speakerText}>
-                {isPlaying ? '¡Reproduciendo!' : 'Presiona para escuchar'}
-              </Text>
-              {gameStats.audioPlays > 0 && (
-                <View style={styles.playCountBadge}>
-                  <Text style={styles.playCountText}>{gameStats.audioPlays}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
+        {/* Pregunta */}
+        <View style={styles.questionContainer}>
+          <Text style={styles.sectionTitle}>Pregunta:</Text>
+          <Text style={styles.questionText}>{step.text}</Text>
+        </View>
+
+        {/* Descripción adicional si existe */}
+        {step.description && (
+          <View style={styles.descriptionContainer}>
+            <Text style={styles.descriptionText}>{step.description}</Text>
+          </View>
+        )}
+
+        {/* Secuencia del patrón */}
+        <View style={styles.sequenceContainer}>
+          <Text style={styles.sectionTitle}>Secuencia del patrón:</Text>
+          <View style={styles.sequenceRow}>
+            {step.sequence?.map((item, index) => renderSequenceItem(item, index))}
+          </View>
         </View>
 
         {/* Opciones de respuesta */}
         <View style={styles.optionsContainer}>
           <Text style={styles.sectionTitle}>Opciones disponibles:</Text>
           <View style={styles.optionsGrid}>
-            {step.options?.map((option, idx) => (
+            {step.options?.map((option, index) => (
               <Animated.View
-                key={idx}
+                key={index}
                 style={[
                   styles.optionWrapper,
-                  { transform: [{ scale: optionScales[idx] || 1 }] }
+                  { transform: [{ scale: optionScales[index] || 1 }] }
                 ]}
               >
                 <TouchableOpacity
-                  style={getOptionStyle(idx, option.correct)}
-                  onPress={() => handlePress(option.correct, idx)}
-                  onPressIn={() => handleOptionPressIn(idx)}
-                  onPressOut={() => handleOptionPressOut(idx)}
+                  style={getOptionStyle(index, option.correct)}
+                  onPress={() => handleAnswerSelect(option.icon, index)}
+                  onPressIn={() => handleOptionPressIn(index)}
+                  onPressOut={() => handleOptionPressOut(index)}
                   activeOpacity={0.8}
                   disabled={isAnswered}
                 >
                   <View style={styles.optionContent}>
                     <View style={[
                       styles.iconContainer,
-                      isAnswered && selectedOption === idx && option.correct && styles.iconContainerCorrect,
-                      isAnswered && selectedOption === idx && !option.correct && styles.iconContainerIncorrect,
+                      isAnswered && selectedAnswer === option.icon && option.correct && styles.iconContainerCorrect,
+                      isAnswered && selectedAnswer === option.icon && !option.correct && styles.iconContainerIncorrect,
                     ]}>
                       <Text style={styles.optionIcon}>{option.icon}</Text>
                     </View>
-                    <Text style={getOptionTextStyle(idx, option.correct)}>
+                    <Text style={getOptionTextStyle(index, option.correct)}>
                       {option.label}
                     </Text>
                   </View>
                   
-                  {isAnswered && selectedOption === idx && (
+                  {isAnswered && selectedAnswer === option.icon && (
                     <View style={[
                       styles.resultIndicator,
                       option.correct ? styles.resultIndicatorCorrect : styles.resultIndicatorIncorrect
@@ -576,8 +598,8 @@ const RepeatSoundScreen = () => {
           <View style={styles.motivationContainer}>
             <Text style={styles.motivationIcon}>⭐</Text>
             <Text style={styles.footerText}>
-              {score === 0 ? '¡Escucha con atención y elige!' :
-               '¡Increíble! Lo lograste'}
+              {score === 0 ? '¡Busca el patrón y complétalo!' :
+               '¡Increíble! Has identificado el patrón'}
             </Text>
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
@@ -585,7 +607,7 @@ const RepeatSoundScreen = () => {
           {/* Mensaje adicional de ánimo */}
           <View style={styles.encouragementFooter}>
             <Text style={styles.encouragementFooterText}>
-              👂 Cada sonido cuenta una historia ✨
+              🧠 Cada patrón te hace más inteligente ✨
             </Text>
           </View>
         </View>
@@ -600,13 +622,13 @@ const RepeatSoundScreen = () => {
         onReset={resetGame}
         onContinue={() => navigation.goBack()}
         performanceMessage={getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.firstTrySuccess)}
-        gameType="audio"
+        gameType="pattern"
         customStats={[
           { label: 'Intentos totales', value: gameStats.totalAttempts },
-          { label: 'Veces que escuchaste', value: gameStats.audioPlays },
-          { label: 'Respuesta correcta', value: score === 1 ? 'Sí' : 'No' },
+          { label: 'Patrón identificado', value: score === 1 ? 'Sí' : 'No' },
+          { label: 'Tipo de patrón', value: getPatternTypeLabel() },
         ]}
-        bonusMessage={gameStats.firstTrySuccess && gameStats.audioPlays <= 1 ? "🎯 ¡Primera vez perfecto!" : undefined}
+        bonusMessage={gameStats.firstTrySuccess ? "🔍 ¡Patrón perfecto!" : undefined}
       />
 
       {/* Feedback Animation */}
@@ -685,6 +707,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
+    flexWrap: 'wrap',
+  },
+  difficultyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 8,
+    marginBottom: 4,
+  },
+  difficultyText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '700',
   },
   instructionIcon: {
     fontSize: 20,
@@ -716,7 +751,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  audioContainer: {
+  questionContainer: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
@@ -728,73 +763,13 @@ const styles = StyleSheet.create({
     elevation: 3,
     borderLeftWidth: 3,
     borderLeftColor: '#ff9800',
-    alignItems: 'center',
   },
-  audioButtonWrapper: {
-    alignItems: 'center',
-  },
-  speakerButton: {
-    backgroundColor: '#4ECDC4',
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    borderRadius: 20,
-    alignItems: 'center',
-    shadowColor: '#26D0CE',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
-    minWidth: 200,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    position: 'relative',
-  },
-  speakerButtonActive: {
-    backgroundColor: '#45B7D1',
-    shadowColor: '#3742FA',
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  speakerIconContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 25,
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  speakerIcon: {
-    fontSize: 28,
-  },
-  speakerText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+  questionText: {
+    fontSize: 16,
+    fontWeight: '700',
     textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  playCountBadge: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: '#ff6b6b',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#ff6b6b',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  playCountText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
+    color: '#1a1a1a',
+    lineHeight: 22,
   },
   sectionTitle: {
     fontSize: 16,
@@ -802,6 +777,70 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 12,
     textAlign: 'center',
+  },
+  descriptionContainer: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: '#1e40af',
+    textAlign: 'center',
+    fontWeight: '600',
+    fontStyle: 'italic',
+  },
+  sequenceContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: '#9c27b0',
+  },
+  sequenceRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sequenceItem: {
+    width: 50,
+    height: 50,
+    backgroundColor: '#ffffff',
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 2,
+    borderColor: '#e8f0fe',
+  },
+  missingItem: {
+    backgroundColor: '#fff3e0',
+    borderWidth: 2,
+    borderColor: '#ff9800',
+    borderStyle: 'dashed',
+  },
+  sequenceIcon: {
+    fontSize: 20,
+  },
+  missingText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ff9800',
   },
   optionsContainer: {
     marginBottom: 16,
@@ -982,4 +1021,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RepeatSoundScreen;
+export default PatternRecognitionScreen;

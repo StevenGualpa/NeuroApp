@@ -17,8 +17,8 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
 import AchievementNotification from '../components/AchievementNotification';
-import { GameStatsDisplay } from '../components/GameStatsDisplay';
 import { GameCompletionModal } from '../components/GameCompletionModal';
+import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
 
 const { width } = Dimensions.get('window');
@@ -31,6 +31,7 @@ interface GameStats {
   perfectRun: boolean;
   resets: number;
   efficiency: number;
+  dragCount: number;
 }
 
 const OrderStepsScreen = () => {
@@ -49,6 +50,7 @@ const OrderStepsScreen = () => {
   const [status, setStatus] = useState<{ [key: string]: 'correct' | 'wrong' | 'idle' }>({});
   const [disabled, setDisabled] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
+  const [score, setScore] = useState(0);
 
   // Animation states
   const [showAnimation, setShowAnimation] = useState(false);
@@ -68,17 +70,14 @@ const OrderStepsScreen = () => {
     perfectRun: true,
     resets: 0,
     efficiency: 100,
+    dragCount: 0,
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
 
-  // Animation refs
-  const headerAnimation = useRef(new Animated.Value(0)).current;
-  const progressAnimation = useRef(new Animated.Value(0)).current;
-  const instructionAnimation = useRef(new Animated.Value(0)).current;
-
   // Memoized values
   const totalSteps = useMemo(() => shuffledOptions.length, [shuffledOptions]);
+  const totalItems = totalSteps; // Para compatibilidad con ProgressSection
 
   // Initialize achievements service
   useEffect(() => {
@@ -96,31 +95,7 @@ const OrderStepsScreen = () => {
     const initStatus: any = {};
     shuffledOptions.forEach(opt => initStatus[opt.label] = 'idle');
     setStatus(initStatus);
-
-    // Entrance animations
-    Animated.sequence([
-      Animated.timing(headerAnimation, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      Animated.timing(instructionAnimation, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-    ]).start();
   }, []);
-
-  useEffect(() => {
-    // Update progress bar
-    const progress = selectedOrder.length / shuffledOptions.length;
-    Animated.timing(progressAnimation, {
-      toValue: progress,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  }, [selectedOrder]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, resets: number, completionTime: number, totalSteps: number): number => {
@@ -180,6 +155,10 @@ const OrderStepsScreen = () => {
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
         errors: finalStats.errors,
+        activityType: 'Ordena los pasos',
+        showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
+        usedHelp: false,
+        tookTime: finalStats.completionTime > 60000,
       };
 
       const newlyUnlocked = await AchievementService.recordGameCompletion(gameData);
@@ -235,11 +214,13 @@ const OrderStepsScreen = () => {
 
     const newOrder = [...selectedOrder, option];
     setSelectedOrder(newOrder);
+    setScore(newOrder.length);
 
     // Update total attempts
     setGameStats(prev => ({
       ...prev,
       totalAttempts: prev.totalAttempts + 1,
+      dragCount: prev.dragCount + 1,
     }));
 
     // Find what step should be next based on order
@@ -288,6 +269,7 @@ const OrderStepsScreen = () => {
     shuffledOptions.forEach(opt => resetStatus[opt.label] = 'idle');
     setStatus(resetStatus);
     setSelectedOrder([]);
+    setScore(0);
     setDisabled(false);
 
     // Update reset count
@@ -303,6 +285,7 @@ const OrderStepsScreen = () => {
     shuffledOptions.forEach(opt => resetStatus[opt.label] = 'idle');
     setStatus(resetStatus);
     setSelectedOrder([]);
+    setScore(0);
     setDisabled(false);
     setGameCompleted(false);
     setShowStars(false);
@@ -314,6 +297,7 @@ const OrderStepsScreen = () => {
       perfectRun: true,
       resets: 0,
       efficiency: 100,
+      dragCount: 0,
     });
   }, [shuffledOptions]);
 
@@ -404,83 +388,64 @@ const OrderStepsScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <Animated.View 
-          style={[
-            styles.header,
-            {
-              opacity: headerAnimation,
-              transform: [{
-                translateY: headerAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [-20, 0],
-                })
-              }]
-            }
-          ]}
+      {/* Header simplificado */}
+      <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={handleBackPress}
         >
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>{lessonTitle}</Text>
-            <View style={styles.titleUnderline} />
-          </View>
-          <View style={styles.activityBadge}>
-            <Text style={styles.activityText}>🔢 Ordenar Pasos</Text>
-          </View>
+          <Text style={styles.backButtonText}>← Volver</Text>
+        </TouchableOpacity>
+      </View>
 
-          {/* Stats Display usando componente reutilizable */}
-          {gameStats.totalAttempts > 0 && (
-            <GameStatsDisplay 
-              stats={gameStats}
-              showPerfectBadge={true}
-              customStats={[
-                { label: 'Secuencia', value: `${selectedOrder.length}/${totalSteps}` }
-              ]}
-            />
-          )}
-
-          <View style={styles.progressBar}>
-            <Animated.View 
-              style={[
-                styles.progressFill,
-                {
-                  width: progressAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  })
-                }
-              ]} 
-            />
-          </View>
-        </Animated.View>
-
-        {/* Instructions */}
-        <Animated.View 
-          style={[
-            styles.instructionCard,
-            {
-              opacity: instructionAnimation,
-              transform: [{
-                scale: instructionAnimation.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0.9, 1],
-                })
-              }]
-            }
-          ]}
-        >
+      {/* Contenido Scrollable */}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+      >
+        {/* Tarjeta principal con instrucciones */}
+        <View style={styles.instructionCard}>
+          {/* Instrucciones */}
           <View style={styles.instructionHeader}>
-            <Text style={styles.instructionIcon}>🎯</Text>
-            <Text style={styles.instructionTitle}>Ordena los pasos</Text>
+            <Text style={styles.instructionIcon}>🔢</Text>
+            <Text style={styles.instructionTitle}>¿Cómo jugar?</Text>
           </View>
-          <Text style={styles.instruction}>{step.text}</Text>
-          <Text style={styles.instructionSubtext}>
-            Toca las opciones en el orden correcto
+          
+          <Text style={styles.instructionText}>
+            1. 👀 Lee la pregunta con atención
           </Text>
-        </Animated.View>
+          <Text style={styles.instructionText}>
+            2. 🤔 Piensa en el orden correcto
+          </Text>
+          <Text style={styles.instructionText}>
+            3. 👆 Toca las opciones en orden
+          </Text>
+          
+          <View style={styles.instructionTip}>
+            <Text style={styles.instructionTipText}>
+              💡 ¡El orden es muy importante!
+            </Text>
+          </View>
+        </View>
 
-        {/* Grid de opciones */}
-        <View style={styles.gameContainer}>
+        {/* Progreso del juego */}
+        <ProgressSection 
+          score={score}
+          totalItems={totalItems}
+          gameStats={gameStats}
+        />
+
+        {/* Pregunta */}
+        <View style={styles.questionContainer}>
+          <Text style={styles.sectionTitle}>Pregunta:</Text>
+          <Text style={styles.questionText}>{step.text}</Text>
+        </View>
+
+        {/* Opciones para ordenar */}
+        <View style={styles.optionsContainer}>
+          <Text style={styles.sectionTitle}>Pasos para ordenar:</Text>
           <FlatList
             data={shuffledOptions}
             keyExtractor={(item, idx) => item.label + idx}
@@ -501,14 +466,27 @@ const OrderStepsScreen = () => {
           </View>
         )}
 
-        {/* Footer motivacional */}
+        {/* Footer motivacional como en otras actividades */}
         <View style={styles.footer}>
           <View style={styles.motivationContainer}>
             <Text style={styles.motivationIcon}>⭐</Text>
-            <Text style={styles.footerText}>¡Piensa en el orden correcto!</Text>
+            <Text style={styles.footerText}>
+              {score === 0 ? '¡Piensa en el orden correcto!' :
+               score === totalItems ? '¡Increíble! Lo lograste' :
+               '¡Excelente! Sigue así, casi terminas'}
+            </Text>
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
+          
+          {/* Mensaje adicional de ánimo */}
+          <View style={styles.encouragementFooter}>
+            <Text style={styles.encouragementFooterText}>
+              🧠 Cada paso te hace más organizado ✨
+            </Text>
+          </View>
         </View>
+
+        <View style={styles.bottomSpacing} />
       </ScrollView>
 
       {/* Game Complete Modal usando componente reutilizable */}
@@ -520,6 +498,10 @@ const OrderStepsScreen = () => {
         performanceMessage={getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.resets)}
         gameType="sequence"
         showEfficiency={true}
+        customStats={[
+          { label: 'Pasos ordenados', value: `${score}/${totalItems}` },
+          { label: 'Reinicios', value: gameStats.resets },
+        ]}
         bonusMessage={gameStats.perfectRun && gameStats.resets === 0 ? "🎯 ¡Secuencia perfecta!" : undefined}
       />
 
@@ -539,16 +521,6 @@ const OrderStepsScreen = () => {
           onHide={handleAchievementNotificationHide}
         />
       )}
-
-      {/* Back Button */}
-      <View style={styles.backButtonContainer}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleBackPress}
-        >
-          <Text style={styles.backButtonText}>← Volver</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 };
@@ -558,155 +530,142 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8faff',
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 80,
-  },
   header: {
+    backgroundColor: '#f8faff',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
     backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    shadowColor: '#4285f4',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    marginHorizontal: -20,
-    marginTop: -20,
-    marginBottom: 20,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e8f0fe',
   },
-  titleContainer: {
-    alignItems: 'center',
-    marginBottom: 15,
+  backButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4285f4',
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    textAlign: 'center',
-    color: '#1a1a1a',
-    marginBottom: 8,
+  scrollView: {
+    flex: 1,
   },
-  titleUnderline: {
-    width: 60,
-    height: 4,
-    backgroundColor: '#4285f4',
-    borderRadius: 2,
-  },
-  activityBadge: {
-    backgroundColor: '#4285f4',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    shadowColor: '#4285f4',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-    marginBottom: 15,
-    alignSelf: 'center',
-  },
-  activityText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#e8f0fe',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#4285f4',
-    borderRadius: 3,
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
   instructionCard: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 24,
-    marginBottom: 30,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     shadowColor: '#4285f4',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderLeftWidth: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
     borderLeftColor: '#4285f4',
   },
   instructionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   instructionIcon: {
-    fontSize: 24,
-    marginRight: 10,
+    fontSize: 20,
+    marginRight: 8,
   },
   instructionTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700',
-    textAlign: 'center',
-    color: '#4285f4',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: '#1a1a1a',
   },
-  instruction: {
-    fontSize: 18,
-    textAlign: 'center',
+  instructionText: {
+    fontSize: 14,
     color: '#1a1a1a',
     fontWeight: '600',
-    lineHeight: 24,
-    marginBottom: 8,
+    marginBottom: 6,
+    paddingLeft: 6,
   },
-  instructionSubtext: {
-    fontSize: 14,
+  instructionTip: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  instructionTipText: {
+    fontSize: 12,
+    color: '#1e40af',
+    fontWeight: '600',
     textAlign: 'center',
-    color: '#6b7280',
-    fontWeight: '500',
   },
-  gameContainer: {
-    flex: 1,
-    marginBottom: 20,
+  questionContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff9800',
+  },
+  questionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#1a1a1a',
+    lineHeight: 22,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  optionsContainer: {
+    marginBottom: 16,
   },
   grid: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   optionWrapper: {
-    width: (width - 60) / 2,
-    marginHorizontal: 5,
+    width: (width - 44) / 2,
+    marginHorizontal: 2,
     marginVertical: 8,
   },
   optionCard: {
-    borderRadius: 20,
-    padding: 20,
+    borderRadius: 16,
+    padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 140,
+    minHeight: 120,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: 4,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-    borderWidth: 3,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 6,
+    borderWidth: 2,
     position: 'relative',
   },
   optionCardIdle: {
@@ -718,21 +677,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#e8f5e8',
     borderColor: '#4caf50',
     shadowColor: '#4caf50',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
   },
   optionCardWrong: {
     backgroundColor: '#ffeaea',
     borderColor: '#f44336',
     shadowColor: '#f44336',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
   },
   optionContent: {
     alignItems: 'center',
     justifyContent: 'center',
   },
   optionIcon: {
-    fontSize: 40,
-    marginBottom: 12,
+    fontSize: 32,
+    marginBottom: 8,
   },
   optionIconCorrect: {
     opacity: 0.9,
@@ -741,11 +700,11 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   optionLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
     color: '#1a1a1a',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   optionLabelCorrect: {
     color: '#2e7d32',
@@ -757,12 +716,12 @@ const styles = StyleSheet.create({
   },
   stepNumber: {
     position: 'absolute',
-    top: -8,
-    right: -8,
-    width: 28,
-    height: 28,
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
     backgroundColor: '#4caf50',
-    borderRadius: 14,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#4caf50',
@@ -773,17 +732,17 @@ const styles = StyleSheet.create({
   },
   stepNumberText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
   },
   wrongIndicator: {
     position: 'absolute',
-    top: -8,
-    right: -8,
-    width: 28,
-    height: 28,
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
     backgroundColor: '#f44336',
-    borderRadius: 14,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#f44336',
@@ -794,85 +753,78 @@ const styles = StyleSheet.create({
   },
   wrongIndicatorText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   resetContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   resetButton: {
     backgroundColor: '#6b7280',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 15,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
     shadowColor: '#6b7280',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   resetText: {
     color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 14,
+    fontWeight: '600',
   },
   footer: {
     alignItems: 'center',
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
   },
   motivationContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 25,
-    paddingVertical: 15,
-    borderRadius: 25,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 20,
     shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    marginBottom: 12,
   },
   motivationIcon: {
-    fontSize: 20,
-    marginHorizontal: 8,
+    fontSize: 18,
+    marginHorizontal: 6,
   },
   footerText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1a1a1a',
     textAlign: 'center',
+    flex: 1,
   },
-  // Back Button Styles
-  backButtonContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
+  encouragementFooter: {
+    backgroundColor: '#f0f9ff',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
   },
-  backButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingVertical: 15,
-    paddingHorizontal: 25,
-    borderRadius: 25,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 2,
-    borderColor: '#4285f4',
+  encouragementFooterText: {
+    fontSize: 12,
+    color: '#1e40af',
+    fontWeight: '600',
+    textAlign: 'center',
   },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4285f4',
+  bottomSpacing: {
+    height: 20,
   },
 });
 

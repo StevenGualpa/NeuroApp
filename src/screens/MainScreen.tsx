@@ -22,10 +22,10 @@ const creditsData = [
   {
     category: 'Desarrollo',
     items: [
-      { name: 'Desarrollador Principal', value: 'Tu Nombre' },
-      { name: 'Diseño UI/UX', value: 'Equipo de Diseño' },
-      { name: 'Programación', value: 'React Native Team' },
-    ]
+      { name: 'Desarrollador Principal', value: 'Steven Gualpa' },
+      { name: 'Diseño UI/UX', value: 'Steven Gualpa' },
+      { name: 'Programación', value: 'Yolo Team' },
+    ],
   },
   {
     category: 'Contenido',
@@ -33,7 +33,7 @@ const creditsData = [
       { name: 'Contenido Educativo', value: 'Especialistas en Educación' },
       { name: 'Ilustraciones', value: 'Artistas Gráficos' },
       { name: 'Sonidos', value: 'Equipo de Audio' },
-    ]
+    ],
   },
   {
     category: 'Agradecimientos',
@@ -41,8 +41,8 @@ const creditsData = [
       { name: 'Beta Testers', value: 'Comunidad de Usuarios' },
       { name: 'Feedback', value: 'Padres y Educadores' },
       { name: 'Inspiración', value: 'Niños de Todo el Mundo' },
-    ]
-  }
+    ],
+  },
 ];
 
 const MainScreen = () => {
@@ -52,18 +52,18 @@ const MainScreen = () => {
 
   const menuOptions = [
     { 
-      key: 'actividades', 
-      label: 'Actividades', 
-      icon: '🎮', 
-      color: '#FF6B6B',
-      shadowColor: '#FF4757',
-    },
-    { 
       key: 'home', 
       label: 'Home', 
       icon: '🏠', 
       color: '#4ECDC4',
       shadowColor: '#26D0CE',
+    },
+    { 
+      key: 'actividades', 
+      label: 'Actividades', 
+      icon: '🎮', 
+      color: '#FF6B6B',
+      shadowColor: '#FF4757',
     },
     { 
       key: 'logros', 
@@ -83,11 +83,11 @@ const MainScreen = () => {
 
   const handleMenuPress = (option: string) => {
     switch (option) {
+      case 'home':
+        navigation.navigate('onboarding');
+        break;
       case 'actividades':
         navigation.navigate('activityMenu');
-        break;
-      case 'home':
-        navigation.navigate('HomeScreen');
         break;
       case 'logros':
         navigation.navigate('Achievements');

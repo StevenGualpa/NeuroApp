@@ -21,7 +21,7 @@ const { width } = Dimensions.get('window');
 const SubLessonListScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'sublessonList'>>();
-  const { category } = route.params;
+  const { category, activityType } = route.params;
 
   // Animation refs
   const headerAnimation = useRef(new Animated.Value(0)).current;
@@ -29,7 +29,18 @@ const SubLessonListScreen = () => {
   const progressAnimation = useRef(new Animated.Value(0)).current; // Animación separada para el progreso
 
   const filteredLessons: Lesson[] = LESSONS_DATA.filter(
-    (lesson) => lesson.category === category
+    (lesson) => {
+      // Filtrar por categoría
+      if (lesson.category !== category) return false;
+      
+      // Si hay activityType, filtrar también por tipo de actividad
+      if (activityType) {
+        return lesson.steps.some(step => step.activityType === activityType);
+      }
+      
+      // Si no hay activityType, mostrar todas las lecciones de la categoría
+      return true;
+    }
   );
 
   const completedLessons = filteredLessons.filter(lesson => lesson.completed).length;
@@ -142,7 +153,10 @@ const SubLessonListScreen = () => {
             <View style={styles.titleInfo}>
               <Text style={styles.categoryTitle}>{category}</Text>
               <Text style={styles.categorySubtitle}>
-                {completedLessons}/{filteredLessons.length} completadas
+                {activityType 
+                  ? `${activityType} • ${completedLessons}/${filteredLessons.length} completadas`
+                  : `${completedLessons}/${filteredLessons.length} completadas`
+                }
               </Text>
             </View>
           </View>
@@ -185,7 +199,22 @@ const SubLessonListScreen = () => {
           showsVerticalScrollIndicator={false}
           bounces={true}
         >
-          <Text style={styles.sectionTitle}>Lecciones Disponibles</Text>
+          {/* Indicador de filtrado activo */}
+          {activityType && (
+            <View style={styles.filterIndicator}>
+              <Text style={styles.filterIcon}>🎯</Text>
+              <Text style={styles.filterText}>
+                Filtrando por: {activityType}
+              </Text>
+            </View>
+          )}
+
+          <Text style={styles.sectionTitle}>
+            {activityType 
+              ? `Lecciones Disponibles (${filteredLessons.length})`
+              : `Lecciones Disponibles (${filteredLessons.length})`
+            }
+          </Text>
           
           {filteredLessons.map((lesson, index) => (
             <TouchableOpacity
@@ -244,10 +273,26 @@ const SubLessonListScreen = () => {
           {filteredLessons.length === 0 && (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateIcon}>📚</Text>
-              <Text style={styles.emptyStateTitle}>No hay lecciones disponibles</Text>
-              <Text style={styles.emptyStateText}>
-                Pronto agregaremos más contenido para esta categoría
+              <Text style={styles.emptyStateTitle}>
+                {activityType 
+                  ? 'No hay lecciones para esta actividad'
+                  : 'No hay lecciones disponibles'
+                }
               </Text>
+              <Text style={styles.emptyStateText}>
+                {activityType 
+                  ? `No se encontraron lecciones de "${activityType}" en la categoría "${category}". ¡Pronto agregaremos más contenido!`
+                  : 'Pronto agregaremos más contenido para esta categoría'
+                }
+              </Text>
+              {activityType && (
+                <TouchableOpacity 
+                  style={styles.emptyStateButton}
+                  onPress={() => navigation.goBack()}
+                >
+                  <Text style={styles.emptyStateButtonText}>← Volver a Categorías</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -359,6 +404,26 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 20,
+  },
+  filterIndicator: {
+    backgroundColor: '#e8f0fe',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#4285f4',
+  },
+  filterIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  filterText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4285f4',
   },
   sectionTitle: {
     fontSize: 18,
@@ -493,6 +558,23 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
+    marginBottom: 20,
+  },
+  emptyStateButton: {
+    backgroundColor: '#4285f4',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  emptyStateButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
   },
   bottomSpacing: {
     height: 20,
