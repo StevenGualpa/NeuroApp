@@ -43,6 +43,7 @@ const OnboardingScreen = () => {
       title: '¡Bienvenido a NeuroApp!',
       subtitle: 'Tu Compañero de Aprendizaje',
       description: 'Una aplicación educativa diseñada especialmente para hacer el aprendizaje divertido, interactivo y personalizado.',
+      audioText: 'Hola! Bienvenido a NeuroApp, tu compañero de aprendizaje. Esta es una aplicación educativa especial que hace que aprender sea divertido, interactivo y personalizado solo para ti.',
       color: '#4285f4',
     },
     {
@@ -104,6 +105,8 @@ const OnboardingScreen = () => {
         duration: 500,
         useNativeDriver: true,
       }).start();
+
+      // No auto-play audio - let user decide when to listen
     });
 
     // Continuous pulse animation for icon
@@ -129,9 +132,23 @@ const OnboardingScreen = () => {
     if (autoAdvance && !isDownloading) {
       slideInterval = setInterval(() => {
         if (currentSlide < slides.length - 1) {
-          handleNextSlide();
+          setCurrentSlide(prev => prev + 1);
+          
+          // Simple slide transition animation for auto-advance
+          Animated.sequence([
+            Animated.timing(slideAnimation, {
+              toValue: 1,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+            Animated.timing(slideAnimation, {
+              toValue: 0,
+              duration: 400,
+              useNativeDriver: true,
+            }),
+          ]).start();
         }
-      }, 5000); // Increased time to read content
+      }, 5000); // 5 seconds per slide
     }
 
     return () => {
@@ -392,7 +409,7 @@ const OnboardingScreen = () => {
                       index === currentSlide && styles.progressDotActive,
                     ]}
                     onPress={() => {
-                      setAutoAdvance(false);
+                      setAutoAdvance(false); // Stop auto-advance permanently when user clicks dots
                       setCurrentSlide(index);
                     }}
                     activeOpacity={0.7}

@@ -483,35 +483,6 @@ const PatternRecognitionScreen = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
-        {/* Tarjeta principal con instrucciones */}
-        <View style={styles.instructionCard}>
-          {/* Header con dificultad y tipo */}
-          <View style={styles.instructionHeader}>
-            <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor() }]}>
-              <Text style={styles.difficultyText}>
-                {step.difficulty?.toUpperCase() || 'FÁCIL'}
-              </Text>
-            </View>
-            <Text style={styles.instructionIcon}>🔍</Text>
-            <Text style={styles.instructionTitle}>¿Cómo jugar?</Text>
-          </View>
-          
-          <Text style={styles.instructionText}>
-            1. 👀 Observa la secuencia del patrón
-          </Text>
-          <Text style={styles.instructionText}>
-            2. 🧠 Identifica qué elemento falta
-          </Text>
-          <Text style={styles.instructionText}>
-            3. 👆 Toca la opción que completa el patrón
-          </Text>
-          
-          <View style={styles.instructionTip}>
-            <Text style={styles.instructionTipText}>
-              💡 {getPatternTypeLabel()} - ¡Busca la lógica!
-            </Text>
-          </View>
-        </View>
 
         {/* Progreso del juego */}
         <ProgressSection 
