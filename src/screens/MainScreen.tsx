@@ -12,7 +12,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import MenuGrid from '../components/MenuGrid';
+import MenuGrid, { MenuGridRef } from '../components/MenuGrid';
 
 const { width } = Dimensions.get('window');
 
@@ -49,6 +49,7 @@ const MainScreen = () => {
   const navigation = useNavigation<MainScreenNavigationProp>();
   const [showCredits, setShowCredits] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const menuGridRef = useRef<MenuGridRef>(null);
 
   const menuOptions = [
     { 
@@ -192,6 +193,7 @@ const MainScreen = () => {
       >
         <View style={styles.screenContainer}>
           <MenuGrid 
+            ref={menuGridRef}
             menuOptions={menuOptions}
             onMenuPress={handleMenuPress}
           />

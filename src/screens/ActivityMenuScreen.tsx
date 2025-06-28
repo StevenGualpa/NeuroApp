@@ -84,14 +84,6 @@ const activityTypes = [
     difficulty: 'Medio',
     estimatedTime: '3-4 min'
   },
-  {
-    id: 'story-creation',
-    title: 'Creación de historias',
-    shortTitle: 'Historias',
-    description: 'Crea historias con pictogramas',
-    difficulty: 'Medio',
-    estimatedTime: '4-6 min'
-  },
 ] as const;
 
 const ActivityMenuScreen = () => {
@@ -141,12 +133,7 @@ const ActivityMenuScreen = () => {
   };
 
   const goToActivityCategory = (activityType: string) => {
-    // Navegación especial para Creación de historias
-    if (activityType === 'Creación de historias') {
-      navigation.navigate('storyCreation', {});
-    } else {
-      navigation.navigate('categoryMenu', { activityType });
-    }
+    navigation.navigate('categoryMenu', { activityType });
   };
 
   const goToAchievements = () => {

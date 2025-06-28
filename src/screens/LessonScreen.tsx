@@ -14,6 +14,7 @@ import {
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import GameIntroAnimation from '../components/GameIntroAnimation';
 
 const { width } = Dimensions.get('window');
 
@@ -28,10 +29,68 @@ const LessonScreen = () => {
   const [optionScales, setOptionScales] = useState(
     lesson.steps[0]?.options?.map(() => new Animated.Value(1)) || []
   );
+  const [showIntro, setShowIntro] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const headerAnimation = useRef(new Animated.Value(0)).current;
   const contentAnimation = useRef(new Animated.Value(0)).current;
 
   const step = lesson.steps[currentStep];
+
+  // Mapeo de tipos de actividad a tipos de animación
+  const getActivityAnimationType = (activityType: string): string => {
+    switch (activityType) {
+      case 'Memoria visual':
+        return 'memoryGame';
+      case 'Repetir sonidos':
+        return 'repeatSound';
+      case 'Arrastra y suelta':
+        return 'dragDrop';
+      case 'Asocia elementos':
+        return 'match';
+      case 'Selecciona la opción correcta':
+        return 'selectOption';
+      case 'Ordena los pasos':
+        return 'orderSteps';
+      case 'Reconocimiento de patrones':
+        return 'patternRecognition';
+      default:
+        return 'selectOption';
+    }
+  };
+
+  // Función para navegar a la actividad correspondiente
+  const navigateToActivity = (activityType: string) => {
+    if (activityType === 'Memoria visual') {
+      navigation.replace('memoryGame', { step, lessonTitle: lesson.title });
+    } else if (activityType === 'Repetir sonidos') {
+      navigation.replace('repeatSound', { step, lessonTitle: lesson.title });
+    } else if (activityType === 'Arrastra y suelta') {
+      navigation.replace('dragDrop', { step, lessonTitle: lesson.title });
+    } else if (activityType === 'Asocia elementos') {
+      navigation.replace('match', { step, lessonTitle: lesson.title });
+    } else if (activityType === 'Selecciona la opción correcta') {
+      navigation.replace('selectOption', { step, lessonTitle: lesson.title });
+    } else if (activityType === 'Ordena los pasos') {
+      navigation.replace('orderSteps', { step, lessonTitle: lesson.title });
+    } else if (activityType === 'Reconocimiento de patrones') {
+      navigation.replace('patternRecognition', { step, lessonTitle: lesson.title });
+    }
+  };
+
+  // Función para mostrar la introducción y luego navegar
+  const showIntroAndNavigate = (activityType: string) => {
+    setPendingNavigation(activityType);
+    setShowIntro(true);
+  };
+
+  // Función que se ejecuta cuando termina la animación de introducción
+  const handleIntroComplete = () => {
+    setShowIntro(false);
+    if (pendingNavigation) {
+      navigateToActivity(pendingNavigation);
+      setPendingNavigation(null);
+    }
+  };
 
   useEffect(() => {
     Animated.sequence([
@@ -47,21 +106,9 @@ const LessonScreen = () => {
       }),
     ]).start();
 
-    // Redirecciones según tipo de actividad
-    if (step.activityType === 'Memoria visual') {
-      navigation.replace('memoryGame', { step, lessonTitle: lesson.title });
-    } else if (step.activityType === 'Repetir sonidos') {
-      navigation.replace('repeatSound', { step, lessonTitle: lesson.title });
-    } else if (step.activityType === 'Arrastra y suelta') {
-      navigation.replace('dragDrop', { step, lessonTitle: lesson.title });
-    } else if (step.activityType === 'Asocia elementos') {
-      navigation.replace('match', { step, lessonTitle: lesson.title });
-    } else if (step.activityType === 'Selecciona la opción correcta') {
-      navigation.replace('selectOption', { step, lessonTitle: lesson.title });
-    } else if (step.activityType === 'Ordena los pasos') {
-      navigation.replace('orderSteps', { step, lessonTitle: lesson.title });
-    } else if (step.activityType === 'Reconocimiento de patrones') {
-      navigation.replace('patternRecognition', { step, lessonTitle: lesson.title });
+    // Mostrar introducción antes de navegar a la actividad
+    if (step.activityType) {
+      showIntroAndNavigate(step.activityType);
     }
   }, [step, navigation, lesson.title]);
 
@@ -118,6 +165,16 @@ const LessonScreen = () => {
       useNativeDriver: true,
     }).start();
   };
+
+  // Mostrar animación de introducción si está activa
+  if (showIntro && pendingNavigation) {
+    return (
+      <GameIntroAnimation
+        activityType={getActivityAnimationType(pendingNavigation)}
+        onComplete={handleIntroComplete}
+      />
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>

@@ -21,6 +21,8 @@ const OnboardingScreen = () => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
+  const [showFeatures, setShowFeatures] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(true);
 
   // Animation refs
   const slideAnimation = useRef(new Animated.Value(0)).current;
@@ -28,35 +30,54 @@ const OnboardingScreen = () => {
   const contentAnimation = useRef(new Animated.Value(0)).current;
   const progressAnimation = useRef(new Animated.Value(0)).current;
   const buttonAnimation = useRef(new Animated.Value(1)).current;
+  const featuresAnimation = useRef(new Animated.Value(0)).current;
+  const pulseAnimation = useRef(new Animated.Value(1)).current;
+  const navButtonsAnimation = useRef(new Animated.Value(0)).current;
+  const prevButtonScale = useRef(new Animated.Value(1)).current;
+  const nextButtonScale = useRef(new Animated.Value(1)).current;
 
-  // Slides content
+  // Slides content with more context
   const slides = [
     {
       icon: '🧠',
-      title: '¡Hola, pequeño explorador!',
-      subtitle: 'Bienvenido a NeuroApp',
-      description: 'Una aplicación especial diseñada para ayudarte a aprender de manera divertida y a tu propio ritmo.',
+      title: '¡Bienvenido a NeuroApp!',
+      subtitle: 'Tu Compañero de Aprendizaje',
+      description: 'Una aplicación educativa diseñada especialmente para hacer el aprendizaje divertido, interactivo y personalizado.',
       color: '#4285f4',
     },
     {
       icon: '🎮',
-      title: '¡Aprende Jugando!',
-      subtitle: 'Actividades Divertidas',
-      description: 'Descubre juegos de memoria, sonidos, colores y muchas actividades que te ayudarán a desarrollar nuevas habilidades.',
+      title: '7 Tipos de Actividades',
+      subtitle: 'Diversión Garantizada',
+      description: 'Explora diferentes tipos de juegos educativos que desarrollan habilidades cognitivas, motoras y de comunicación.',
       color: '#FF6B6B',
     },
     {
-      icon: '⭐',
-      title: '¡Eres Increíble!',
-      subtitle: 'A Tu Propio Ritmo',
-      description: 'Cada niño es único y especial. Aquí puedes aprender sin prisa, celebrando cada pequeño logro.',
+      icon: '🏆',
+      title: 'Sistema de Recompensas',
+      subtitle: 'Celebra Cada Logro',
+      description: 'Gana estrellas, desbloquea logros y ve tu progreso mientras aprendes. Cada pequeño paso cuenta.',
       color: '#4ECDC4',
     },
     {
+      icon: '🎨',
+      title: 'Aprendizaje Personalizado',
+      subtitle: 'A Tu Propio Ritmo',
+      description: 'La aplicación se adapta a tu velocidad de aprendizaje. Sin presión, sin estrés, solo diversión educativa.',
+      color: '#9C27B0',
+    },
+    {
+      icon: '🌟',
+      title: 'Categorías Educativas',
+      subtitle: 'Contenido Organizado',
+      description: 'Explora diferentes ��reas de aprendizaje organizadas por categorías para un desarrollo integral.',
+      color: '#FF9800',
+    },
+    {
       icon: '🚀',
-      title: '¡Comencemos la Aventura!',
-      subtitle: 'Todo Listo',
-      description: 'Estás a punto de comenzar un viaje increíble de aprendizaje. ¡Vamos a descargar tu aventura!',
+      title: '¡Todo Listo para Empezar!',
+      subtitle: 'Tu Aventura Comienza Ahora',
+      description: 'Tienes todo lo necesario para comenzar tu viaje de aprendizaje. ¡Vamos a explorar juntos!',
       color: '#FFA726',
     },
   ];
@@ -76,31 +97,122 @@ const OnboardingScreen = () => {
         duration: 800,
         useNativeDriver: true,
       }),
+    ]).start(() => {
+      // Show navigation buttons after content loads
+      Animated.timing(navButtonsAnimation, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    // Continuous pulse animation for icon
+    const pulseLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnimation, {
+          toValue: 1.1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnimation, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseLoop.start();
+
+    // Auto-advance slides with enhanced transitions (only if autoAdvance is true)
+    let slideInterval: NodeJS.Timeout | null = null;
+    
+    if (autoAdvance && !isDownloading) {
+      slideInterval = setInterval(() => {
+        if (currentSlide < slides.length - 1) {
+          handleNextSlide();
+        }
+      }, 5000); // Increased time to read content
+    }
+
+    return () => {
+      if (slideInterval) clearInterval(slideInterval);
+      pulseLoop.stop();
+    };
+  }, [currentSlide, isDownloading, autoAdvance]);
+
+  const handleNextSlide = () => {
+    if (currentSlide < slides.length - 1) {
+      setAutoAdvance(false); // Disable auto-advance when user manually navigates
+      setCurrentSlide(prev => prev + 1);
+      
+      // Enhanced slide transition animation
+      Animated.sequence([
+        Animated.timing(slideAnimation, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnimation, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  };
+
+  const handlePrevSlide = () => {
+    if (currentSlide > 0) {
+      setAutoAdvance(false); // Disable auto-advance when user manually navigates
+      setCurrentSlide(prev => prev - 1);
+      
+      // Enhanced slide transition animation
+      Animated.sequence([
+        Animated.timing(slideAnimation, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnimation, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  };
+
+  const handlePrevButtonPress = () => {
+    Animated.sequence([
+      Animated.timing(prevButtonScale, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(prevButtonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
     ]).start();
+    handlePrevSlide();
+  };
 
-    // Auto-advance slides
-    const slideInterval = setInterval(() => {
-      if (currentSlide < slides.length - 1 && !isDownloading) {
-        setCurrentSlide(prev => prev + 1);
-        
-        // Slide transition animation
-        Animated.sequence([
-          Animated.timing(slideAnimation, {
-            toValue: 1,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-          Animated.timing(slideAnimation, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }
-    }, 3000);
-
-    return () => clearInterval(slideInterval);
-  }, [currentSlide, isDownloading]);
+  const handleNextButtonPress = () => {
+    Animated.sequence([
+      Animated.timing(nextButtonScale, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(nextButtonScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    handleNextSlide();
+  };
 
   const handleDownload = () => {
     setIsDownloading(true);
@@ -202,9 +314,16 @@ const OnboardingScreen = () => {
             }
           ]}
         >
-          <View style={styles.iconContainer}>
+          <Animated.View 
+            style={[
+              styles.iconContainer,
+              {
+                transform: [{ scale: pulseAnimation }]
+              }
+            ]}
+          >
             <Text style={styles.slideIcon}>{currentSlideData.icon}</Text>
-          </View>
+          </Animated.View>
         </Animated.View>
 
         {/* Content Section */}
@@ -226,18 +345,80 @@ const OnboardingScreen = () => {
           <Text style={styles.description}>{currentSlideData.description}</Text>
         </Animated.View>
 
-        {/* Progress Indicators */}
+        {/* Navigation Controls */}
         {!isDownloading && (
-          <View style={styles.progressIndicators}>
-            {slides.map((_, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.progressDot,
-                  index === currentSlide && styles.progressDotActive,
-                ]}
-              />
-            ))}
+          <View style={styles.navigationContainer}>
+            {/* Navigation Buttons */}
+            <Animated.View 
+              style={[
+                styles.navigationButtons,
+                {
+                  opacity: navButtonsAnimation,
+                  transform: [{
+                    translateY: navButtonsAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [20, 0],
+                    })
+                  }]
+                }
+              ]}
+            >
+              {/* Previous Button */}
+              <Animated.View style={{ transform: [{ scale: prevButtonScale }] }}>
+                <TouchableOpacity
+                  style={[
+                    styles.navButton,
+                    styles.prevButton,
+                    currentSlide === 0 && styles.navButtonDisabled
+                  ]}
+                  onPress={handlePrevButtonPress}
+                  disabled={currentSlide === 0}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.navButtonText,
+                    currentSlide === 0 && styles.navButtonTextDisabled
+                  ]}>‹</Text>
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* Progress Indicators */}
+              <View style={styles.progressIndicators}>
+                {slides.map((_, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.progressDot,
+                      index === currentSlide && styles.progressDotActive,
+                    ]}
+                    onPress={() => {
+                      setAutoAdvance(false);
+                      setCurrentSlide(index);
+                    }}
+                    activeOpacity={0.7}
+                  />
+                ))}
+              </View>
+
+              {/* Next Button */}
+              <Animated.View style={{ transform: [{ scale: nextButtonScale }] }}>
+                <TouchableOpacity
+                  style={[
+                    styles.navButton,
+                    styles.nextButton,
+                    currentSlide === slides.length - 1 && styles.navButtonDisabled
+                  ]}
+                  onPress={handleNextButtonPress}
+                  disabled={currentSlide === slides.length - 1}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[
+                    styles.navButtonText,
+                    currentSlide === slides.length - 1 && styles.navButtonTextDisabled
+                  ]}>›</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            </Animated.View>
           </View>
         )}
 
@@ -251,8 +432,8 @@ const OnboardingScreen = () => {
                   onPress={handleDownload}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.downloadButtonIcon}>📥</Text>
-                  <Text style={styles.downloadButtonText}>¡Descargar Mi Aventura!</Text>
+                  <Text style={styles.downloadButtonIcon}>🚀</Text>
+                  <Text style={styles.downloadButtonText}>¡Iniciar Mi Aventura!</Text>
                 </TouchableOpacity>
               </Animated.View>
             ) : (
@@ -293,7 +474,7 @@ const OnboardingScreen = () => {
       {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          💝 Hecho con amor para niños especiales ✨
+          💝 Creado con amor para el aprendizaje divertido ✨
         </Text>
       </View>
     </SafeAreaView>
@@ -386,10 +567,61 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
     fontWeight: '500',
+    paddingHorizontal: 10,
+  },
+  navigationContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  navigationButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: 20,
+  },
+  navButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  navButtonDisabled: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  navButtonText: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  navButtonTextDisabled: {
+    color: 'rgba(255, 255, 255, 0.3)',
+  },
+  prevButton: {
+    marginRight: 10,
+  },
+  nextButton: {
+    marginLeft: 10,
   },
   progressIndicators: {
     flexDirection: 'row',
-    marginBottom: 40,
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
   },
   progressDot: {
     width: 12,
@@ -397,10 +629,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     marginHorizontal: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   progressDotActive: {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    transform: [{ scale: 1.2 }],
+    borderColor: 'rgba(255, 255, 255, 0.9)',
+    transform: [{ scale: 1.3 }],
   },
   downloadSection: {
     width: '100%',

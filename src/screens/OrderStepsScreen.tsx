@@ -405,30 +405,6 @@ const OrderStepsScreen = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
-        {/* Tarjeta principal con instrucciones */}
-        <View style={styles.instructionCard}>
-          {/* Instrucciones */}
-          <View style={styles.instructionHeader}>
-            <Text style={styles.instructionIcon}>🔢</Text>
-            <Text style={styles.instructionTitle}>¿Cómo jugar?</Text>
-          </View>
-          
-          <Text style={styles.instructionText}>
-            1. 👀 Lee la pregunta con atención
-          </Text>
-          <Text style={styles.instructionText}>
-            2. 🤔 Piensa en el orden correcto
-          </Text>
-          <Text style={styles.instructionText}>
-            3. 👆 Toca las opciones en orden
-          </Text>
-          
-          <View style={styles.instructionTip}>
-            <Text style={styles.instructionTipText}>
-              💡 ¡El orden es muy importante!
-            </Text>
-          </View>
-        </View>
 
         {/* Progreso del juego */}
         <ProgressSection 

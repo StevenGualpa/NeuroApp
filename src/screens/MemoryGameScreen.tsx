@@ -489,30 +489,6 @@ const MemoryGameScreen = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
-        {/* Tarjeta principal con instrucciones */}
-        <View style={styles.instructionCard}>
-          {/* Instrucciones */}
-          <View style={styles.instructionHeader}>
-            <Text style={styles.instructionIcon}>🧠</Text>
-            <Text style={styles.instructionTitle}>¿Cómo jugar?</Text>
-          </View>
-          
-          <Text style={styles.instructionText}>
-            1. 👀 Observa bien las cartas al inicio
-          </Text>
-          <Text style={styles.instructionText}>
-            2. 🧠 Memoriza dónde están los pares
-          </Text>
-          <Text style={styles.instructionText}>
-            3. 👆 Toca las cartas para voltearlas
-          </Text>
-          
-          <View style={styles.instructionTip}>
-            <Text style={styles.instructionTipText}>
-              💡 ¡Encuentra todas las parejas iguales!
-            </Text>
-          </View>
-        </View>
 
         {/* Progreso del juego */}
         <ProgressSection 

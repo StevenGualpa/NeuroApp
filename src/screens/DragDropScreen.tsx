@@ -452,35 +452,7 @@ const DragDropScreen = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
-        {/* Tarjeta principal con título, actividad e instrucciones */}
-        <View style={styles.instructionCard}>
-          {/* Título de la lección */}
-          <View style={styles.lessonHeader}>
-            <Text style={styles.lessonTitle}>{lessonTitle}</Text>
-          </View>
-          
-          {/* Instrucciones */}
-          <View style={styles.instructionHeader}>
-            <Text style={styles.instructionIcon}>👆</Text>
-            <Text style={styles.instructionTitle}>¿Cómo jugar?</Text>
-          </View>
-          
-          <Text style={styles.instructionText}>
-            1. 👀 Mira los elementos de abajo
-          </Text>
-          <Text style={styles.instructionText}>
-            2. 👆 Toca y arrastra cada uno
-          </Text>
-          <Text style={styles.instructionText}>
-            3. 🎯 Suéltalo en su lugar correcto
-          </Text>
-          
-          <View style={styles.instructionTip}>
-            <Text style={styles.instructionTipText}>
-              💡 ¡Piensa bien dónde va cada cosa!
-            </Text>
-          </View>
-        </View>
+
 
         {/* Progreso del juego */}
         <ProgressSection 

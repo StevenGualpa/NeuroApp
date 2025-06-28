@@ -342,30 +342,6 @@ const MatchScreen = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
       >
-        {/* Tarjeta principal con instrucciones */}
-        <View style={styles.instructionCard}>
-          {/* Instrucciones */}
-          <View style={styles.instructionHeader}>
-            <Text style={styles.instructionIcon}>🎯</Text>
-            <Text style={styles.instructionTitle}>¿Cómo jugar?</Text>
-          </View>
-          
-          <Text style={styles.instructionText}>
-            1. 👀 Lee la pregunta con atención
-          </Text>
-          <Text style={styles.instructionText}>
-            2. 🤔 Piensa cuál es la respuesta correcta
-          </Text>
-          <Text style={styles.instructionText}>
-            3. 👆 Toca la opción que crees correcta
-          </Text>
-          
-          <View style={styles.instructionTip}>
-            <Text style={styles.instructionTipText}>
-              💡 ¡Solo hay una respuesta correcta!
-            </Text>
-          </View>
-        </View>
 
         {/* Progreso del juego */}
         <ProgressSection 
