@@ -22,6 +22,16 @@ export const GAME_CONFIG = {
   GOOD_FLIPS_MULTIPLIER: 1.5,
 } as const;
 
+// Adaptive Reinforcement Constants
+export const ADAPTIVE_REINFORCEMENT_CONFIG = {
+  INACTIVITY_TIMEOUT_MS: 8000, // 8 seconds
+  MAX_CONSECUTIVE_ERRORS: 2,
+  HELP_DURATION_MS: 5000, // 5 seconds
+  BLINK_INTERVAL_MS: 500, // 0.5 seconds
+  TTS_RATE: 0.7, // Slower speech for better comprehension
+  TTS_LANGUAGE: 'es-ES', // Spanish
+} as const;
+
 // Colors
 export const COLORS = {
   PRIMARY: '#4285f4',
@@ -101,7 +111,6 @@ export const ACTIVITY_TYPES = {
   ORDER_STEPS: 'Ordena los pasos',
   DRAG_DROP: 'Arrastra y suelta',
   MATCH_ELEMENTS: 'Asocia elementos',
-  REPEAT_SOUNDS: 'Repetir sonidos',
   VISUAL_MEMORY: 'Memoria visual',
   PATTERN_RECOGNITION: 'Reconocimiento de patrones',
 } as const;

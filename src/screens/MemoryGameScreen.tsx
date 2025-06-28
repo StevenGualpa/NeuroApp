@@ -20,6 +20,8 @@ import AchievementNotification from '../components/AchievementNotification';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
+import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
+import AudioService from '../services/AudioService';
 
 type MemoryGameRouteProp = RouteProp<RootStackParamList, 'memoryGame'>;
 
@@ -84,6 +86,13 @@ const MemoryGameScreen = () => {
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
 
+  // Adaptive reinforcement states
+  const [isHelpActive, setIsHelpActive] = useState(false);
+  const [blinkingCardIds, setBlinkingCardIds] = useState<number[]>([]);
+  const [helpBlinkAnimation] = useState(new Animated.Value(1));
+  const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
+  const audioService = useRef(AudioService.getInstance());
+
   // Memoized values
   const totalPairs = useMemo(() => step.options?.length || 0, [step.options]);
   const totalItems = totalPairs; // Para compatibilidad con ProgressSection
@@ -99,6 +108,44 @@ const MemoryGameScreen = () => {
     };
     initAchievements();
   }, []);
+
+  // Initialize adaptive reinforcement service
+  useEffect(() => {
+    adaptiveService.current.initialize(
+      (helpCardIndex) => {
+        // Handle help trigger
+        if (helpCardIndex === -1) {
+          // Inactivity help - find a pair that can be matched
+          triggerHelpForMemoryGame();
+        } else {
+          // Error-based help
+          triggerHelpForMemoryGame();
+        }
+      },
+      (message, activityType) => {
+        // Handle audio help - use step's helpMessage if available, otherwise use service message
+        let helpMessage: string;
+        
+        if (step.helpMessage) {
+          helpMessage = step.helpMessage;
+          console.log(`🔊 Using custom lesson help: ${helpMessage}`);
+        } else {
+          helpMessage = message;
+          console.log(`🔊 Using default help for ${activityType}: ${helpMessage}`);
+        }
+        
+        console.log(`🔊 About to play TTS: ${helpMessage}`);
+        audioService.current.playTextToSpeech(helpMessage);
+      },
+      step.activityType // Pass the activity type to the service
+    );
+
+    return () => {
+      console.log(`🔊 MemoryGameScreen: Cleaning up services`);
+      adaptiveService.current.cleanup();
+      audioService.current.cleanup();
+    };
+  }, [step]);
 
   const initializeCards = useCallback(() => {
     const duplicated: Card[] =
@@ -155,6 +202,62 @@ const MemoryGameScreen = () => {
     const cleanup = initializeCards();
     return cleanup;
   }, [initializeCards]);
+
+  // Helper function to trigger help for memory game
+  const triggerHelpForMemoryGame = useCallback(() => {
+    // Find a pair that hasn't been matched yet
+    const unmatchedCards = cards.filter(card => !card.matched);
+    if (unmatchedCards.length === 0) return;
+
+    // Group cards by icon to find pairs
+    const cardGroups: { [icon: string]: Card[] } = {};
+    unmatchedCards.forEach(card => {
+      if (!cardGroups[card.icon]) {
+        cardGroups[card.icon] = [];
+      }
+      cardGroups[card.icon].push(card);
+    });
+
+    // Find the first complete pair
+    const availablePair = Object.values(cardGroups).find(group => group.length >= 2);
+    if (!availablePair) return;
+
+    // Take the first two cards of this pair
+    const helpCards = availablePair.slice(0, 2);
+    const helpCardIds = helpCards.map(card => card.id);
+
+    setIsHelpActive(true);
+    setBlinkingCardIds(helpCardIds);
+    
+    // Start blinking animation
+    const blinkAnimation = () => {
+      Animated.sequence([
+        Animated.timing(helpBlinkAnimation, {
+          toValue: 0.3,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(helpBlinkAnimation, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        if (isHelpActive) {
+          blinkAnimation();
+        }
+      });
+    };
+    
+    blinkAnimation();
+    
+    // Stop help after 5 seconds
+    setTimeout(() => {
+      setIsHelpActive(false);
+      setBlinkingCardIds([]);
+      helpBlinkAnimation.setValue(1);
+    }, 5000);
+  }, [cards, helpBlinkAnimation, isHelpActive]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, flipCount: number, completionTime: number, totalPairs: number): number => {
@@ -285,6 +388,16 @@ const MemoryGameScreen = () => {
   const flipCard = useCallback((card: Card) => {
     if (card.flipped || card.matched || selected.length === 2 || !gameStarted) return;
 
+    // Record user interaction for inactivity tracking
+    adaptiveService.current.recordInactivity();
+
+    // Clear any active help
+    if (isHelpActive) {
+      setIsHelpActive(false);
+      setBlinkingCardIds([]);
+      helpBlinkAnimation.setValue(1);
+    }
+
     // Update flip count and drag count for ProgressSection compatibility
     setGameStats(prev => ({
       ...prev,
@@ -315,7 +428,12 @@ const MemoryGameScreen = () => {
         totalAttempts: prev.totalAttempts + 1,
       }));
 
-      if (first.icon === second.icon) {
+      const isMatch = first.icon === second.icon;
+
+      // Record action in adaptive reinforcement service
+      adaptiveService.current.recordAction(isMatch, -1, step.activityType);
+
+      if (isMatch) {
         // Match found
         setTimeout(() => {
           setCards((prev) =>
@@ -329,6 +447,8 @@ const MemoryGameScreen = () => {
             matchesFound: prev.matchesFound + 1,
           }));
           showFeedbackAnimation('success');
+          // Play encouragement audio
+          audioService.current.playEncouragementMessage();
         }, 500);
       } else {
         // No match
@@ -359,12 +479,14 @@ const MemoryGameScreen = () => {
             )
           );
           showFeedbackAnimation('error');
+          // Play error guidance audio
+          audioService.current.playErrorGuidanceMessage();
         }, 1000);
       }
 
       setTimeout(() => setSelected([]), 1200);
     }
-  }, [cards, selected, gameStarted, showFeedbackAnimation]);
+  }, [cards, selected, gameStarted, showFeedbackAnimation, step.activityType, isHelpActive, helpBlinkAnimation]);
 
   const resetGame = useCallback(() => {
     setMatchedCount(0);
@@ -432,14 +554,22 @@ const MemoryGameScreen = () => {
       outputRange: ['180deg', '360deg'],
     });
 
+    const isBlinking = isHelpActive && blinkingCardIds.includes(card.id);
+
     return (
       <TouchableWithoutFeedback key={card.id} onPress={() => flipCard(card)}>
-        <View style={styles.cardWrapper}>
+        <Animated.View 
+          style={[
+            styles.cardWrapper,
+            { opacity: isBlinking ? helpBlinkAnimation : 1 }
+          ]}
+        >
           <Animated.View
             style={[
               styles.card,
               styles.front,
               styles.cardFace,
+              isBlinking && styles.cardHelp,
               {
                 transform: [{ rotateY }],
               },
@@ -453,6 +583,7 @@ const MemoryGameScreen = () => {
               styles.back,
               styles.cardFaceBack,
               card.matched && styles.matchedCard,
+              isBlinking && styles.cardHelp,
               {
                 transform: [{ rotateY: rotateYBack }],
               },
@@ -460,10 +591,10 @@ const MemoryGameScreen = () => {
           >
             <Text style={styles.cardIcon}>{card.icon}</Text>
           </Animated.View>
-        </View>
+        </Animated.View>
       </TouchableWithoutFeedback>
     );
-  }, [flipCard]);
+  }, [flipCard, isHelpActive, blinkingCardIds, helpBlinkAnimation]);
 
   // Process achievement queue when it changes
   useEffect(() => {
@@ -488,6 +619,14 @@ const MemoryGameScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={true}
+        onTouchStart={() => {
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
+        }}
+        onScrollBeginDrag={() => {
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
+        }}
       >
 
         {/* Progreso del juego */}
@@ -735,6 +874,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#e8f5e8',
     borderColor: '#4caf50',
     shadowColor: '#4caf50',
+  },
+  cardHelp: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffc107',
+    borderWidth: 3,
+    shadowColor: '#ffc107',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   cardQuestionText: {
     fontSize: 24,

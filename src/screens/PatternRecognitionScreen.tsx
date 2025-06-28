@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,8 @@ import AchievementNotification from '../components/AchievementNotification';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
+import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
+import AudioService from '../services/AudioService';
 
 type PatternRecognitionRouteProp = RouteProp<RootStackParamList, 'patternRecognition'>;
 
@@ -77,6 +79,13 @@ const PatternRecognitionScreen = () => {
     step.options?.map(() => new Animated.Value(1)) || []
   );
 
+  // Adaptive reinforcement states
+  const [isHelpActive, setIsHelpActive] = useState(false);
+  const [blinkingOptionIndex, setBlinkingOptionIndex] = useState<number | null>(null);
+  const [helpBlinkAnimation] = useState(new Animated.Value(1));
+  const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
+  const audioService = useRef(AudioService.getInstance());
+
   // Memoized values
   const totalItems = 1; // Solo una respuesta correcta en reconocimiento de patrones
 
@@ -91,6 +100,47 @@ const PatternRecognitionScreen = () => {
     };
     initAchievements();
   }, []);
+
+  // Initialize adaptive reinforcement service
+  useEffect(() => {
+    adaptiveService.current.initialize(
+      (helpOptionIndex: number) => {
+        // Handle help trigger
+        if (helpOptionIndex === -1) {
+          // Inactivity help - find correct option
+          const correctIndex = step.options?.findIndex(option => option.correct) ?? -1;
+          if (correctIndex !== -1) {
+            triggerHelpForOption(correctIndex);
+          }
+        } else {
+          // Error-based help
+          triggerHelpForOption(helpOptionIndex);
+        }
+      },
+      (message: string, activityType: string) => {
+        // Handle audio help - use step's helpMessage if available, otherwise use service message
+        let helpMessage: string;
+        
+        if (step.helpMessage) {
+          helpMessage = step.helpMessage;
+          console.log(`🔊 Using custom lesson help: ${helpMessage}`);
+        } else {
+          helpMessage = message;
+          console.log(`🔊 Using default help for ${activityType}: ${helpMessage}`);
+        }
+        
+        console.log(`🔊 About to play TTS: ${helpMessage}`);
+        audioService.current.playTextToSpeech(helpMessage);
+      },
+      step.activityType // Pass the activity type to the service
+    );
+
+    return () => {
+      console.log(`🔊 PatternRecognitionScreen: Cleaning up services`);
+      adaptiveService.current.cleanup();
+      audioService.current.cleanup();
+    };
+  }, [step]);
 
   useEffect(() => {
     // Animación de entrada para la secuencia
@@ -127,6 +177,41 @@ const PatternRecognitionScreen = () => {
       pulseAnimationLoop.stop();
     };
   }, []);
+
+  // Helper function to trigger help for a specific option
+  const triggerHelpForOption = useCallback((optionIndex: number) => {
+    setIsHelpActive(true);
+    setBlinkingOptionIndex(optionIndex);
+    
+    // Start blinking animation
+    const blinkAnimation = () => {
+      Animated.sequence([
+        Animated.timing(helpBlinkAnimation, {
+          toValue: 0.3,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(helpBlinkAnimation, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        if (isHelpActive) {
+          blinkAnimation();
+        }
+      });
+    };
+    
+    blinkAnimation();
+    
+    // Stop help after 5 seconds
+    setTimeout(() => {
+      setIsHelpActive(false);
+      setBlinkingOptionIndex(null);
+      helpBlinkAnimation.setValue(1);
+    }, 5000);
+  }, [helpBlinkAnimation, isHelpActive]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, completionTime: number, firstTry: boolean): number => {
@@ -245,11 +330,22 @@ const PatternRecognitionScreen = () => {
   const handleAnswerSelect = useCallback((selectedIcon: string, index: number) => {
     if (isAnswered || gameCompleted) return;
 
-    setSelectedAnswer(selectedIcon);
-    setIsAnswered(true);
-
+    // Record action in adaptive reinforcement service
+    const correctOptionIndex = step.options?.findIndex(option => option.correct) ?? -1;
     const correctOption = step.options?.find(option => option.correct);
     const correct = selectedIcon === correctOption?.icon;
+    
+    adaptiveService.current.recordAction(correct, correctOptionIndex, step.activityType);
+
+    // Clear any active help
+    if (isHelpActive) {
+      setIsHelpActive(false);
+      setBlinkingOptionIndex(null);
+      helpBlinkAnimation.setValue(1);
+    }
+
+    setSelectedAnswer(selectedIcon);
+    setIsAnswered(true);
 
     // Update stats
     const isFirstAttempt = gameStats.totalAttempts === 0;
@@ -279,8 +375,12 @@ const PatternRecognitionScreen = () => {
       if (correct) {
         setScore(1);
         showFeedbackAnimation('success');
+        // Play encouragement audio
+        audioService.current.playEncouragementMessage();
       } else {
         showFeedbackAnimation('error');
+        // Play error guidance audio
+        audioService.current.playErrorGuidanceMessage();
         setTimeout(() => {
           setIsAnswered(false);
           setSelectedAnswer(null);
@@ -293,7 +393,7 @@ const PatternRecognitionScreen = () => {
         }, 1500);
       }
     }, 600);
-  }, [isAnswered, gameCompleted, gameStats, optionScales, showFeedbackAnimation, step.options]);
+  }, [isAnswered, gameCompleted, gameStats, optionScales, showFeedbackAnimation, step.options, step.activityType, isHelpActive, helpBlinkAnimation]);
 
   const handleOptionPressIn = useCallback((index: number) => {
     if (isAnswered) return;
@@ -482,6 +582,14 @@ const PatternRecognitionScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={true}
+        onTouchStart={() => {
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
+        }}
+        onScrollBeginDrag={() => {
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
+        }}
       >
 
         {/* Progreso del juego */}
@@ -516,22 +624,34 @@ const PatternRecognitionScreen = () => {
         <View style={styles.optionsContainer}>
           <Text style={styles.sectionTitle}>Opciones disponibles:</Text>
           <View style={styles.optionsGrid}>
-            {step.options?.map((option, index) => (
-              <Animated.View
-                key={index}
-                style={[
-                  styles.optionWrapper,
-                  { transform: [{ scale: optionScales[index] || 1 }] }
-                ]}
-              >
-                <TouchableOpacity
-                  style={getOptionStyle(index, option.correct)}
-                  onPress={() => handleAnswerSelect(option.icon, index)}
-                  onPressIn={() => handleOptionPressIn(index)}
-                  onPressOut={() => handleOptionPressOut(index)}
-                  activeOpacity={0.8}
-                  disabled={isAnswered}
+            {step.options?.map((option, index) => {
+              const isBlinking = isHelpActive && blinkingOptionIndex === index;
+              return (
+                <Animated.View
+                  key={index}
+                  style={[
+                    styles.optionWrapper,
+                    { 
+                      transform: [{ scale: optionScales[index] || 1 }],
+                      opacity: isBlinking ? helpBlinkAnimation : 1
+                    }
+                  ]}
                 >
+                  <TouchableOpacity
+                    style={[
+                      getOptionStyle(index, option.correct || false),
+                      isBlinking && styles.optionButtonHelp
+                    ]}
+                    onPress={() => {
+                      // Record user interaction for inactivity tracking
+                      adaptiveService.current.recordInactivity();
+                      handleAnswerSelect(option.icon, index);
+                    }}
+                    onPressIn={() => handleOptionPressIn(index)}
+                    onPressOut={() => handleOptionPressOut(index)}
+                    activeOpacity={0.8}
+                    disabled={isAnswered}
+                  >
                   <View style={styles.optionContent}>
                     <View style={[
                       styles.iconContainer,
@@ -540,7 +660,7 @@ const PatternRecognitionScreen = () => {
                     ]}>
                       <Text style={styles.optionIcon}>{option.icon}</Text>
                     </View>
-                    <Text style={getOptionTextStyle(index, option.correct)}>
+                    <Text style={getOptionTextStyle(index, option.correct || false)}>
                       {option.label}
                     </Text>
                   </View>
@@ -558,9 +678,10 @@ const PatternRecognitionScreen = () => {
                       </Text>
                     </View>
                   )}
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
           </View>
         </View>
 
@@ -857,6 +978,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderColor: '#e0e0e0',
     opacity: 0.6,
+  },
+  optionButtonHelp: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffc107',
+    borderWidth: 3,
+    shadowColor: '#ffc107',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   optionContent: {
     alignItems: 'center',

@@ -11,7 +11,6 @@ import LoginScreen from '../screens/LoginScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import ActivityMenuScreen from '../screens/ActivityMenuScreen';
 import MemoryGameScreen from '../screens/MemoryGameScreen';
-import RepeatSoundScreen from '../screens/RepeatSoundScreen';
 import DragDropScreen from '../screens/DragDropScreen';
 import MatchScreen from '../screens/MatchScreen';
 import SelectOptionScreen from '../screens/SelectOptionScreen';
@@ -37,7 +36,6 @@ export type RootStackParamList = {
   
   // Pantallas de juegos
   memoryGame: { step: Step; lessonTitle: string };
-  repeatSound: { step: Step; lessonTitle: string };
   dragDrop: { step: Step; lessonTitle: string };
   match: { step: Step; lessonTitle: string };
   selectOption: { step: Step; lessonTitle: string };
@@ -71,7 +69,6 @@ const AppNavigator = () => (
       
       {/* Pantallas de Juegos */}
       <Stack.Screen name="memoryGame" component={MemoryGameScreen} />
-      <Stack.Screen name="repeatSound" component={RepeatSoundScreen} />
       <Stack.Screen name="dragDrop" component={DragDropScreen} />
       <Stack.Screen name="match" component={MatchScreen} />
       <Stack.Screen name="selectOption" component={SelectOptionScreen} />

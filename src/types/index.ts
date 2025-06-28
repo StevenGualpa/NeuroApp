@@ -30,7 +30,6 @@ export interface Step {
     | 'Ordena los pasos'
     | 'Arrastra y suelta'
     | 'Asocia elementos'
-    | 'Repetir sonidos'
     | 'Memoria visual'
     | 'Reconocimiento de patrones';
   options?: {

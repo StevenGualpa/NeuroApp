@@ -87,7 +87,6 @@ const CategoryMenuScreen = () => {
     'Sí / No': '✅',
     'Asocia elementos': '🔗',
     'Memoria visual': '🧠',
-    'Repetir sonidos': '🎵',
     'Arrastra y suelta': '🎯',
     'Ordena los pasos': '🔢',
     'Reconocimiento de patrones': '🔍',

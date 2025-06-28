@@ -27,6 +27,8 @@ export interface Step {
   sequence?: string[];
   missingPosition?: number;
   difficulty?: 'easy' | 'medium' | 'hard';
+  // Nueva propiedad para refuerzo adaptativo
+  helpMessage?: string;
 }
 
 export interface Lesson {
@@ -55,7 +57,8 @@ export const LESSONS_DATA: Lesson[] = [
         options: [
           { icon: "🖐️", label: "Tocarlo", correct: false },
           { icon: "🚫", label: "Alejarse y avisar", correct: true }
-        ]
+        ],
+        helpMessage: "Recuerda: los enchufes pueden ser peligrosos. Nunca los toques, siempre aléjate y avisa a un adulto."
       }
     ]
   },
@@ -75,7 +78,8 @@ export const LESSONS_DATA: Lesson[] = [
         options: [
           { icon: "✅", label: "Sí", correct: false },
           { icon: "❌", label: "No", correct: true }
-        ]
+        ],
+        helpMessage: "¡Nunca toques enchufes con las manos mojadas! El agua y la electricidad son muy peligrosos juntos."
       }
     ]
   },
@@ -95,7 +99,8 @@ export const LESSONS_DATA: Lesson[] = [
         options: [
           { icon: "🏞️", label: "En medio del parque", correct: false },
           { icon: "⚫⚪⚫", label: "En el paso de cebra", correct: true }
-        ]
+        ],
+        helpMessage: "Recuerda: siempre cruza por el paso de cebra. Es el lugar más seguro para cruzar la calle."
       },
     ]
   },
@@ -115,7 +120,8 @@ export const LESSONS_DATA: Lesson[] = [
         options: [
           { icon: "🔴", label: "Rojo", correct: false },
           { icon: "🟢", label: "Verde", correct: true }
-        ]
+        ],
+        helpMessage: "Recuerda: antes de cruzar, mira a ambos lados. Solo cruza cuando el semáforo esté en verde."
       }
     ]
   },
@@ -137,7 +143,8 @@ export const LESSONS_DATA: Lesson[] = [
           { icon: "🎮", label: "Jugar", correct: false },
           { icon: "🛌", label: "Dormir", correct: false },
           { icon: "🚪", label: "Salir", correct: false }
-        ]
+        ],
+        helpMessage: "Busca el pictograma que muestra libros. Estudiar significa aprender con libros."
       }
     ]
   },
@@ -159,7 +166,8 @@ export const LESSONS_DATA: Lesson[] = [
           { icon: "✏️", label: "Escribir", correct: false },
           { icon: "🎨", label: "Dibujar", correct: false },
           { icon: "🧃", label: "Tomar jugo", correct: false }
-        ]
+        ],
+        helpMessage: "Busca el pictograma que muestra un libro abierto. Leer significa mirar las palabras en un libro."
       }
     ]
   },
@@ -269,7 +277,8 @@ export const LESSONS_DATA: Lesson[] = [
           { icon: "🍔", label: "Hamburguesa", correct: false },
           { icon: "🍩", label: "Dona", correct: false },
           { icon: "🥤", label: "Refresco", correct: false }
-        ]
+        ],
+        helpMessage: "Las frutas son alimentos naturales y saludables. La manzana es una fruta."
       }
     ]
   },
@@ -291,7 +300,8 @@ export const LESSONS_DATA: Lesson[] = [
           { icon: "🍟", label: "Papas fritas", correct: false },
           { icon: "🍕", label: "Pizza", correct: false },
           { icon: "🍰", label: "Pastel", correct: false }
-        ]
+        ],
+        helpMessage: "Los vegetales y ensaladas son muy saludables para nuestro cuerpo."
       }
     ]
   },
@@ -313,7 +323,8 @@ export const LESSONS_DATA: Lesson[] = [
           { icon: "✋", label: "Detener", correct: false },
           { icon: "🙅", label: "No", correct: false },
           { icon: "😡", label: "Enojado", correct: false }
-        ]
+        ],
+        helpMessage: "Compartir significa dar algo a otros. Busca el pictograma que muestra dos manos juntas."
       }
     ]
   },
@@ -377,33 +388,12 @@ export const LESSONS_DATA: Lesson[] = [
         options: [
           { icon: "✏️", label: "Lápiz", correct: true },
           { icon: "📐", label: "Escuadra", correct: true }
-        ]
+        ],
+        helpMessage: "Observa bien las cartas cuando se muestren. Recuerda dónde están los objetos iguales y tócalos para hacer parejas."
       }
     ]
   },
-  {
-    id: 19,
-    title: "Reconoce el sonido correcto",
-    icon: "🔊",
-    category: "Lenguaje y Comunicación",
-    completed: false,
-    steps: [
-      {
-        id: 1,
-        text: "Escucha y elige el pictograma que representa lo que oíste.",
-        icon: "👂",
-        completed: false,
-        activityType: "Repetir sonidos",
-        audio: "comer",
-        options: [
-          { icon: "🍽️", label: "Comer", correct: true },
-          { icon: "🛁", label: "Bañarse", correct: false },
-          { icon: "🏃", label: "Correr", correct: false }
-        ]
-      }
-    ]
-  },
-  {
+    {
     id: 20,
     title: "Clasifica los objetos reciclables",
     icon: "🗑️",
@@ -421,7 +411,8 @@ export const LESSONS_DATA: Lesson[] = [
           { icon: "🍕", label: "Pizza", correctZone: "No Reciclaje" },
           { icon: "📰", label: "Periódico", correctZone: "Reciclaje" },
           { icon: "🍔", label: "Hamburguesa", correctZone: "No Reciclaje" }
-        ]
+        ],
+        helpMessage: "Arrastra cada elemento a la zona correcta. Los envases y papeles van a Reciclaje, la comida va a No Reciclaje."
       }
     ]
   },
@@ -445,7 +436,8 @@ export const LESSONS_DATA: Lesson[] = [
         { icon: "🍪", label: "Galletas", correctZone: "Despensa" },
         { icon: "🥩", label: "Carne", correctZone: "Refrigerador" },
         { icon: "🍝", label: "Pasta", correctZone: "Despensa" }
-      ]
+      ],
+      helpMessage: "Arrastra los alimentos frescos como leche, queso y carne al Refrigerador. Los alimentos secos como pan, galletas y pasta van a la Despensa."
     }
   ]
 },
@@ -466,7 +458,8 @@ export const LESSONS_DATA: Lesson[] = [
           { icon: "🚿", label: "Mojar el cepillo", correct: true, order: 1 },
           { icon: "🧴", label: "Colocar la pasta dental", correct: true, order: 2 },
           { icon: "🪥", label: "Cepillar durante 2 minutos", correct: true, order: 3 }
-        ]
+        ],
+        helpMessage: "Piensa en el orden lógico: primero mojas el cepillo, luego pones pasta dental, y finalmente cepillas."
       }
     ]
   },
@@ -492,7 +485,8 @@ export const LESSONS_DATA: Lesson[] = [
           { icon: "🔵", label: "Azul", correct: true },
           { icon: "🟡", label: "Amarillo", correct: false },
           { icon: "🟢", label: "Verde", correct: false }
-        ]
+        ],
+        helpMessage: "Observa la secuencia: rojo, azul, rojo, azul, rojo... ¿Qué color viene después? El patrón se repite: rojo, azul, rojo, azul."
       }
     ]
   },
@@ -517,7 +511,8 @@ export const LESSONS_DATA: Lesson[] = [
           { icon: "🔲", label: "Cuadrado", correct: true },
           { icon: "🔺", label: "Triángulo", correct: false },
           { icon: "⭕", label: "Círculo", correct: false }
-        ]
+        ],
+        helpMessage: "Mira el patrón: triángulo, círculo, cuadrado, triángulo, círculo... ¿Qué forma sigue? El patrón es: triángulo, círculo, cuadrado."
       }
     ]
   },
@@ -567,7 +562,8 @@ export const LESSONS_DATA: Lesson[] = [
           { icon: "6️⃣", label: "Seis", correct: true },
           { icon: "4️⃣", label: "Cuatro", correct: false },
           { icon: "8️⃣", label: "Ocho", correct: false }
-        ]
+        ],
+        helpMessage: "Cuenta los números: uno, dos, tres, cuatro, cinco... ¿Qué número viene después? Los números van en orden: 1, 2, 3, 4, 5, 6."
       }
     ]
   },

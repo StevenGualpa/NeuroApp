@@ -19,6 +19,8 @@ import AchievementNotification from '../components/AchievementNotification';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
+import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
+import AudioService from '../services/AudioService';
 
 const { width } = Dimensions.get('window');
 
@@ -72,6 +74,13 @@ const MatchScreen = () => {
     step.options?.map(() => new Animated.Value(0)) || []
   ).current;
 
+  // Adaptive reinforcement states
+  const [isHelpActive, setIsHelpActive] = useState(false);
+  const [blinkingOptionIndex, setBlinkingOptionIndex] = useState<number | null>(null);
+  const [helpBlinkAnimation] = useState(new Animated.Value(1));
+  const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
+  const audioService = useRef(AudioService.getInstance());
+
   // Memoized values
   const totalOptions = useMemo(() => step.options?.length || 0, [step.options]);
   const totalItems = 1; // Solo una respuesta correcta en asociar
@@ -88,6 +97,47 @@ const MatchScreen = () => {
     initAchievements();
   }, []);
 
+  // Initialize adaptive reinforcement service
+  useEffect(() => {
+    adaptiveService.current.initialize(
+      (helpOptionIndex) => {
+        // Handle help trigger
+        if (helpOptionIndex === -1) {
+          // Inactivity help - find correct option
+          const correctIndex = step.options?.findIndex(option => option.correct) ?? -1;
+          if (correctIndex !== -1) {
+            triggerHelpForOption(correctIndex);
+          }
+        } else {
+          // Error-based help
+          triggerHelpForOption(helpOptionIndex);
+        }
+      },
+      (message, activityType) => {
+        // Handle audio help - use step's helpMessage if available, otherwise use service message
+        let helpMessage: string;
+        
+        if (step.helpMessage) {
+          helpMessage = step.helpMessage;
+          console.log(`🔊 Using custom lesson help: ${helpMessage}`);
+        } else {
+          helpMessage = message;
+          console.log(`🔊 Using default help for ${activityType}: ${helpMessage}`);
+        }
+        
+        console.log(`🔊 About to play TTS: ${helpMessage}`);
+        audioService.current.playTextToSpeech(helpMessage);
+      },
+      step.activityType // Pass the activity type to the service
+    );
+
+    return () => {
+      console.log(`🔊 MatchScreen: Cleaning up services`);
+      adaptiveService.current.cleanup();
+      audioService.current.cleanup();
+    };
+  }, [step]);
+
   useEffect(() => {
     // Entrance animations
     Animated.stagger(150, 
@@ -100,6 +150,41 @@ const MatchScreen = () => {
       )
     ).start();
   }, []);
+
+  // Helper function to trigger help for a specific option
+  const triggerHelpForOption = useCallback((optionIndex: number) => {
+    setIsHelpActive(true);
+    setBlinkingOptionIndex(optionIndex);
+    
+    // Start blinking animation
+    const blinkAnimation = () => {
+      Animated.sequence([
+        Animated.timing(helpBlinkAnimation, {
+          toValue: 0.3,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(helpBlinkAnimation, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        if (isHelpActive) {
+          blinkAnimation();
+        }
+      });
+    };
+    
+    blinkAnimation();
+    
+    // Stop help after 5 seconds
+    setTimeout(() => {
+      setIsHelpActive(false);
+      setBlinkingOptionIndex(null);
+      helpBlinkAnimation.setValue(1);
+    }, 5000);
+  }, [helpBlinkAnimation, isHelpActive]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, completionTime: number, firstTry: boolean): number => {
@@ -218,6 +303,17 @@ const MatchScreen = () => {
   const handleOptionPress = useCallback((correct: boolean, index: number) => {
     if (isAnswered || gameCompleted) return;
     
+    // Record action in adaptive reinforcement service
+    const correctOptionIndex = step.options?.findIndex(option => option.correct) ?? -1;
+    adaptiveService.current.recordAction(correct, correctOptionIndex, step.activityType);
+
+    // Clear any active help
+    if (isHelpActive) {
+      setIsHelpActive(false);
+      setBlinkingOptionIndex(null);
+      helpBlinkAnimation.setValue(1);
+    }
+
     setSelectedOption(index);
     setIsAnswered(true);
 
@@ -251,15 +347,19 @@ const MatchScreen = () => {
       if (correct) {
         setScore(1);
         showFeedbackAnimation('success');
+        // Play encouragement audio
+        audioService.current.playEncouragementMessage();
       } else {
         showFeedbackAnimation('error');
+        // Play error guidance audio
+        audioService.current.playErrorGuidanceMessage();
         setTimeout(() => {
           setIsAnswered(false);
           setSelectedOption(null);
         }, 1500);
       }
     }, 500);
-  }, [isAnswered, gameCompleted, gameStats, optionAnimations, showFeedbackAnimation]);
+  }, [isAnswered, gameCompleted, gameStats, optionAnimations, showFeedbackAnimation, step.options, step.activityType, isHelpActive, helpBlinkAnimation]);
 
   const resetGame = useCallback(() => {
     setSelectedOption(null);
@@ -341,6 +441,14 @@ const MatchScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={true}
+        onTouchStart={() => {
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
+        }}
+        onScrollBeginDrag={() => {
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
+        }}
       >
 
         {/* Progreso del juego */}
@@ -360,30 +468,39 @@ const MatchScreen = () => {
         <View style={styles.optionsContainer}>
           <Text style={styles.sectionTitle}>Opciones disponibles:</Text>
           <View style={styles.optionsGrid}>
-            {step.options?.map((option, idx) => (
-              <Animated.View
-                key={idx}
-                style={[
-                  styles.optionWrapper,
-                  {
-                    opacity: optionAnimations[idx],
-                    transform: [{
-                      translateY: optionAnimations[idx].interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [30, 0],
-                      })
-                    }, {
-                      scale: optionAnimations[idx]
-                    }]
-                  }
-                ]}
-              >
-                <TouchableOpacity
-                  style={getOptionStyle(idx, option.correct || false)}
-                  onPress={() => handleOptionPress(option.correct || false, idx)}
-                  activeOpacity={0.8}
-                  disabled={isAnswered}
+            {step.options?.map((option, idx) => {
+              const isBlinking = isHelpActive && blinkingOptionIndex === idx;
+              return (
+                <Animated.View
+                  key={idx}
+                  style={[
+                    styles.optionWrapper,
+                    {
+                      opacity: isBlinking ? helpBlinkAnimation : optionAnimations[idx],
+                      transform: [{
+                        translateY: optionAnimations[idx].interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [30, 0],
+                        })
+                      }, {
+                        scale: optionAnimations[idx]
+                      }]
+                    }
+                  ]}
                 >
+                  <TouchableOpacity
+                    style={[
+                      getOptionStyle(idx, option.correct || false),
+                      isBlinking && styles.optionButtonHelp
+                    ]}
+                    onPress={() => {
+                      // Record user interaction for inactivity tracking
+                      adaptiveService.current.recordInactivity();
+                      handleOptionPress(option.correct || false, idx);
+                    }}
+                    activeOpacity={0.8}
+                    disabled={isAnswered}
+                  >
                   <View style={styles.optionContent}>
                     <View style={[
                       styles.iconContainer,
@@ -412,9 +529,10 @@ const MatchScreen = () => {
                       </Text>
                     </View>
                   )}
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
+                  </TouchableOpacity>
+                </Animated.View>
+              );
+            })}
           </View>
         </View>
 
@@ -633,6 +751,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderColor: '#e0e0e0',
     opacity: 0.6,
+  },
+  optionButtonHelp: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffc107',
+    borderWidth: 3,
+    shadowColor: '#ffc107',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   optionContent: {
     alignItems: 'center',

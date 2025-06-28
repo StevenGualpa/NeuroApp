@@ -97,21 +97,7 @@ const activityConfigs: { [key: string]: ActivityConfig } = {
     color: '#9C27B0',
     shadowColor: '#7B1FA2'
   },
-  'repeatSound': {
-    icon: '🎵',
-    title: 'Repetir Sonidos',
-    description: 'Escucha atentamente y repite la secuencia de sonidos.',
-    steps: [
-      '👂 Escucha la secuencia de sonidos',
-      '🧠 Memoriza el orden',
-      '🎵 Repite tocando en el mismo orden',
-      '🎶 ¡Melodía perfecta!'
-    ],
-    tip: '¡Usa tus oídos!',
-    color: '#E91E63',
-    shadowColor: '#C2185B'
-  },
-  'patternRecognition': {
+    'patternRecognition': {
     icon: '🔍',
     title: 'Reconocimiento de Patrones',
     description: 'Identifica el patrón y completa la secuencia.',

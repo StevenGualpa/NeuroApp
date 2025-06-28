@@ -20,6 +20,8 @@ import AchievementNotification from '../components/AchievementNotification';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
+import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
+import AudioService from '../services/AudioService';
 
 const { width } = Dimensions.get('window');
 
@@ -75,6 +77,13 @@ const OrderStepsScreen = () => {
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
 
+  // Adaptive reinforcement states
+  const [isHelpActive, setIsHelpActive] = useState(false);
+  const [blinkingStepIndex, setBlinkingStepIndex] = useState<number | null>(null);
+  const [helpBlinkAnimation] = useState(new Animated.Value(1));
+  const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
+  const audioService = useRef(AudioService.getInstance());
+
   // Memoized values
   const totalSteps = useMemo(() => shuffledOptions.length, [shuffledOptions]);
   const totalItems = totalSteps; // Para compatibilidad con ProgressSection
@@ -91,11 +100,88 @@ const OrderStepsScreen = () => {
     initAchievements();
   }, []);
 
+  // Initialize adaptive reinforcement service
+  useEffect(() => {
+    adaptiveService.current.initialize(
+      (helpStepIndex) => {
+        // Handle help trigger
+        if (helpStepIndex === -1) {
+          // Inactivity help - find next correct step
+          const nextStepOrder = selectedOrder.length + 1;
+          const nextCorrectStep = shuffledOptions.findIndex(option => option.order === nextStepOrder);
+          if (nextCorrectStep !== -1) {
+            triggerHelpForStep(nextCorrectStep);
+          }
+        } else {
+          // Error-based help
+          triggerHelpForStep(helpStepIndex);
+        }
+      },
+      (message, activityType) => {
+        // Handle audio help - use step's helpMessage if available, otherwise use service message
+        let helpMessage: string;
+        
+        if (step.helpMessage) {
+          helpMessage = step.helpMessage;
+          console.log(`🔊 Using custom lesson help: ${helpMessage}`);
+        } else {
+          helpMessage = message;
+          console.log(`🔊 Using default help for ${activityType}: ${helpMessage}`);
+        }
+        
+        console.log(`🔊 About to play TTS: ${helpMessage}`);
+        audioService.current.playTextToSpeech(helpMessage);
+      },
+      step.activityType // Pass the activity type to the service
+    );
+
+    return () => {
+      console.log(`🔊 OrderStepsScreen: Cleaning up services`);
+      adaptiveService.current.cleanup();
+      audioService.current.cleanup();
+    };
+  }, [step, selectedOrder, shuffledOptions]);
+
   useEffect(() => {
     const initStatus: any = {};
     shuffledOptions.forEach(opt => initStatus[opt.label] = 'idle');
     setStatus(initStatus);
   }, []);
+
+  // Helper function to trigger help for a specific step
+  const triggerHelpForStep = useCallback((stepIndex: number) => {
+    setIsHelpActive(true);
+    setBlinkingStepIndex(stepIndex);
+    
+    // Start blinking animation
+    const blinkAnimation = () => {
+      Animated.sequence([
+        Animated.timing(helpBlinkAnimation, {
+          toValue: 0.3,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(helpBlinkAnimation, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        if (isHelpActive) {
+          blinkAnimation();
+        }
+      });
+    };
+    
+    blinkAnimation();
+    
+    // Stop help after 5 seconds
+    setTimeout(() => {
+      setIsHelpActive(false);
+      setBlinkingStepIndex(null);
+      helpBlinkAnimation.setValue(1);
+    }, 5000);
+  }, [helpBlinkAnimation, isHelpActive]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, resets: number, completionTime: number, totalSteps: number): number => {
@@ -216,16 +302,28 @@ const OrderStepsScreen = () => {
     setSelectedOrder(newOrder);
     setScore(newOrder.length);
 
+    // Find what step should be next based on order
+    const expectedStep = newOrder.length;
+    const isCorrect = option.order === expectedStep;
+
+    // Record action in adaptive reinforcement service
+    const nextStepOrder = newOrder.length + 1;
+    const nextCorrectStepIndex = shuffledOptions.findIndex(opt => opt.order === nextStepOrder);
+    adaptiveService.current.recordAction(isCorrect, nextCorrectStepIndex, step.activityType);
+
+    // Clear any active help
+    if (isHelpActive) {
+      setIsHelpActive(false);
+      setBlinkingStepIndex(null);
+      helpBlinkAnimation.setValue(1);
+    }
+
     // Update total attempts
     setGameStats(prev => ({
       ...prev,
       totalAttempts: prev.totalAttempts + 1,
       dragCount: prev.dragCount + 1,
     }));
-
-    // Find what step should be next based on order
-    const expectedStep = newOrder.length;
-    const isCorrect = option.order === expectedStep;
 
     setStatus(prev => ({ ...prev, [option.label]: isCorrect ? 'correct' : 'wrong' }));
 
@@ -240,6 +338,8 @@ const OrderStepsScreen = () => {
       setDisabled(true);
       setTimeout(() => {
         showFeedbackAnimation('error');
+        // Play error guidance audio
+        audioService.current.playErrorGuidanceMessage();
         setTimeout(() => {
           Alert.alert(
             '🤔 ¡Inténtalo otra vez!', 
@@ -261,8 +361,10 @@ const OrderStepsScreen = () => {
     } else {
       // Correct step, continue
       showFeedbackAnimation('success');
+      // Play encouragement audio
+      audioService.current.playEncouragementMessage();
     }
-  }, [disabled, selectedOrder, shuffledOptions.length, showFeedbackAnimation]);
+  }, [disabled, selectedOrder, shuffledOptions, showFeedbackAnimation, step.activityType, isHelpActive, helpBlinkAnimation]);
 
   const reset = useCallback(() => {
     const resetStatus: any = {};
@@ -330,13 +432,19 @@ const OrderStepsScreen = () => {
     }
   }, [gameStats.totalAttempts, gameCompleted, navigation]);
 
-  const renderItem = useCallback(({ item }: { item: any }) => {
+  const renderItem = useCallback(({ item, index }: { item: any; index: number }) => {
     const itemStatus = status[item.label];
     const isSelected = selectedOrder.some(selected => selected.label === item.label);
     const stepNumber = selectedOrder.findIndex(selected => selected.label === item.label) + 1;
+    const isBlinking = isHelpActive && blinkingStepIndex === index;
 
     return (
-      <View style={styles.optionWrapper}>
+      <Animated.View 
+        style={[
+          styles.optionWrapper,
+          { opacity: isBlinking ? helpBlinkAnimation : 1 }
+        ]}
+      >
         <TouchableOpacity
           disabled={disabled || itemStatus !== 'idle'}
           style={[
@@ -344,8 +452,13 @@ const OrderStepsScreen = () => {
             itemStatus === 'correct' && styles.optionCardCorrect,
             itemStatus === 'wrong' && styles.optionCardWrong,
             itemStatus === 'idle' && styles.optionCardIdle,
+            isBlinking && styles.optionCardHelp,
           ]}
-          onPress={() => handleSelect(item)}
+          onPress={() => {
+            // Record user interaction for inactivity tracking
+            adaptiveService.current.recordInactivity();
+            handleSelect(item);
+          }}
           activeOpacity={0.8}
         >
           <View style={styles.optionContent}>
@@ -377,9 +490,9 @@ const OrderStepsScreen = () => {
             </View>
           )}
         </TouchableOpacity>
-      </View>
+      </Animated.View>
     );
-  }, [status, selectedOrder, disabled, handleSelect]);
+  }, [status, selectedOrder, disabled, handleSelect, isHelpActive, blinkingStepIndex, helpBlinkAnimation]);
 
   // Process achievement queue when it changes
   useEffect(() => {
@@ -404,6 +517,14 @@ const OrderStepsScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={true}
+        onTouchStart={() => {
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
+        }}
+        onScrollBeginDrag={() => {
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
+        }}
       >
 
         {/* Progreso del juego */}
@@ -660,6 +781,15 @@ const styles = StyleSheet.create({
     borderColor: '#f44336',
     shadowColor: '#f44336',
     shadowOpacity: 0.25,
+  },
+  optionCardHelp: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffc107',
+    borderWidth: 3,
+    shadowColor: '#ffc107',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   optionContent: {
     alignItems: 'center',

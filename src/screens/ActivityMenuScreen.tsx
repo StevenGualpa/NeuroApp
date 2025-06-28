@@ -60,15 +60,7 @@ const activityTypes = [
     difficulty: 'Difícil',
     estimatedTime: '3-5 min'
   },
-  {
-    id: 'repeat-sounds',
-    title: 'Repetir sonidos',
-    shortTitle: 'Sonidos',
-    description: 'Reproduce secuencias auditivas',
-    difficulty: 'Medio',
-    estimatedTime: '2-3 min'
-  },
-  {
+    {
     id: 'drag-drop',
     title: 'Arrastra y suelta',
     shortTitle: 'Arrastrar',

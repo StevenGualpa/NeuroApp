@@ -21,6 +21,8 @@ import { GameStatsDisplay } from '../components/GameStatsDisplay';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
+import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
+import AudioService from '../services/AudioService';
 
 const { width } = Dimensions.get('window');
 
@@ -92,6 +94,14 @@ const DragDropScreen = () => {
   const zones = useMemo(() => Array.from(new Set(step.options?.map(o => o.correctZone) || [])), [step.options]);
   const totalItems = useMemo(() => step.options?.length || 0, [step.options]);
 
+  // Adaptive reinforcement states
+  const [isHelpActive, setIsHelpActive] = useState(false);
+  const [blinkingItemIndex, setBlinkingItemIndex] = useState<number | null>(null);
+  const [blinkingZone, setBlinkingZone] = useState<string | null>(null);
+  const [helpBlinkAnimation] = useState(new Animated.Value(1));
+  const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
+  const audioService = useRef(AudioService.getInstance());
+
   // Refs for zone positions
   const zoneRefs = useRef<{ [key: string]: View | null }>({});
   const zoneBounds = useRef<{ [key: string]: ZoneBounds }>({});
@@ -108,6 +118,44 @@ const DragDropScreen = () => {
     };
     initAchievements();
   }, []);
+
+  // Initialize adaptive reinforcement service
+  useEffect(() => {
+    adaptiveService.current.initialize(
+      (helpItemIndex) => {
+        // Handle help trigger
+        if (helpItemIndex === -1) {
+          // Inactivity help - find an item that hasn't been placed yet
+          triggerHelpForDragDrop();
+        } else {
+          // Error-based help
+          triggerHelpForDragDrop();
+        }
+      },
+      (message, activityType) => {
+        // Handle audio help - use step's helpMessage if available, otherwise use service message
+        let helpMessage: string;
+        
+        if (step.helpMessage) {
+          helpMessage = step.helpMessage;
+          console.log(`🔊 Using custom lesson help: ${helpMessage}`);
+        } else {
+          helpMessage = message;
+          console.log(`🔊 Using default help for ${activityType}: ${helpMessage}`);
+        }
+        
+        console.log(`🔊 About to play TTS: ${helpMessage}`);
+        audioService.current.playTextToSpeech(helpMessage);
+      },
+      step.activityType // Pass the activity type to the service
+    );
+
+    return () => {
+      console.log(`🔊 DragDropScreen: Cleaning up services`);
+      adaptiveService.current.cleanup();
+      audioService.current.cleanup();
+    };
+  }, [step]);
 
   // Update zone bounds when layout changes
   const updateZoneBounds = useCallback((zone: string) => {
@@ -130,6 +178,54 @@ const DragDropScreen = () => {
       updateZoneBounds(zone);
     }, 300);
   }, [updateZoneBounds]);
+
+  // Helper function to trigger help for drag and drop
+  const triggerHelpForDragDrop = useCallback(() => {
+    // Find an item that hasn't been placed yet
+    const unplacedItems = step.options?.filter((_, index) => !correctlyPlaced.has(index)) || [];
+    if (unplacedItems.length === 0) return;
+
+    // Select the first unplaced item
+    const firstUnplacedIndex = step.options?.findIndex((_, index) => !correctlyPlaced.has(index)) ?? -1;
+    if (firstUnplacedIndex === -1) return;
+
+    const targetItem = step.options?.[firstUnplacedIndex];
+    if (!targetItem) return;
+
+    setIsHelpActive(true);
+    setBlinkingItemIndex(firstUnplacedIndex);
+    setBlinkingZone(targetItem.correctZone || null);
+    
+    // Start blinking animation
+    const blinkAnimation = () => {
+      Animated.sequence([
+        Animated.timing(helpBlinkAnimation, {
+          toValue: 0.3,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(helpBlinkAnimation, {
+          toValue: 1,
+          duration: 500,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        if (isHelpActive) {
+          blinkAnimation();
+        }
+      });
+    };
+    
+    blinkAnimation();
+    
+    // Stop help after 5 seconds
+    setTimeout(() => {
+      setIsHelpActive(false);
+      setBlinkingItemIndex(null);
+      setBlinkingZone(null);
+      helpBlinkAnimation.setValue(1);
+    }, 5000);
+  }, [step.options, correctlyPlaced, helpBlinkAnimation, isHelpActive]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, totalItems: number, completionTime: number, dragCount: number): number => {
@@ -244,6 +340,17 @@ const DragDropScreen = () => {
   }, [animationType, score, totalItems, gameCompleted, startTime, gameStats, calculateStars, recordGameCompletion, showFeedbackAnimation]);
 
   const handleCorrectDrop = useCallback((zone: string, option: Option, index: number) => {
+    // Record action in adaptive reinforcement service
+    adaptiveService.current.recordAction(true, -1, step.activityType);
+
+    // Clear any active help
+    if (isHelpActive) {
+      setIsHelpActive(false);
+      setBlinkingItemIndex(null);
+      setBlinkingZone(null);
+      helpBlinkAnimation.setValue(1);
+    }
+
     setCorrectlyPlaced(prev => new Set([...prev, index]));
     setZoneItems(prev => ({
       ...prev,
@@ -258,9 +365,14 @@ const DragDropScreen = () => {
     }));
 
     showFeedbackAnimation('success');
-  }, [score, showFeedbackAnimation]);
+    // Play encouragement audio
+    audioService.current.playEncouragementMessage();
+  }, [score, showFeedbackAnimation, step.activityType, isHelpActive, helpBlinkAnimation]);
 
   const handleIncorrectDrop = useCallback(() => {
+    // Record action in adaptive reinforcement service
+    adaptiveService.current.recordAction(false, -1, step.activityType);
+
     setGameStats(prev => ({
       ...prev,
       totalAttempts: prev.totalAttempts + 1,
@@ -269,7 +381,9 @@ const DragDropScreen = () => {
     }));
 
     showFeedbackAnimation('error');
-  }, [showFeedbackAnimation]);
+    // Play error guidance audio
+    audioService.current.playErrorGuidanceMessage();
+  }, [showFeedbackAnimation, step.activityType]);
 
   const checkCollision = useCallback((gestureX: number, gestureY: number): string | null => {
     console.log('Checking collision at:', { gestureX, gestureY });
@@ -310,8 +424,8 @@ const DragDropScreen = () => {
           }));
 
           pan.setOffset({
-            x: pan.x._value,
-            y: pan.y._value,
+            x: (pan.x as any)._value,
+            y: (pan.y as any)._value,
           });
           pan.setValue({ x: 0, y: 0 });
         },
@@ -407,7 +521,9 @@ const DragDropScreen = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       zones.forEach(zone => {
-        updateZoneBounds(zone);
+        if (zone) {
+          updateZoneBounds(zone);
+        }
       });
     }, 1000);
 
@@ -418,7 +534,9 @@ const DragDropScreen = () => {
   useEffect(() => {
     const intervalTimer = setInterval(() => {
       zones.forEach(zone => {
-        updateZoneBounds(zone);
+        if (zone) {
+          updateZoneBounds(zone);
+        }
       });
     }, 2000);
 
@@ -451,6 +569,14 @@ const DragDropScreen = () => {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         bounces={true}
+        onTouchStart={() => {
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
+        }}
+        onScrollBeginDrag={() => {
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
+        }}
       >
 
 
@@ -465,25 +591,32 @@ const DragDropScreen = () => {
         <View style={styles.zonesContainer}>
           <Text style={styles.sectionTitle}>Zonas de destino:</Text>
           <View style={styles.zonesGrid}>
-            {zones.map(zone => (
-              <View 
-                key={zone} 
-                ref={(ref) => {
-                  zoneRefs.current[zone] = ref;
-                }}
-                style={[
-                  styles.zone,
-                  isDragging && styles.zoneHighlighted
-                ]}
-                onLayout={() => handleZoneLayout(zone)}
-              >
+            {zones.map((zone, zoneIndex) => {
+              if (!zone) return null;
+              const isBlinkingZone = isHelpActive && blinkingZone === zone;
+              return (
+                <Animated.View 
+                  key={`${zone}-${zoneIndex}`} 
+                  ref={(ref: any) => {
+                    if (zone) {
+                      zoneRefs.current[zone] = ref;
+                    }
+                  }}
+                  style={[
+                    styles.zone,
+                    isDragging && styles.zoneHighlighted,
+                    isBlinkingZone && styles.zoneHelp,
+                    { opacity: isBlinkingZone ? helpBlinkAnimation : 1 }
+                  ]}
+                  onLayout={() => zone && handleZoneLayout(zone)}
+                >
                 <Text style={styles.zoneTitle}>{zone}</Text>
                 <View style={styles.zoneContent}>
                   {(zoneItems[zone] || []).length === 0 ? (
                     <Text style={styles.emptyZoneText}>Suelta aquí</Text>
                   ) : (
                     <View style={styles.placedItemsContainer}>
-                      {(zoneItems[zone] || []).map((placedItem, i) => (
+                      {(zoneItems[zone] || []).map((placedItem: PlacedItem, i: number) => (
                         <View key={i} style={styles.placedItem}>
                           <Text style={styles.placedIcon}>{placedItem.option.icon}</Text>
                         </View>
@@ -491,8 +624,9 @@ const DragDropScreen = () => {
                     </View>
                   )}
                 </View>
-              </View>
-            ))}
+                </Animated.View>
+              );
+            })}
           </View>
         </View>
 
@@ -501,8 +635,10 @@ const DragDropScreen = () => {
           <Text style={styles.sectionTitle}>Elementos para arrastrar:</Text>
           <View style={styles.optionsGrid}>
             {step.options?.map((option, idx) => {
-              const { pan, panResponder } = createPanHandlers(option, idx);
+              if (!option.correctZone) return null;
+              const { pan, panResponder } = createPanHandlers(option as Option, idx);
               const isPlaced = correctlyPlaced.has(idx);
+              const isBlinkingItem = isHelpActive && blinkingItemIndex === idx;
 
               return (
                 <Animated.View
@@ -511,8 +647,10 @@ const DragDropScreen = () => {
                   style={[
                     styles.draggable,
                     isPlaced && styles.draggablePlaced,
+                    isBlinkingItem && styles.draggableHelp,
                     {
                       transform: pan.getTranslateTransform(),
+                      opacity: isBlinkingItem ? helpBlinkAnimation : 1,
                     },
                   ]}
                 >
@@ -747,6 +885,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     elevation: 5,
   },
+  zoneHelp: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffc107',
+    borderWidth: 3,
+    shadowColor: '#ffc107',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
+  },
   zoneTitle: {
     fontSize: 14,
     fontWeight: '700',
@@ -816,6 +963,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
     borderColor: '#4caf50',
     shadowColor: '#4caf50',
+  },
+  draggableHelp: {
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffc107',
+    borderWidth: 3,
+    shadowColor: '#ffc107',
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   optionIcon: {
     fontSize: 24,

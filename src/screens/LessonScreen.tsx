@@ -41,8 +41,6 @@ const LessonScreen = () => {
     switch (activityType) {
       case 'Memoria visual':
         return 'memoryGame';
-      case 'Repetir sonidos':
-        return 'repeatSound';
       case 'Arrastra y suelta':
         return 'dragDrop';
       case 'Asocia elementos':
@@ -62,8 +60,6 @@ const LessonScreen = () => {
   const navigateToActivity = (activityType: string) => {
     if (activityType === 'Memoria visual') {
       navigation.replace('memoryGame', { step, lessonTitle: lesson.title });
-    } else if (activityType === 'Repetir sonidos') {
-      navigation.replace('repeatSound', { step, lessonTitle: lesson.title });
     } else if (activityType === 'Arrastra y suelta') {
       navigation.replace('dragDrop', { step, lessonTitle: lesson.title });
     } else if (activityType === 'Asocia elementos') {
