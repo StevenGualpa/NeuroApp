@@ -11,7 +11,6 @@ import RealLessonScreen from '../screens/RealLessonScreen';
 import SubLessonListScreen from '../screens/SubLessonListScreen';
 import RealLessonListScreen from '../screens/RealLessonListScreen';
 import LoginScreen from '../screens/LoginScreen';
-import RealLoginScreen from '../screens/RealLoginScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import ActivityMenuScreen from '../screens/ActivityMenuScreen';
 import RealActivityMenuScreen from '../screens/RealActivityMenuScreen';
@@ -22,9 +21,7 @@ import SelectOptionScreen from '../screens/SelectOptionScreen';
 import OrderStepsScreen from '../screens/OrderStepsScreen';
 import PatternRecognitionScreen from '../screens/PatternRecognitionScreen';
 import AchievementsScreen from '../screens/AchievementsScreen';
-import RealAchievementsScreen from '../screens/RealAchievementsScreen';
 import StatisticsScreen from '../screens/StatisticsScreen';
-
 
 import type { Lesson, Step } from '../data/lessons';
 
@@ -34,7 +31,6 @@ export type RootStackParamList = {
   
   // Pantallas de autenticación y onboarding
   login: undefined;
-  realLogin: undefined;
   onboarding: undefined;
   
   // Pantallas de actividades
@@ -57,9 +53,7 @@ export type RootStackParamList = {
   
   // Pantallas adicionales
   Achievements: undefined;
-  RealAchievements: undefined;
   Statistics: undefined;
-  Debug: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -68,14 +62,13 @@ const AppNavigator = () => (
   <NavigationContainer>
     <Stack.Navigator 
       screenOptions={{ headerShown: false }} 
-      initialRouteName="realLogin"
+      initialRouteName="login"
     >
       {/* Pantalla Principal */}
       <Stack.Screen name="MainScreen" component={MainScreen} />
       
       {/* Pantallas de Autenticación y Onboarding */}
       <Stack.Screen name="login" component={LoginScreen} />
-      <Stack.Screen name="realLogin" component={RealLoginScreen} />
       <Stack.Screen name="onboarding" component={OnboardingScreen} />
       
       {/* Pantallas de Actividades */}
@@ -98,7 +91,6 @@ const AppNavigator = () => (
       
       {/* Pantallas Adicionales */}
       <Stack.Screen name="Achievements" component={AchievementsScreen} />
-      <Stack.Screen name="RealAchievements" component={RealAchievementsScreen} />
       <Stack.Screen name="Statistics" component={StatisticsScreen} />
     </Stack.Navigator>
   </NavigationContainer>

@@ -320,6 +320,13 @@ class RealAchievementServiceEnhanced {
     const newlyUnlocked: ServerAchievement[] = [];
     const now = new Date();
 
+    // ✅ FIX: Obtener usuario correctamente
+    const user = AuthService.getCurrentUser();
+    if (!user) {
+      console.error('❌ [Achievement] No hay usuario logueado para verificar logros');
+      return [];
+    }
+
     for (const achievement of this.achievements) {
       // ✅ MAPEO CORREGIDO: Usar AchievementID en lugar de achievement_id
       const userAchievement = this.userAchievements.find(ua => ua.AchievementID === achievement.ID);
@@ -420,35 +427,68 @@ class RealAchievementServiceEnhanced {
     const hour = now.getHours();
     const isWeekend = now.getDay() === 0 || now.getDay() === 6;
 
-    // ✅ USAR CONDITION EN LUGAR DE CONDITION_TYPE
+    // ✅ CONDICIONES CORREGIDAS PARA COINCIDIR CON EL SERVIDOR
     switch (achievement.condition) {
+      // Condiciones básicas
       case 'complete_first_lesson':
       case 'first_activity':
+      case 'complete_activity':
         return this.localStats.totalActivitiesCompleted >= 1;
       
-      case 'games_played':
-        return this.localStats.totalActivitiesCompleted >= achievement.max_progress;  // ✅ Usar max_progress
-      
-      case 'perfect_games':
+      case 'complete_perfect':
       case 'perfect_lesson':
-        return gameData.isPerfect && this.localStats.totalActivitiesCompleted >= achievement.max_progress;
-      
-      case 'stars_earned':
-      case 'collect_stars':
-        return this.localStats.totalStarsEarned >= achievement.max_progress;  // ✅ Usar max_progress
-      
-      case 'consecutive_days':
-        return this.localStats.daysPlaying >= achievement.max_progress;  // ✅ Usar max_progress
-      
-      case 'activity_type':
-        return gameData.activityType === achievement.description && this.localStats.totalActivitiesCompleted >= achievement.max_progress;
-      
-      case 'fast_completion':
-        return gameData.completionTime <= achievement.max_progress;  // ✅ Usar max_progress
-      
       case 'no_errors':
-        return gameData.errors === 0 && gameData.isPerfect;
+        return gameData.isPerfect && gameData.errors === 0;
       
+      case 'earn_stars':
+      case 'collect_stars':
+      case 'earn_3_stars':
+        return this.localStats.totalStarsEarned >= (achievement.max_progress || 1);
+      
+      case 'complete_5_lessons':
+        return this.localStats.totalActivitiesCompleted >= 5;
+      
+      case 'play_3_consecutive_days':
+        return this.localStats.daysPlaying >= 3;
+      
+      case 'earn_10_stars':
+        return this.localStats.totalStarsEarned >= 10;
+      
+      case 'earn_50_stars':
+        return this.localStats.totalStarsEarned >= 50;
+      
+      case 'earn_100_stars':
+        return this.localStats.totalStarsEarned >= 100;
+      
+      case 'complete_all_categories':
+        return this.localStats.totalActivitiesCompleted >= 20; // Assuming 20 activities across all categories
+      
+      case 'complete_after_3_attempts':
+        return gameData.errors >= 2; // 3 attempts means 2+ errors
+      
+      case 'use_help_5_times':
+        return this.localStats.helpfulAttempts >= 5;
+      
+      case 'play_early_morning':
+        return hour >= 6 && hour < 9;
+      
+      case 'play_evening':
+        return hour >= 18 && hour < 22;
+      
+      case 'play_weekend':
+        return isWeekend;
+      
+      case 'play_full_week':
+        return this.localStats.daysPlaying >= 7;
+      
+      // Condiciones de tiempo
+      case 'fast_completion':
+        return gameData.completionTime <= 30000; // 30 seconds
+      
+      case 'patient_learning':
+        return gameData.completionTime > 60000; // More than 1 minute
+      
+      // Condiciones de mejora
       case 'improvement':
         return gameData.showedImprovement === true;
       
@@ -456,35 +496,35 @@ class RealAchievementServiceEnhanced {
       case 'help_seeker':
         return gameData.usedHelp === true;
       
-      case 'morning_activity':
-        return hour >= 6 && hour < 12;
-      
-      case 'weekend_learning':
-        return isWeekend;
-      
-      case 'patient_learning':
-        return gameData.completionTime > 60000; // More than 1 minute
-      
       default:
-        console.warn(`⚠️ [Achievement] Condición desconocida: ${achievement.condition}`);  // ✅ Usar condition
+        console.warn(`⚠️ [Achievement] Condición desconocida: ${achievement.condition}`);
         return false;
     }
   }
 
   private calculateAchievementProgress(achievement: ServerAchievement): number {
-    // ✅ USAR CONDITION EN LUGAR DE CONDITION_TYPE Y MAX_PROGRESS EN LUGAR DE CONDITION_VALUE
+    // ✅ CÁLCULO DE PROGRESO CORREGIDO
     switch (achievement.condition) {
-      case 'games_played':
       case 'complete_first_lesson':
       case 'first_activity':
-        return Math.min(this.localStats.totalActivitiesCompleted, achievement.max_progress);
+      case 'complete_activity':
+      case 'complete_5_lessons':
+        return Math.min(this.localStats.totalActivitiesCompleted, achievement.max_progress || 1);
       
-      case 'stars_earned':
+      case 'earn_stars':
       case 'collect_stars':
-        return Math.min(this.localStats.totalStarsEarned, achievement.max_progress);
+      case 'earn_3_stars':
+      case 'earn_10_stars':
+      case 'earn_50_stars':
+      case 'earn_100_stars':
+        return Math.min(this.localStats.totalStarsEarned, achievement.max_progress || 1);
       
-      case 'consecutive_days':
-        return Math.min(this.localStats.daysPlaying, achievement.max_progress);
+      case 'play_3_consecutive_days':
+      case 'play_full_week':
+        return Math.min(this.localStats.daysPlaying, achievement.max_progress || 1);
+      
+      case 'use_help_5_times':
+        return Math.min(this.localStats.helpfulAttempts, achievement.max_progress || 1);
       
       default:
         return 0;

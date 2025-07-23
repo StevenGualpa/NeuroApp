@@ -12,18 +12,24 @@ import {
   Platform,
   ScrollView,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import AuthService from '../services/AuthService';
 
 const { width, height } = Dimensions.get('window');
 
 const LoginScreen = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isRegisterMode, setIsRegisterMode] = useState(false);
   
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -32,6 +38,7 @@ const LoginScreen = () => {
   const formAnimation = useRef(new Animated.Value(0)).current;
   const buttonAnimation = useRef(new Animated.Value(1)).current;
   const loadingAnimation = useRef(new Animated.Value(0)).current;
+  const modeAnimation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Entrance animations
@@ -49,14 +56,60 @@ const LoginScreen = () => {
     ]).start();
   }, []);
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      // Shake animation for empty fields
-      Animated.sequence([
-        Animated.timing(formAnimation, { toValue: 0.95, duration: 100, useNativeDriver: true }),
-        Animated.timing(formAnimation, { toValue: 1.05, duration: 100, useNativeDriver: true }),
-        Animated.timing(formAnimation, { toValue: 1, duration: 100, useNativeDriver: true }),
-      ]).start();
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateForm = () => {
+    if (!email.trim()) {
+      Alert.alert('Error', 'Por favor ingresa tu correo electrónico');
+      return false;
+    }
+
+    if (!validateEmail(email.trim())) {
+      Alert.alert('Error', 'Por favor ingresa un correo electrónico válido');
+      return false;
+    }
+
+    if (!password.trim()) {
+      Alert.alert('Error', 'Por favor ingresa tu contraseña');
+      return false;
+    }
+
+    if (password.length < 6) {
+      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+      return false;
+    }
+
+    if (isRegisterMode) {
+      if (!name.trim()) {
+        Alert.alert('Error', 'Por favor ingresa tu nombre');
+        return false;
+      }
+
+      if (name.trim().length < 2) {
+        Alert.alert('Error', 'El nombre debe tener al menos 2 caracteres');
+        return false;
+      }
+
+      if (!confirmPassword.trim()) {
+        Alert.alert('Error', 'Por favor confirma tu contraseña');
+        return false;
+      }
+
+      if (password !== confirmPassword) {
+        Alert.alert('Error', 'Las contraseñas no coinciden');
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      shakeForm();
       return;
     }
 
@@ -70,16 +123,92 @@ const LoginScreen = () => {
     }).start();
 
     // Loading animation
-    Animated.loop(
+    const loadingLoop = Animated.loop(
       Animated.timing(loadingAnimation, {
         toValue: 1,
         duration: 1000,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    loadingLoop.start();
 
-    // Simulate login delay
-    setTimeout(() => {
+    try {
+      if (isRegisterMode) {
+        console.log('📝 [LoginScreen] Intentando registro con:', { 
+          email: email.trim(), 
+          name: name.trim() 
+        });
+        
+        // Split name into first and last name
+        const nameParts = name.trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        
+        const result = await AuthService.register({
+          username: email.trim(), // Use email as username for simplicity
+          email: email.trim(),
+          password: password,
+          first_name: firstName,
+          last_name: lastName,
+        });
+        
+        if (result.success) {
+          console.log('✅ [LoginScreen] Registro exitoso');
+          
+          // Stop loading animation
+          loadingLoop.stop();
+          setIsLoading(false);
+          
+          Alert.alert(
+            '¡Registro exitoso!',
+            'Tu cuenta ha sido creada correctamente. Ahora puedes iniciar sesión.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  // Switch to login mode
+                  setIsRegisterMode(false);
+                  setConfirmPassword('');
+                  setName('');
+                  // Keep email and password for easy login
+                }
+              }
+            ]
+          );
+        } else {
+          throw new Error(result.message || 'Error en el registro');
+        }
+      } else {
+        console.log('🔐 [LoginScreen] Intentando login con:', { email: email.trim() });
+        
+        const result = await AuthService.login({
+          email: email.trim(),
+          password: password,
+        });
+        
+        if (result.success) {
+          console.log('✅ [LoginScreen] Login exitoso');
+          
+          // Stop loading animation
+          loadingLoop.stop();
+          
+          // Success animation and navigation
+          Animated.timing(formAnimation, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }).start(() => {
+            navigation.replace('onboarding');
+          });
+        } else {
+          throw new Error(result.message || 'Credenciales incorrectas');
+        }
+      }
+    } catch (error) {
+      console.error(`❌ [LoginScreen] Error en ${isRegisterMode ? 'registro' : 'login'}:`, error);
+      
+      // Stop loading animation
+      loadingLoop.stop();
       setIsLoading(false);
       
       // Reset button animation
@@ -89,26 +218,60 @@ const LoginScreen = () => {
         useNativeDriver: true,
       }).start();
 
-      // Success animation and navigation
-      Animated.timing(formAnimation, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        navigation.replace('onboarding');
-      });
-    }, 1500);
+      // Show error
+      const errorMessage = error instanceof Error ? error.message : 
+        (isRegisterMode 
+          ? 'No se pudo crear la cuenta. Es posible que el correo ya esté registrado.'
+          : 'Correo electrónico o contraseña incorrectos. Por favor verifica tus credenciales.');
+      
+      Alert.alert(
+        isRegisterMode ? 'Error de registro' : 'Error de inicio de sesión',
+        errorMessage,
+        [{ text: 'OK' }]
+      );
+      
+      shakeForm();
+    }
   };
 
-  const handleGuestLogin = () => {
-    // Quick guest access
-    Animated.timing(formAnimation, {
-      toValue: 0,
+  const shakeForm = () => {
+    Animated.sequence([
+      Animated.timing(formAnimation, { toValue: 0.95, duration: 100, useNativeDriver: true }),
+      Animated.timing(formAnimation, { toValue: 1.05, duration: 100, useNativeDriver: true }),
+      Animated.timing(formAnimation, { toValue: 1, duration: 100, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const toggleMode = () => {
+    if (isLoading) return;
+
+    // Animate mode change
+    Animated.timing(modeAnimation, {
+      toValue: isRegisterMode ? 0 : 1,
       duration: 300,
       useNativeDriver: true,
-    }).start(() => {
-      navigation.replace('onboarding');
-    });
+    }).start();
+
+    setIsRegisterMode(!isRegisterMode);
+    
+    // Clear form when switching modes
+    if (!isRegisterMode) {
+      // Switching to register mode
+      setConfirmPassword('');
+      setName('');
+    } else {
+      // Switching to login mode
+      setConfirmPassword('');
+      setName('');
+    }
+  };
+
+  const handleForgotPassword = () => {
+    Alert.alert(
+      'Recuperar contraseña',
+      'Para recuperar tu contraseña, contacta al administrador del sistema.',
+      [{ text: 'OK' }]
+    );
   };
 
   return (
@@ -143,13 +306,18 @@ const LoginScreen = () => {
               <Text style={styles.logoIcon}>🧠</Text>
               <Text style={styles.logoText}>NeuroApp</Text>
             </View>
-            <Text style={styles.welcomeText}>¡Bienvenido de vuelta!</Text>
+            <Text style={styles.welcomeText}>
+              {isRegisterMode ? '¡Únete a nosotros!' : '¡Bienvenido de vuelta!'}
+            </Text>
             <Text style={styles.subtitleText}>
-              Continúa tu aventura de aprendizaje
+              {isRegisterMode 
+                ? 'Crea tu cuenta y comienza a aprender'
+                : 'Continúa tu aventura de aprendizaje'
+              }
             </Text>
           </Animated.View>
 
-          {/* Login Form */}
+          {/* Login/Register Form */}
           <Animated.View 
             style={[
               styles.formContainer,
@@ -165,20 +333,53 @@ const LoginScreen = () => {
             ]}
           >
             <View style={styles.inputContainer}>
+              {/* Name field (only for register) */}
+              {isRegisterMode && (
+                <Animated.View 
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      opacity: modeAnimation,
+                      transform: [{
+                        translateY: modeAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-20, 0],
+                        })
+                      }]
+                    }
+                  ]}
+                >
+                  <Text style={styles.inputIcon}>👤</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Nombre completo"
+                    placeholderTextColor="#9ca3af"
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    value={name}
+                    onChangeText={setName}
+                    editable={!isLoading}
+                  />
+                </Animated.View>
+              )}
+
+              {/* Email field */}
               <View style={styles.inputWrapper}>
-                <Text style={styles.inputIcon}>👤</Text>
+                <Text style={styles.inputIcon}>📧</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="Correo electrónico"
                   placeholderTextColor="#9ca3af"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
                   value={email}
                   onChangeText={setEmail}
                   editable={!isLoading}
                 />
               </View>
 
+              {/* Password field */}
               <View style={styles.inputWrapper}>
                 <Text style={styles.inputIcon}>🔒</Text>
                 <TextInput
@@ -195,17 +396,65 @@ const LoginScreen = () => {
                   onPress={() => setShowPassword(!showPassword)}
                 >
                   <Text style={styles.eyeIcon}>
-                    {showPassword ? '👁️' : '👁️‍🗨️'}
+                    {showPassword ? '👁️' : '🙈'}
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {/* Confirm Password field (only for register) */}
+              {isRegisterMode && (
+                <Animated.View 
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      opacity: modeAnimation,
+                      transform: [{
+                        translateY: modeAnimation.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-20, 0],
+                        })
+                      }]
+                    }
+                  ]}
+                >
+                  <Text style={styles.inputIcon}>🔐</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Confirmar contraseña"
+                    placeholderTextColor="#9ca3af"
+                    secureTextEntry={!showConfirmPassword}
+                    value={confirmPassword}
+                    onChangeText={setConfirmPassword}
+                    editable={!isLoading}
+                  />
+                  <TouchableOpacity 
+                    style={styles.eyeButton}
+                    onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    <Text style={styles.eyeIcon}>
+                      {showConfirmPassword ? '👁️' : '🙈'}
+                    </Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              )}
             </View>
 
-            {/* Login Button */}
+            {/* Forgot Password (only for login) */}
+            {!isRegisterMode && (
+              <TouchableOpacity 
+                style={styles.forgotPasswordButton}
+                onPress={handleForgotPassword}
+                disabled={isLoading}
+              >
+                <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Submit Button */}
             <Animated.View style={{ transform: [{ scale: buttonAnimation }] }}>
               <TouchableOpacity
-                style={[styles.loginButton, isLoading && styles.loginButtonLoading]}
-                onPress={handleLogin}
+                style={[styles.submitButton, isLoading && styles.submitButtonLoading]}
+                onPress={handleSubmit}
                 disabled={isLoading}
                 activeOpacity={0.8}
               >
@@ -226,40 +475,40 @@ const LoginScreen = () => {
                     >
                       <Text style={styles.loadingIcon}>⚡</Text>
                     </Animated.View>
-                    <Text style={styles.loginButtonText}>Iniciando sesión...</Text>
+                    <Text style={styles.submitButtonText}>
+                      {isRegisterMode ? 'Creando cuenta...' : 'Iniciando sesión...'}
+                    </Text>
                   </View>
                 ) : (
                   <>
-                    <Text style={styles.loginButtonIcon}>🚀</Text>
-                    <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+                    <Text style={styles.submitButtonIcon}>
+                      {isRegisterMode ? '📝' : '🚀'}
+                    </Text>
+                    <Text style={styles.submitButtonText}>
+                      {isRegisterMode ? 'Crear Cuenta' : 'Iniciar Sesión'}
+                    </Text>
                   </>
                 )}
               </TouchableOpacity>
             </Animated.View>
 
-            {/* Divider */}
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>o</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            {/* Guest Access */}
-            <TouchableOpacity
-              style={styles.guestButton}
-              onPress={handleGuestLogin}
-              disabled={isLoading}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.guestButtonIcon}>👋</Text>
-              <Text style={styles.guestButtonText}>Continuar como invitado</Text>
-            </TouchableOpacity>
-
-            {/* Demo Credentials */}
-            <View style={styles.demoContainer}>
-              <Text style={styles.demoTitle}>💡 Credenciales de prueba:</Text>
-              <Text style={styles.demoText}>Email: cualquier texto</Text>
-              <Text style={styles.demoText}>Contraseña: cualquier texto</Text>
+            {/* Mode Toggle */}
+            <View style={styles.modeToggleContainer}>
+              <Text style={styles.modeToggleText}>
+                {isRegisterMode 
+                  ? '¿Ya tienes una cuenta?' 
+                  : '¿No tienes una cuenta?'
+                }
+              </Text>
+              <TouchableOpacity
+                style={styles.modeToggleButton}
+                onPress={toggleMode}
+                disabled={isLoading}
+              >
+                <Text style={styles.modeToggleButtonText}>
+                  {isRegisterMode ? 'Iniciar Sesión' : 'Crear Cuenta'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </Animated.View>
 
@@ -267,6 +516,9 @@ const LoginScreen = () => {
           <View style={styles.footer}>
             <Text style={styles.footerText}>
               🌟 Aprende, juega y crece con NeuroApp ✨
+            </Text>
+            <Text style={styles.versionText}>
+              Versión 1.0.0
             </Text>
           </View>
         </ScrollView>
@@ -334,7 +586,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   inputContainer: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -364,7 +616,16 @@ const styles = StyleSheet.create({
   eyeIcon: {
     fontSize: 18,
   },
-  loginButton: {
+  forgotPasswordButton: {
+    alignSelf: 'flex-end',
+    marginBottom: 24,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: '#4285f4',
+    fontWeight: '600',
+  },
+  submitButton: {
     backgroundColor: '#4285f4',
     borderRadius: 16,
     paddingVertical: 16,
@@ -379,14 +640,14 @@ const styles = StyleSheet.create({
     elevation: 6,
     marginBottom: 20,
   },
-  loginButtonLoading: {
+  submitButtonLoading: {
     backgroundColor: '#6b7280',
   },
-  loginButtonIcon: {
+  submitButtonIcon: {
     fontSize: 20,
     marginRight: 8,
   },
-  loginButtonText: {
+  submitButtonText: {
     fontSize: 16,
     fontWeight: '700',
     color: '#ffffff',
@@ -401,62 +662,22 @@ const styles = StyleSheet.create({
   loadingIcon: {
     fontSize: 20,
   },
-  divider: {
-    flexDirection: 'row',
+  modeToggleContainer: {
     alignItems: 'center',
-    marginBottom: 20,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e8f0fe',
-  },
-  dividerText: {
+  modeToggleText: {
     fontSize: 14,
     color: '#6b7280',
-    fontWeight: '500',
-    marginHorizontal: 16,
-  },
-  guestButton: {
-    backgroundColor: '#f8faff',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#e8f0fe',
-    marginBottom: 20,
-  },
-  guestButtonIcon: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  guestButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4285f4',
-  },
-  demoContainer: {
-    backgroundColor: '#f0f9ff',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  demoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e40af',
     marginBottom: 8,
-    textAlign: 'center',
   },
-  demoText: {
-    fontSize: 12,
-    color: '#1e40af',
-    textAlign: 'center',
-    marginBottom: 2,
+  modeToggleButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  modeToggleButtonText: {
+    fontSize: 16,
+    color: '#4285f4',
+    fontWeight: '600',
   },
   footer: {
     alignItems: 'center',
@@ -467,6 +688,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
     fontWeight: '500',
+    marginBottom: 8,
+  },
+  versionText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+    fontWeight: '400',
   },
 });
 

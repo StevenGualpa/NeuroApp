@@ -93,13 +93,13 @@ const MainScreen = () => {
     console.log('🎯 [MainScreen] Navegando a:', option);
     switch (option) {
       case 'home':
-        navigation.navigate('realLogin');
+        navigation.navigate('login');
         break;
       case 'actividades':
         navigation.navigate('realActivityMenu');
         break;
       case 'logros':
-        console.log('🏆 [MainScreen] Navegando a pantalla de logros del servidor');
+        console.log('🏆 [MainScreen] Navegando a pantalla de logros');
         navigation.navigate('Achievements');
         break;
       case 'estadisticas':
