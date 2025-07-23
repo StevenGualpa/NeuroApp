@@ -5,11 +5,16 @@ import { NavigationContainer } from '@react-navigation/native';
 
 import MainScreen from '../screens/MainScreen';
 import CategoryMenuScreen from '../screens/CategoryMenuScreen';
+import RealCategoryMenuScreen from '../screens/RealCategoryMenuScreen';
 import LessonScreen from '../screens/LessonScreen';
+import RealLessonScreen from '../screens/RealLessonScreen';
 import SubLessonListScreen from '../screens/SubLessonListScreen';
+import RealLessonListScreen from '../screens/RealLessonListScreen';
 import LoginScreen from '../screens/LoginScreen';
+import RealLoginScreen from '../screens/RealLoginScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import ActivityMenuScreen from '../screens/ActivityMenuScreen';
+import RealActivityMenuScreen from '../screens/RealActivityMenuScreen';
 import MemoryGameScreen from '../screens/MemoryGameScreen';
 import DragDropScreen from '../screens/DragDropScreen';
 import MatchScreen from '../screens/MatchScreen';
@@ -17,6 +22,9 @@ import SelectOptionScreen from '../screens/SelectOptionScreen';
 import OrderStepsScreen from '../screens/OrderStepsScreen';
 import PatternRecognitionScreen from '../screens/PatternRecognitionScreen';
 import AchievementsScreen from '../screens/AchievementsScreen';
+import RealAchievementsScreen from '../screens/RealAchievementsScreen';
+import StatisticsScreen from '../screens/StatisticsScreen';
+
 
 import type { Lesson, Step } from '../data/lessons';
 
@@ -26,13 +34,18 @@ export type RootStackParamList = {
   
   // Pantallas de autenticación y onboarding
   login: undefined;
+  realLogin: undefined;
   onboarding: undefined;
   
   // Pantallas de actividades
   activityMenu: undefined;
+  realActivityMenu: undefined;
   categoryMenu: { activityType?: string };
+  realCategoryMenu: { activityType?: string };
   lesson: { lesson: Lesson };
+  realLesson: { lesson: Lesson };
   sublessonList: { category: string; activityType?: string };
+  realLessonList: { category: string; activityType?: string };
   
   // Pantallas de juegos
   memoryGame: { step: Step; lessonTitle: string };
@@ -44,6 +57,9 @@ export type RootStackParamList = {
   
   // Pantallas adicionales
   Achievements: undefined;
+  RealAchievements: undefined;
+  Statistics: undefined;
+  Debug: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -52,20 +68,25 @@ const AppNavigator = () => (
   <NavigationContainer>
     <Stack.Navigator 
       screenOptions={{ headerShown: false }} 
-      initialRouteName="login"
+      initialRouteName="realLogin"
     >
       {/* Pantalla Principal */}
       <Stack.Screen name="MainScreen" component={MainScreen} />
       
       {/* Pantallas de Autenticación y Onboarding */}
       <Stack.Screen name="login" component={LoginScreen} />
+      <Stack.Screen name="realLogin" component={RealLoginScreen} />
       <Stack.Screen name="onboarding" component={OnboardingScreen} />
       
       {/* Pantallas de Actividades */}
       <Stack.Screen name="activityMenu" component={ActivityMenuScreen} />
+      <Stack.Screen name="realActivityMenu" component={RealActivityMenuScreen} />
       <Stack.Screen name="categoryMenu" component={CategoryMenuScreen} />
+      <Stack.Screen name="realCategoryMenu" component={RealCategoryMenuScreen} />
       <Stack.Screen name="sublessonList" component={SubLessonListScreen} />
+      <Stack.Screen name="realLessonList" component={RealLessonListScreen} />
       <Stack.Screen name="lesson" component={LessonScreen} />
+      <Stack.Screen name="realLesson" component={RealLessonScreen} />
       
       {/* Pantallas de Juegos */}
       <Stack.Screen name="memoryGame" component={MemoryGameScreen} />
@@ -77,6 +98,8 @@ const AppNavigator = () => (
       
       {/* Pantallas Adicionales */}
       <Stack.Screen name="Achievements" component={AchievementsScreen} />
+      <Stack.Screen name="RealAchievements" component={RealAchievementsScreen} />
+      <Stack.Screen name="Statistics" component={StatisticsScreen} />
     </Stack.Navigator>
   </NavigationContainer>
 );

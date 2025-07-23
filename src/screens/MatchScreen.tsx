@@ -16,11 +16,14 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
 import AchievementNotification from '../components/AchievementNotification';
+import AchievementCelebration from '../components/AchievementCelebration';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
+import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
+import { useRealProgress } from '../hooks/useRealProgress';
 
 const { width } = Dimensions.get('window');
 
@@ -33,12 +36,27 @@ interface GameStats {
   firstTrySuccess: boolean;
   dragCount: number;
   efficiency: number;
+  usedHelp?: boolean;
+  helpActivations?: number;
+}
+
+interface ServerAchievement {
+  ID: number;
+  title: string;
+  description: string;
+  icon: string;
+  rarity: string;
+  points: number;
+  category: string;
 }
 
 const MatchScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'match'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
+
+  // Real progress hook
+  const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
   
   // Game state
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -54,6 +72,10 @@ const MatchScreen = () => {
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
   const [showAchievementNotification, setShowAchievementNotification] = useState(false);
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
+  
+  // New celebration states
+  const [unlockedAchievements, setUnlockedAchievements] = useState<ServerAchievement[]>([]);
+  const [showCelebration, setShowCelebration] = useState(false);
 
   // Gamification states
   const [gameStats, setGameStats] = useState<GameStats>({
@@ -65,6 +87,8 @@ const MatchScreen = () => {
     firstTrySuccess: false,
     dragCount: 0,
     efficiency: 100,
+    usedHelp: false,
+    helpActivations: 0,
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
@@ -89,9 +113,11 @@ const MatchScreen = () => {
   useEffect(() => {
     const initAchievements = async () => {
       try {
-        await AchievementService.initializeAchievements();
+        console.log('🏆 [MatchScreen] Inicializando servicio de logros mejorado...');
+        await RealAchievementServiceEnhanced.initializeAchievements();
+        console.log('✅ [MatchScreen] Servicio de logros inicializado');
       } catch (error) {
-        console.error('Error initializing achievements:', error);
+        console.error('❌ [MatchScreen] Error inicializando logros:', error);
       }
     };
     initAchievements();
@@ -155,6 +181,13 @@ const MatchScreen = () => {
   const triggerHelpForOption = useCallback((optionIndex: number) => {
     setIsHelpActive(true);
     setBlinkingOptionIndex(optionIndex);
+    
+    // Update help stats
+    setGameStats(prev => ({
+      ...prev,
+      usedHelp: true,
+      helpActivations: (prev.helpActivations || 0) + 1,
+    }));
     
     // Start blinking animation
     const blinkAnimation = () => {
@@ -235,9 +268,70 @@ const MatchScreen = () => {
     }, 1000);
   }, [processAchievementQueue]);
 
+  // Save progress to backend
+  const saveProgressToBackend = useCallback(async (finalStats: GameStats) => {
+    try {
+      console.log('💾 [MatchScreen] Guardando progreso en backend...');
+      
+      const progressData = {
+        lessonId: (step as any).lesson_id || 1,
+        stepId: (step as any).ID || step.id || 1,
+        stars: finalStats.stars,
+        attempts: finalStats.totalAttempts,
+        errors: finalStats.errors,
+        timeSpent: Math.round(finalStats.completionTime / 1000),
+        usedHelp: finalStats.usedHelp || false,
+        helpActivations: finalStats.helpActivations || 0,
+        perfectRun: finalStats.perfectRun,
+      };
+
+      console.log('📊 [MatchScreen] ===== DATOS ENVIADOS AL SERVIDOR =====');
+      console.log('🎯 Lección ID:', progressData.lessonId);
+      console.log('📝 Paso ID:', progressData.stepId);
+      console.log('⭐ Estrellas ganadas:', progressData.stars);
+      console.log('🔄 Intentos totales:', progressData.attempts);
+      console.log('❌ Errores cometidos:', progressData.errors);
+      console.log('⏱️ Tiempo gastado (segundos):', progressData.timeSpent);
+      console.log('🤝 Usó ayuda:', progressData.usedHelp);
+      console.log('💡 Activaciones de ayuda:', progressData.helpActivations);
+      console.log('🏆 Ejecución perfecta:', progressData.perfectRun);
+      console.log('================================================');
+      
+      const success = await completeStep(progressData);
+
+      if (success) {
+        console.log('✅ [MatchScreen] ¡PROGRESO GUARDADO EXITOSAMENTE EN EL SERVIDOR!');
+        console.log('📊 [MatchScreen] Todos los datos fueron enviados y procesados correctamente');
+      } else {
+        console.warn('⚠️ [MatchScreen] No se pudo guardar el progreso en backend');
+        if (progressError) {
+          console.error('❌ [MatchScreen] Error específico:', progressError);
+          Alert.alert(
+            'Error de Conexión',
+            `No se pudo guardar tu progreso: ${progressError}. Tu progreso local se ha guardado.`,
+            [{ text: 'OK' }]
+          );
+        }
+      }
+    } catch (error) {
+      console.error('❌ [MatchScreen] Error guardando progreso:', error);
+      Alert.alert(
+        'Error',
+        'Hubo un problema guardando tu progreso. Tu progreso local se ha guardado.',
+        [{ text: 'OK' }]
+      );
+    }
+  }, [completeStep, step, progressError]);
+
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
+      console.log('🎮 [MatchScreen] Registrando finalización del juego...');
+
+      // 1. Save progress to backend first
+      await saveProgressToBackend(finalStats);
+
+      // 2. Use the enhanced achievement service that syncs with server
       const gameData = {
         stars: finalStats.stars,
         isPerfect: finalStats.perfectRun,
@@ -245,30 +339,53 @@ const MatchScreen = () => {
         errors: finalStats.errors,
         activityType: 'Asocia elementos',
         showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
-        usedHelp: false,
+        usedHelp: finalStats.usedHelp || false,
         tookTime: finalStats.completionTime > 60000,
+        lessonId: (step as any).lesson_id,
+        stepId: (step as any).ID || step.id,
       };
 
-      const newlyUnlocked = await AchievementService.recordGameCompletion(gameData);
+      console.log('🏆 [MatchScreen] Verificando logros con datos:', gameData);
+
+      const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
       
       if (newlyUnlocked.length > 0) {
-        setAchievementQueue(prev => [...prev, ...newlyUnlocked]);
+        console.log(`🎉 [MatchScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
+        newlyUnlocked.forEach((achievement, index) => {
+          console.log(`   ${index + 1}. 🏆 ${achievement.title} - ${achievement.description}`);
+        });
         
-        if (!showAchievementNotification) {
-          setTimeout(() => {
-            processAchievementQueue();
-          }, 2000);
-        }
+        // Convert to server achievement format for celebration
+        const serverAchievements: ServerAchievement[] = newlyUnlocked.map(achievement => ({
+          ID: achievement.ID || 0,
+          title: achievement.title,
+          description: achievement.description,
+          icon: achievement.icon,
+          rarity: achievement.rarity || 'common',
+          points: achievement.points || 0,
+          category: achievement.category || 'general',
+        }));
+        
+        setUnlockedAchievements(serverAchievements);
+        
+        // Show celebration after a short delay
+        setTimeout(() => {
+          setShowCelebration(true);
+        }, 1500);
+        
+      } else {
+        console.log('📊 [MatchScreen] No se desbloquearon nuevos logros esta vez');
+        console.log('💡 [MatchScreen] Esto puede ser normal si ya tienes logros desbloqueados');
       }
     } catch (error) {
-      console.error('Error recording game completion:', error);
+      console.error('❌ [MatchScreen] Error registrando finalización:', error);
       Alert.alert(
         'Error',
-        'No se pudieron guardar los logros. Tu progreso se ha guardado localmente.',
+        'No se pudieron verificar los logros. Tu progreso se ha guardado.',
         [{ text: 'OK' }]
       );
     }
-  }, [showAchievementNotification, processAchievementQueue]);
+  }, [saveProgressToBackend, step]);
 
   const handleAnimationFinish = useCallback(() => {
     setShowAnimation(false);
@@ -284,8 +401,19 @@ const MatchScreen = () => {
         stars: calculateStars(gameStats.errors, completionTime, gameStats.firstTrySuccess),
       };
       setGameStats(finalStats);
+
+      console.log('📈 [MatchScreen] Estadísticas finales calculadas:', {
+        totalAttempts: finalStats.totalAttempts,
+        errors: finalStats.errors,
+        stars: finalStats.stars,
+        completionTime: finalStats.completionTime,
+        perfectRun: finalStats.perfectRun,
+        firstTrySuccess: finalStats.firstTrySuccess,
+        usedHelp: finalStats.usedHelp,
+        helpActivations: finalStats.helpActivations,
+      });
       
-      // Record game completion for achievements
+      // Record game completion (includes backend save and achievement check)
       recordGameCompletion(finalStats);
       
       // Small delay before showing winner animation
@@ -376,6 +504,8 @@ const MatchScreen = () => {
       firstTrySuccess: false,
       dragCount: 0,
       efficiency: 100,
+      usedHelp: false,
+      helpActivations: 0,
     });
   }, []);
 
@@ -408,6 +538,11 @@ const MatchScreen = () => {
     }
   }, [gameStats.totalAttempts, gameCompleted, navigation]);
 
+  const handleCelebrationClose = useCallback(() => {
+    setShowCelebration(false);
+    setUnlockedAchievements([]);
+  }, []);
+
   const getOptionStyle = useCallback((index: number, correct: boolean) => {
     if (!isAnswered) return styles.optionButton;
     
@@ -423,6 +558,17 @@ const MatchScreen = () => {
     processAchievementQueue();
   }, [processAchievementQueue]);
 
+  // Log component mount
+  useEffect(() => {
+    console.log('🎮 [MatchScreen] Componente montado');
+    console.log('📝 [MatchScreen] Datos del paso:', {
+      stepId: (step as any).ID || step.id,
+      lessonId: (step as any).lesson_id,
+      text: step.text,
+      optionsCount: step.options?.length || 0,
+    });
+  }, [step]);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header simplificado */}
@@ -433,6 +579,13 @@ const MatchScreen = () => {
         >
           <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
+        
+        {/* Progress indicator */}
+        {progressLoading && (
+          <View style={styles.progressIndicator}>
+            <Text style={styles.progressText}>Guardando...</Text>
+          </View>
+        )}
       </View>
 
       {/* Contenido Scrollable */}
@@ -560,7 +713,7 @@ const MatchScreen = () => {
 
       {/* Game Complete Modal usando componente reutilizable */}
       <GameCompletionModal
-        visible={gameCompleted && !showAnimation && showStars}
+        visible={gameCompleted && !showAnimation && showStars && !showCelebration}
         stats={gameStats}
         onReset={resetGame}
         onContinue={() => navigation.goBack()}
@@ -569,6 +722,8 @@ const MatchScreen = () => {
         customStats={[
           { label: 'Intentos totales', value: gameStats.totalAttempts },
           { label: 'Respuesta correcta', value: score === 1 ? 'Sí' : 'No' },
+          { label: 'Ayuda usada', value: gameStats.usedHelp ? 'Sí' : 'No' },
+          { label: 'Progreso guardado', value: progressLoading ? 'Guardando...' : 'Guardado ✅' },
         ]}
         bonusMessage={gameStats.firstTrySuccess ? "🎯 ¡Primera vez perfecto!" : undefined}
       />
@@ -580,6 +735,13 @@ const MatchScreen = () => {
           onFinish={handleAnimationFinish}
         />
       )}
+
+      {/* Achievement Celebration - NEW! */}
+      <AchievementCelebration
+        achievements={unlockedAchievements}
+        visible={showCelebration}
+        onClose={handleCelebrationClose}
+      />
 
       {/* Achievement Notification */}
       {newAchievement && (
@@ -605,6 +767,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   backButton: {
     backgroundColor: '#ffffff',
@@ -624,61 +787,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#4285f4',
   },
+  progressIndicator: {
+    backgroundColor: '#4285f4',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  progressText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
-  },
-  instructionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-    borderLeftWidth: 3,
-    borderLeftColor: '#4285f4',
-  },
-  instructionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  instructionIcon: {
-    fontSize: 20,
-    marginRight: 8,
-  },
-  instructionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1a1a1a',
-  },
-  instructionText: {
-    fontSize: 14,
-    color: '#1a1a1a',
-    fontWeight: '600',
-    marginBottom: 6,
-    paddingLeft: 6,
-  },
-  instructionTip: {
-    backgroundColor: '#f0f9ff',
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  instructionTipText: {
-    fontSize: 12,
-    color: '#1e40af',
-    fontWeight: '600',
-    textAlign: 'center',
   },
   questionContainer: {
     backgroundColor: '#ffffff',

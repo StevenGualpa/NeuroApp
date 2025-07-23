@@ -74,6 +74,13 @@ const MainScreen = () => {
       shadowColor: '#3742FA',
     },
     { 
+      key: 'estadisticas', 
+      label: 'Estadísticas', 
+      icon: '📊', 
+      color: '#9C27B0',
+      shadowColor: '#7B1FA2',
+    },
+    { 
       key: 'creditos', 
       label: 'Créditos', 
       icon: '👥', 
@@ -83,15 +90,21 @@ const MainScreen = () => {
   ];
 
   const handleMenuPress = (option: string) => {
+    console.log('🎯 [MainScreen] Navegando a:', option);
     switch (option) {
       case 'home':
-        navigation.navigate('onboarding');
+        navigation.navigate('realLogin');
         break;
       case 'actividades':
-        navigation.navigate('activityMenu');
+        navigation.navigate('realActivityMenu');
         break;
       case 'logros':
+        console.log('🏆 [MainScreen] Navegando a pantalla de logros del servidor');
         navigation.navigate('Achievements');
+        break;
+      case 'estadisticas':
+        console.log('📊 [MainScreen] Navegando a pantalla de estadísticas');
+        navigation.navigate('Statistics');
         break;
       case 'creditos':
         setShowCredits(true);

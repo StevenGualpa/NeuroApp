@@ -17,14 +17,12 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
 import AchievementNotification from '../components/AchievementNotification';
-import AchievementCelebration from '../components/AchievementCelebration';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
-import { AchievementService, Achievement } from '../services/AchievementService';
-import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
+import RealAchievementService from '../services/RealAchievementService';
+import { Achievement } from '../services/ApiService';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
-import { useRealProgress } from '../hooks/useRealProgress';
 
 type MemoryGameRouteProp = RouteProp<RootStackParamList, 'memoryGame'>;
 
@@ -46,31 +44,15 @@ interface GameStats {
   flipCount: number;
   efficiency: number;
   dragCount: number;
-  usedHelp?: boolean;
-  helpActivations?: number;
-  firstTrySuccess: boolean;
-}
-
-interface ServerAchievement {
-  ID: number;
-  title: string;
-  description: string;
-  icon: string;
-  rarity: string;
-  points: number;
-  category: string;
 }
 
 const { width } = Dimensions.get('window');
-const CARD_SIZE = (width - 60) / 4; // Reduced for better fit
+const CARD_SIZE = (width - 60) / 4;
 
-const MemoryGameScreen = () => {
+const RealMemoryGameScreen = () => {
   const route = useRoute<MemoryGameRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
-
-  // Real progress hook
-  const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
 
   // Game state
   const [cards, setCards] = useState<Card[]>([]);
@@ -89,10 +71,6 @@ const MemoryGameScreen = () => {
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
   const [showAchievementNotification, setShowAchievementNotification] = useState(false);
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
-  
-  // New celebration states
-  const [unlockedAchievements, setUnlockedAchievements] = useState<ServerAchievement[]>([]);
-  const [showCelebration, setShowCelebration] = useState(false);
 
   // Gamification states
   const [gameStats, setGameStats] = useState<GameStats>({
@@ -105,9 +83,6 @@ const MemoryGameScreen = () => {
     flipCount: 0,
     efficiency: 100,
     dragCount: 0,
-    usedHelp: false,
-    helpActivations: 0,
-    firstTrySuccess: false,
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
@@ -121,17 +96,18 @@ const MemoryGameScreen = () => {
 
   // Memoized values
   const totalPairs = useMemo(() => step.options?.length || 0, [step.options]);
-  const totalItems = totalPairs; // Para compatibilidad con ProgressSection
+  const totalItems = totalPairs;
 
   // Initialize achievements service
   useEffect(() => {
     const initAchievements = async () => {
       try {
-        console.log('🏆 [MemoryGameScreen] Inicializando servicio de logros mejorado...');
-        await RealAchievementServiceEnhanced.initializeAchievements();
-        console.log('✅ [MemoryGameScreen] Servicio de logros inicializado');
+        console.log('🏆 Initializing Real Achievement Service...');
+        await RealAchievementService.initializeAchievements();
+        console.log('✅ Real Achievement Service initialized');
       } catch (error) {
-        console.error('❌ [MemoryGameScreen] Error inicializando logros:', error);
+        console.error('❌ Error initializing real achievements:', error);
+        // Continue without achievements if there's an error
       }
     };
     initAchievements();
@@ -141,17 +117,13 @@ const MemoryGameScreen = () => {
   useEffect(() => {
     adaptiveService.current.initialize(
       (helpCardIndex) => {
-        // Handle help trigger
         if (helpCardIndex === -1) {
-          // Inactivity help - find a pair that can be matched
           triggerHelpForMemoryGame();
         } else {
-          // Error-based help
           triggerHelpForMemoryGame();
         }
       },
       (message, activityType) => {
-        // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
         if (step.helpMessage) {
@@ -165,11 +137,11 @@ const MemoryGameScreen = () => {
         console.log(`🔊 About to play TTS: ${helpMessage}`);
         audioService.current.playTextToSpeech(helpMessage);
       },
-      step.activityType // Pass the activity type to the service
+      step.activityType
     );
 
     return () => {
-      console.log(`🔊 MemoryGameScreen: Cleaning up services`);
+      console.log(`🔊 RealMemoryGameScreen: Cleaning up services`);
       adaptiveService.current.cleanup();
       audioService.current.cleanup();
     };
@@ -185,7 +157,6 @@ const MemoryGameScreen = () => {
         animation: new Animated.Value(180),
       })) ?? [];
 
-    // Create unique Animated.Value instances for each card
     const shuffled = [...duplicated]
       .flatMap((card) => [
         { 
@@ -203,7 +174,6 @@ const MemoryGameScreen = () => {
 
     setCards(shuffled);
 
-    // Show cards for 4 seconds (reduced)
     const timer = setTimeout(() => {
       setShowingCards(false);
       const reset = shuffled.map((c) => ({
@@ -231,13 +201,10 @@ const MemoryGameScreen = () => {
     return cleanup;
   }, [initializeCards]);
 
-  // Helper function to trigger help for memory game
   const triggerHelpForMemoryGame = useCallback(() => {
-    // Find a pair that hasn't been matched yet
     const unmatchedCards = cards.filter(card => !card.matched);
     if (unmatchedCards.length === 0) return;
 
-    // Group cards by icon to find pairs
     const cardGroups: { [icon: string]: Card[] } = {};
     unmatchedCards.forEach(card => {
       if (!cardGroups[card.icon]) {
@@ -246,25 +213,15 @@ const MemoryGameScreen = () => {
       cardGroups[card.icon].push(card);
     });
 
-    // Find the first complete pair
     const availablePair = Object.values(cardGroups).find(group => group.length >= 2);
     if (!availablePair) return;
 
-    // Take the first two cards of this pair
     const helpCards = availablePair.slice(0, 2);
     const helpCardIds = helpCards.map(card => card.id);
 
     setIsHelpActive(true);
     setBlinkingCardIds(helpCardIds);
     
-    // Update help stats
-    setGameStats(prev => ({
-      ...prev,
-      usedHelp: true,
-      helpActivations: (prev.helpActivations || 0) + 1,
-    }));
-    
-    // Start blinking animation
     const blinkAnimation = () => {
       Animated.sequence([
         Animated.timing(helpBlinkAnimation, {
@@ -286,7 +243,6 @@ const MemoryGameScreen = () => {
     
     blinkAnimation();
     
-    // Stop help after 5 seconds
     setTimeout(() => {
       setIsHelpActive(false);
       setBlinkingCardIds([]);
@@ -294,16 +250,15 @@ const MemoryGameScreen = () => {
     }, 5000);
   }, [cards, helpBlinkAnimation, isHelpActive]);
 
-  // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, flipCount: number, completionTime: number, totalPairs: number): number => {
-    const maxTime = totalPairs * 12000; // 12 seconds per pair
+    const maxTime = totalPairs * 12000;
     const minFlips = totalPairs * 2;
     
     const timeBonus = completionTime < maxTime * 0.6 ? 1 : 0;
     const memoryBonus = flipCount <= minFlips * 1.4 ? 1 : 0;
 
     if (errors === 0 && flipCount <= minFlips * 1.2) {
-      return 3; // Perfect performance
+      return 3;
     } else if (errors <= 2 && flipCount <= minFlips * 1.5) {
       return 2 + timeBonus;
     } else if (errors <= 4) {
@@ -326,7 +281,6 @@ const MemoryGameScreen = () => {
     }
   }, []);
 
-  // Handle achievement notifications queue
   const processAchievementQueue = useCallback(() => {
     if (achievementQueue.length > 0 && !showAchievementNotification) {
       const nextAchievement = achievementQueue[0];
@@ -345,70 +299,11 @@ const MemoryGameScreen = () => {
     }, 1000);
   }, [processAchievementQueue]);
 
-  // Save progress to backend
-  const saveProgressToBackend = useCallback(async (finalStats: GameStats) => {
-    try {
-      console.log('💾 [MemoryGameScreen] Guardando progreso en backend...');
-      
-      const progressData = {
-        lessonId: (step as any).lesson_id || 1,
-        stepId: (step as any).ID || step.id || 1,
-        stars: finalStats.stars,
-        attempts: finalStats.totalAttempts,
-        errors: finalStats.errors,
-        timeSpent: Math.round(finalStats.completionTime / 1000),
-        usedHelp: finalStats.usedHelp || false,
-        helpActivations: finalStats.helpActivations || 0,
-        perfectRun: finalStats.perfectRun,
-      };
-
-      console.log('📊 [MemoryGameScreen] ===== DATOS ENVIADOS AL SERVIDOR =====');
-      console.log('🎯 Lección ID:', progressData.lessonId);
-      console.log('📝 Paso ID:', progressData.stepId);
-      console.log('⭐ Estrellas ganadas:', progressData.stars);
-      console.log('🔄 Intentos totales:', progressData.attempts);
-      console.log('❌ Errores cometidos:', progressData.errors);
-      console.log('⏱️ Tiempo gastado (segundos):', progressData.timeSpent);
-      console.log('🤝 Usó ayuda:', progressData.usedHelp);
-      console.log('💡 Activaciones de ayuda:', progressData.helpActivations);
-      console.log('🏆 Ejecución perfecta:', progressData.perfectRun);
-      console.log('================================================');
-      
-      const success = await completeStep(progressData);
-
-      if (success) {
-        console.log('✅ [MemoryGameScreen] ¡PROGRESO GUARDADO EXITOSAMENTE EN EL SERVIDOR!');
-        console.log('📊 [MemoryGameScreen] Todos los datos fueron enviados y procesados correctamente');
-      } else {
-        console.warn('⚠️ [MemoryGameScreen] No se pudo guardar el progreso en backend');
-        if (progressError) {
-          console.error('❌ [MemoryGameScreen] Error específico:', progressError);
-          Alert.alert(
-            'Error de Conexión',
-            `No se pudo guardar tu progreso: ${progressError}. Tu progreso local se ha guardado.`,
-            [{ text: 'OK' }]
-          );
-        }
-      }
-    } catch (error) {
-      console.error('❌ [MemoryGameScreen] Error guardando progreso:', error);
-      Alert.alert(
-        'Error',
-        'Hubo un problema guardando tu progreso. Tu progreso local se ha guardado.',
-        [{ text: 'OK' }]
-      );
-    }
-  }, [completeStep, step, progressError]);
-
-  // Record game completion and check for achievements
+  // Record game completion and check for achievements with REAL backend
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
-      console.log('🎮 [MemoryGameScreen] Registrando finalización del juego...');
-
-      // 1. Save progress to backend first
-      await saveProgressToBackend(finalStats);
-
-      // 2. Use the enhanced achievement service that syncs with server
+      console.log('🎮 Recording game completion with Real Achievement Service...');
+      
       const gameData = {
         stars: finalStats.stars,
         isPerfect: finalStats.perfectRun,
@@ -416,53 +311,37 @@ const MemoryGameScreen = () => {
         errors: finalStats.errors,
         activityType: 'Memoria visual',
         showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
-        usedHelp: finalStats.usedHelp || false,
+        usedHelp: false,
         tookTime: finalStats.completionTime > 60000,
-        lessonId: (step as any).lesson_id,
-        stepId: (step as any).ID || step.id,
+        lessonId: step.lesson_id,
+        stepId: step.ID,
       };
 
-      console.log('🏆 [MemoryGameScreen] Verificando logros con datos:', gameData);
+      console.log('📊 Game data to record:', gameData);
 
-      const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
+      const newlyUnlocked = await RealAchievementService.recordGameCompletion(gameData);
       
       if (newlyUnlocked.length > 0) {
-        console.log(`🎉 [MemoryGameScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
-        newlyUnlocked.forEach((achievement, index) => {
-          console.log(`   ${index + 1}. 🏆 ${achievement.title} - ${achievement.description}`);
-        });
+        console.log(`🏆 Unlocked ${newlyUnlocked.length} new achievements:`, newlyUnlocked.map(a => a.name));
+        setAchievementQueue(prev => [...prev, ...newlyUnlocked]);
         
-        // Convert to server achievement format for celebration
-        const serverAchievements: ServerAchievement[] = newlyUnlocked.map(achievement => ({
-          ID: achievement.ID || 0,
-          title: achievement.title,
-          description: achievement.description,
-          icon: achievement.icon,
-          rarity: achievement.rarity || 'common',
-          points: achievement.points || 0,
-          category: achievement.category || 'general',
-        }));
-        
-        setUnlockedAchievements(serverAchievements);
-        
-        // Show celebration after a short delay
-        setTimeout(() => {
-          setShowCelebration(true);
-        }, 1500);
-        
+        if (!showAchievementNotification) {
+          setTimeout(() => {
+            processAchievementQueue();
+          }, 2000);
+        }
       } else {
-        console.log('📊 [MemoryGameScreen] No se desbloquearon nuevos logros esta vez');
-        console.log('💡 [MemoryGameScreen] Esto puede ser normal si ya tienes logros desbloqueados');
+        console.log('📈 No new achievements unlocked, but progress may have been updated');
       }
     } catch (error) {
-      console.error('❌ [MemoryGameScreen] Error registrando finalización:', error);
+      console.error('❌ Error recording game completion:', error);
       Alert.alert(
-        'Error',
-        'No se pudieron verificar los logros. Tu progreso se ha guardado.',
+        'Conexión',
+        'No se pudieron sincronizar los logros con el servidor. Tu progreso se ha guardado localmente.',
         [{ text: 'OK' }]
       );
     }
-  }, [saveProgressToBackend, step]);
+  }, [step, showAchievementNotification, processAchievementQueue]);
 
   const handleAnimationFinish = useCallback(() => {
     setShowAnimation(false);
@@ -470,7 +349,6 @@ const MemoryGameScreen = () => {
     if (animationType === 'winner' && !gameCompleted) {
       setGameCompleted(true);
       
-      // Calculate final stats
       const completionTime = Date.now() - startTime;
       const efficiency = Math.round((totalPairs * 2 / gameStats.flipCount) * 100);
       const finalStats = {
@@ -480,24 +358,10 @@ const MemoryGameScreen = () => {
         stars: calculateStars(gameStats.errors, gameStats.flipCount, completionTime, totalPairs),
       };
       setGameStats(finalStats);
-
-      console.log('📈 [MemoryGameScreen] Estadísticas finales calculadas:', {
-        totalAttempts: finalStats.totalAttempts,
-        errors: finalStats.errors,
-        stars: finalStats.stars,
-        completionTime: finalStats.completionTime,
-        perfectRun: finalStats.perfectRun,
-        matchesFound: finalStats.matchesFound,
-        flipCount: finalStats.flipCount,
-        efficiency: finalStats.efficiency,
-        usedHelp: finalStats.usedHelp,
-        helpActivations: finalStats.helpActivations,
-      });
       
-      // Record game completion (includes backend save and achievement check)
+      // Record game completion for achievements with REAL backend
       recordGameCompletion(finalStats);
       
-      // Show stars after a delay
       setTimeout(() => {
         setShowStars(true);
       }, 500);
@@ -505,10 +369,8 @@ const MemoryGameScreen = () => {
   }, [animationType, gameCompleted, gameStats, startTime, calculateStars, totalPairs, recordGameCompletion]);
 
   useEffect(() => {
-    // Update score for ProgressSection
     setScore(matchedCount);
 
-    // Check if game is complete
     if (matchedCount === totalPairs && totalPairs > 0 && !gameCompleted) {
       const timer = setTimeout(() => {
         showFeedbackAnimation('winner');
@@ -520,26 +382,20 @@ const MemoryGameScreen = () => {
   const flipCard = useCallback((card: Card) => {
     if (card.flipped || card.matched || selected.length === 2 || !gameStarted) return;
 
-    // Record user interaction for inactivity tracking
     adaptiveService.current.recordInactivity();
 
-    // Clear any active help
     if (isHelpActive) {
       setIsHelpActive(false);
       setBlinkingCardIds([]);
       helpBlinkAnimation.setValue(1);
     }
 
-    // Update flip count and drag count for ProgressSection compatibility
-    const isFirstFlip = gameStats.flipCount === 0;
     setGameStats(prev => ({
       ...prev,
       flipCount: prev.flipCount + 1,
       dragCount: prev.dragCount + 1,
-      firstTrySuccess: isFirstFlip,
     }));
 
-    // Animate the specific card
     Animated.timing(card.animation, {
       toValue: 180,
       duration: 400,
@@ -556,7 +412,6 @@ const MemoryGameScreen = () => {
     if (newSelected.length === 2) {
       const [first, second] = newSelected;
       
-      // Update total attempts
       setGameStats(prev => ({
         ...prev,
         totalAttempts: prev.totalAttempts + 1,
@@ -564,11 +419,9 @@ const MemoryGameScreen = () => {
 
       const isMatch = first.icon === second.icon;
 
-      // Record action in adaptive reinforcement service
       adaptiveService.current.recordAction(isMatch, -1, step.activityType);
 
       if (isMatch) {
-        // Match found
         setTimeout(() => {
           setCards((prev) =>
             prev.map((c) =>
@@ -581,11 +434,9 @@ const MemoryGameScreen = () => {
             matchesFound: prev.matchesFound + 1,
           }));
           showFeedbackAnimation('success');
-          // Play encouragement audio
           audioService.current.playEncouragementMessage();
         }, 500);
       } else {
-        // No match
         setGameStats(prev => ({
           ...prev,
           errors: prev.errors + 1,
@@ -593,7 +444,6 @@ const MemoryGameScreen = () => {
         }));
 
         setTimeout(() => {
-          // Animate cards back
           [first, second].forEach((selectedCard) => {
             const currentCard = cards.find(c => c.id === selectedCard.id);
             if (currentCard) {
@@ -613,14 +463,13 @@ const MemoryGameScreen = () => {
             )
           );
           showFeedbackAnimation('error');
-          // Play error guidance audio
           audioService.current.playErrorGuidanceMessage();
         }, 1000);
       }
 
       setTimeout(() => setSelected([]), 1200);
     }
-  }, [cards, selected, gameStarted, showFeedbackAnimation, step.activityType, isHelpActive, helpBlinkAnimation, gameStats.flipCount]);
+  }, [cards, selected, gameStarted, showFeedbackAnimation, step.activityType, isHelpActive, helpBlinkAnimation]);
 
   const resetGame = useCallback(() => {
     setMatchedCount(0);
@@ -640,12 +489,8 @@ const MemoryGameScreen = () => {
       flipCount: 0,
       efficiency: 100,
       dragCount: 0,
-      usedHelp: false,
-      helpActivations: 0,
-      firstTrySuccess: false,
     });
 
-    // Reinitialize cards
     initializeCards();
   }, [initializeCards]);
 
@@ -679,11 +524,6 @@ const MemoryGameScreen = () => {
       navigation.goBack();
     }
   }, [gameStats.totalAttempts, gameCompleted, navigation]);
-
-  const handleCelebrationClose = useCallback(() => {
-    setShowCelebration(false);
-    setUnlockedAchievements([]);
-  }, []);
 
   const renderCard = useCallback((card: Card) => {
     const rotateY = card.animation.interpolate({
@@ -738,25 +578,13 @@ const MemoryGameScreen = () => {
     );
   }, [flipCard, isHelpActive, blinkingCardIds, helpBlinkAnimation]);
 
-  // Process achievement queue when it changes
   useEffect(() => {
     processAchievementQueue();
   }, [processAchievementQueue]);
 
-  // Log component mount
-  useEffect(() => {
-    console.log('🎮 [MemoryGameScreen] Componente montado');
-    console.log('📝 [MemoryGameScreen] Datos del paso:', {
-      stepId: (step as any).ID || step.id,
-      lessonId: (step as any).lesson_id,
-      text: step.text,
-      optionsCount: step.options?.length || 0,
-    });
-  }, [step]);
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header simplificado */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
@@ -764,13 +592,10 @@ const MemoryGameScreen = () => {
         >
           <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
-        
-        {/* Progress indicator */}
-        {progressLoading && (
-          <View style={styles.progressIndicator}>
-            <Text style={styles.progressText}>Guardando...</Text>
-          </View>
-        )}
+        <View style={styles.headerInfo}>
+          <Text style={styles.headerTitle}>🧠 Memoria Visual</Text>
+          <Text style={styles.headerSubtitle}>Conectado a API Real</Text>
+        </View>
       </View>
 
       {/* Contenido Scrollable */}
@@ -780,11 +605,9 @@ const MemoryGameScreen = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
         onTouchStart={() => {
-          // Record user interaction for inactivity tracking
           adaptiveService.current.recordInactivity();
         }}
         onScrollBeginDrag={() => {
-          // Record user interaction for inactivity tracking
           adaptiveService.current.recordInactivity();
         }}
       >
@@ -816,7 +639,7 @@ const MemoryGameScreen = () => {
           </View>
         </View>
 
-        {/* Footer motivacional como en otras actividades */}
+        {/* Footer motivacional */}
         <View style={styles.footer}>
           <View style={styles.motivationContainer}>
             <Text style={styles.motivationIcon}>⭐</Text>
@@ -829,10 +652,9 @@ const MemoryGameScreen = () => {
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
           
-          {/* Mensaje adicional de ánimo */}
           <View style={styles.encouragementFooter}>
             <Text style={styles.encouragementFooterText}>
-              🧠 Cada juego fortalece tu memoria ✨
+              🏆 Los logros se sincronizan automáticamente ✨
             </Text>
           </View>
         </View>
@@ -840,9 +662,9 @@ const MemoryGameScreen = () => {
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
-      {/* Game Complete Modal usando componente reutilizable */}
+      {/* Game Complete Modal */}
       <GameCompletionModal
-        visible={gameCompleted && !showAnimation && showStars && !showCelebration}
+        visible={gameCompleted && !showAnimation && showStars}
         stats={gameStats}
         onReset={resetGame}
         onContinue={() => navigation.goBack()}
@@ -851,9 +673,7 @@ const MemoryGameScreen = () => {
         showEfficiency={true}
         customStats={[
           { label: 'Volteos totales', value: gameStats.flipCount },
-          { label: 'Parejas encontradas', value: `${gameStats.matchesFound}/${totalPairs}` },
-          { label: 'Ayuda usada', value: gameStats.usedHelp ? 'Sí' : 'No' },
-          { label: 'Progreso guardado', value: progressLoading ? 'Guardando...' : 'Guardado ✅' },
+          { label: 'Parejas encontradas', value: `${gameStats.matchesFound}/${totalPairs}` }
         ]}
         bonusMessage={gameStats.perfectRun && gameStats.flipCount <= totalPairs * 2.4 ? "🧠 ¡Memoria excepcional!" : undefined}
       />
@@ -865,13 +685,6 @@ const MemoryGameScreen = () => {
           onFinish={handleAnimationFinish}
         />
       )}
-
-      {/* Achievement Celebration - NEW! */}
-      <AchievementCelebration
-        achievements={unlockedAchievements}
-        visible={showCelebration}
-        onClose={handleCelebrationClose}
-      />
 
       {/* Achievement Notification */}
       {newAchievement && (
@@ -885,7 +698,7 @@ const MemoryGameScreen = () => {
   );
 };
 
-export default MemoryGameScreen;
+export default RealMemoryGameScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -893,42 +706,42 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8faff',
   },
   header: {
-    backgroundColor: '#f8faff',
+    backgroundColor: '#4285f4',
     paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 8,
+    paddingBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
   },
   backButton: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e8f0fe',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   backButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#4285f4',
-  },
-  progressIndicator: {
-    backgroundColor: '#4285f4',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  progressText: {
-    fontSize: 12,
-    fontWeight: '600',
     color: '#ffffff',
+  },
+  headerInfo: {
+    flex: 1,
+    alignItems: 'center',
+    marginLeft: -60, // Compensate for back button
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  headerSubtitle: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
   },
   scrollView: {
     flex: 1,
@@ -1066,16 +879,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   encouragementFooter: {
-    backgroundColor: '#f0f9ff',
+    backgroundColor: '#e8f5e8',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: '#c8e6c9',
   },
   encouragementFooterText: {
     fontSize: 12,
-    color: '#1e40af',
+    color: '#2e7d32',
     fontWeight: '600',
     textAlign: 'center',
   },

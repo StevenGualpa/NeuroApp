@@ -1,2 +1,0 @@
-        <View style={styles.instructionCard}>
-          {/* Instrucciones */}
