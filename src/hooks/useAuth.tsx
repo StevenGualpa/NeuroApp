@@ -41,6 +41,16 @@ export const useAuth = () => {
       if (userData) {
         const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
+        
+        // Initialize settings for existing user
+        try {
+          const { default: UserSettingsService } = await import('../services/UserSettingsService');
+          const settingsService = UserSettingsService.getInstance();
+          await settingsService.initializeSettings(parsedUser.id);
+          console.log('✅ [Auth] Configuraciones cargadas desde storage');
+        } catch (settingsError) {
+          console.warn('⚠️ [Auth] Error cargando configuraciones desde storage:', settingsError);
+        }
       }
     } catch (err) {
       console.error('Error loading user from storage:', err);
@@ -73,6 +83,7 @@ export const useAuth = () => {
       setLoading(true);
       setError(null);
       
+      console.log('🔐 [Auth] Iniciando login...');
       const response = await ApiService.login(credentials);
       const authUser: AuthUser = {
         ...response.user,
@@ -82,9 +93,23 @@ export const useAuth = () => {
       setUser(authUser);
       await saveUserToStorage(authUser);
       
+      // Initialize user settings after successful login
+      try {
+        console.log('🔧 [Auth] Inicializando configuraciones de usuario...');
+        const { default: UserSettingsService } = await import('../services/UserSettingsService');
+        const settingsService = UserSettingsService.getInstance();
+        await settingsService.initializeSettings(authUser.id);
+        console.log('✅ [Auth] Configuraciones de usuario inicializadas correctamente');
+      } catch (settingsError) {
+        console.warn('⚠️ [Auth] Error inicializando configuraciones (continuando login):', settingsError);
+        // Don't fail login if settings initialization fails
+      }
+      
+      console.log('✅ [Auth] Login completado exitosamente');
       return authUser;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error during login';
+      console.error('❌ [Auth] Error en login:', errorMessage);
       setError(errorMessage);
       throw err;
     } finally {
@@ -98,15 +123,30 @@ export const useAuth = () => {
       setLoading(true);
       setError(null);
       
+      console.log('📝 [Auth] Iniciando registro...');
       const response = await ApiService.register(userData);
       const authUser: AuthUser = response.user;
       
       setUser(authUser);
       await saveUserToStorage(authUser);
       
+      // Initialize user settings after successful registration
+      try {
+        console.log('🔧 [Auth] Inicializando configuraciones para nuevo usuario...');
+        const { default: UserSettingsService } = await import('../services/UserSettingsService');
+        const settingsService = UserSettingsService.getInstance();
+        await settingsService.initializeSettings(authUser.id);
+        console.log('✅ [Auth] Configuraciones inicializadas para nuevo usuario');
+      } catch (settingsError) {
+        console.warn('⚠️ [Auth] Error inicializando configuraciones (continuando registro):', settingsError);
+        // Don't fail registration if settings initialization fails
+      }
+      
+      console.log('✅ [Auth] Registro completado exitosamente');
       return authUser;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error during registration';
+      console.error('❌ [Auth] Error en registro:', errorMessage);
       setError(errorMessage);
       throw err;
     } finally {
@@ -118,8 +158,21 @@ export const useAuth = () => {
   const logout = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
+      console.log('🚪 [Auth] Cerrando sesión...');
+      
+      // Clear user settings
+      try {
+        const { default: UserSettingsService } = await import('../services/UserSettingsService');
+        const settingsService = UserSettingsService.getInstance();
+        settingsService.clearSettings();
+      } catch (settingsError) {
+        console.warn('⚠️ [Auth] Error limpiando configuraciones:', settingsError);
+      }
+      
       setUser(null);
       await clearUserFromStorage();
+      
+      console.log('✅ [Auth] Sesión cerrada correctamente');
     } catch (err) {
       console.error('Error during logout:', err);
     } finally {

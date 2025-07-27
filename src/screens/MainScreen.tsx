@@ -81,6 +81,13 @@ const MainScreen = () => {
       shadowColor: '#7B1FA2',
     },
     { 
+      key: 'opciones', 
+      label: 'Opciones', 
+      icon: '⚙️', 
+      color: '#66BB6A',
+      shadowColor: '#4CAF50',
+    },
+    { 
       key: 'creditos', 
       label: 'Créditos', 
       icon: '👥', 
@@ -96,7 +103,8 @@ const MainScreen = () => {
         navigation.navigate('login');
         break;
       case 'actividades':
-        navigation.navigate('realActivityMenu');
+        console.log('🎮 [MainScreen] Navegando a menú de actividades');
+        navigation.navigate('activityMenu');
         break;
       case 'logros':
         console.log('🏆 [MainScreen] Navegando a pantalla de logros');
@@ -105,6 +113,10 @@ const MainScreen = () => {
       case 'estadisticas':
         console.log('📊 [MainScreen] Navegando a pantalla de estadísticas');
         navigation.navigate('Statistics');
+        break;
+      case 'opciones':
+        console.log('⚙️ [MainScreen] Navegando a pantalla de configuraciones');
+        navigation.navigate('Settings');
         break;
       case 'creditos':
         setShowCredits(true);

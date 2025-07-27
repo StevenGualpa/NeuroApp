@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,59 +6,35 @@ import {
   SafeAreaView,
   ScrollView,
   TouchableOpacity,
-  RefreshControl,
+  Dimensions,
+  Animated,
   ActivityIndicator,
+  RefreshControl,
+  Alert,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import ApiService from '../services/ApiService';
+import RealAchievementService from '../services/RealAchievementService';
 import AuthService from '../services/AuthService';
-import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
+import { Achievement, UserAchievement } from '../services/ApiService';
+
+const { width } = Dimensions.get('window');
 
 type AchievementsNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-// ✅ INTERFACES CORREGIDAS SEGÚN LOS DATOS DEL SERVIDOR
-interface ServerAchievement {
-  ID: number;
-  title: string;  // ← Servidor usa "title", no "name"
-  description: string;
-  icon: string;
-  category: string;
-  rarity: string;
-  points: number;
-  condition: string;  // ← Servidor usa "condition", no "condition_type"
-  max_progress: number;  // ← Servidor usa "max_progress", no "condition_value"
-  is_active: boolean;
+interface AchievementWithProgress extends Achievement {
+  isUnlocked: boolean;
+  currentProgress: number;
+  unlockedAt?: string;
 }
 
-interface UserAchievement {
-  ID: number;
-  UserID: number;  // ← Servidor usa "UserID", no "user_id"
-  AchievementID: number;  // ← Servidor usa "AchievementID", no "achievement_id"
-  is_unlocked: boolean;
-  current_progress: number;  // ← Servidor usa "current_progress", no "progress"
-  unlocked_at?: string;
-  Achievement: ServerAchievement;
-}
-
-interface UserStats {
-  total_activities_completed: number;
-  total_stars_earned: number;
-  total_play_time: number;
-  helpful_attempts: number;
-  improvement_moments: number;
-  exploration_points: number;
-  days_playing: number;
-}
-
-const AchievementsScreen = () => {
+const RealAchievementsScreen = () => {
   const navigation = useNavigation<AchievementsNavigationProp>();
-  const [achievements, setAchievements] = useState<UserAchievement[]>([]);
-  const [allAchievements, setAllAchievements] = useState<ServerAchievement[]>([]);
-  const [userStats, setUserStats] = useState<UserStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [achievements, setAchievements] = useState<AchievementWithProgress[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [stats, setStats] = useState({
     totalUnlocked: 0,
     totalAchievements: 0,
@@ -66,303 +42,335 @@ const AchievementsScreen = () => {
     totalPoints: 0,
   });
 
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  const categories = [
+    { key: 'all', label: 'Todos', icon: '🏆', color: '#4285f4' },
+    { key: 'gameplay', label: 'Juego', icon: '🎮', color: '#FF6B6B' },
+    { key: 'learning', label: 'Aprendizaje', icon: '📚', color: '#4CAF50' },
+    { key: 'progress', label: 'Progreso', icon: '⭐', color: '#FFA726' },
+    { key: 'social', label: 'Social', icon: '👥', color: '#9C27B0' },
+    { key: 'special', label: 'Especiales', icon: '💎', color: '#FF5722' },
+  ];
+
   useEffect(() => {
-    loadAchievements();
+    initializeAchievements();
+    
+    // Animate on mount
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        tension: 80,
+        friction: 8,
+        useNativeDriver: true,
+      }),
+    ]).start();
   }, []);
 
-  // ✅ NUEVO: Auto-refresh cuando la pantalla recibe foco
-  useFocusEffect(
-    React.useCallback(() => {
-      console.log('🔄 [AchievementsScreen] Pantalla recibió foco, refrescando datos...');
-      // Forzar refresh del servicio de logros
-      RealAchievementServiceEnhanced.forceRefresh().then(() => {
-        loadAchievements();
-      }).catch(error => {
-        console.error('❌ [AchievementsScreen] Error en force refresh:', error);
-        loadAchievements(); // Intentar cargar de todas formas
-      });
-    }, [])
-  );
+  useEffect(() => {
+    filterAchievements();
+  }, [selectedCategory]);
 
-  const loadAchievements = async () => {
+  const initializeAchievements = async () => {
+    setIsLoading(true);
     try {
-      setLoading(true);
       const user = AuthService.getCurrentUser();
-      
       if (!user) {
-        console.error('❌ No hay usuario logueado');
+        Alert.alert('Error', 'No hay usuario logueado');
+        navigation.goBack();
         return;
       }
 
-      console.log('🏆 [AchievementsScreen] Cargando datos del servidor...');
-
-      // Cargar todos los datos en paralelo
-      const [allAchievementsData, userAchievementsData, userStatsData] = await Promise.all([
-        ApiService.getAchievements(),
-        ApiService.getUserAchievements(user.id),
-        ApiService.getUserStats(user.id),
-      ]);
-
-      console.log(`✅ [AchievementsScreen] Cargados ${allAchievementsData.length} logros totales`);
-      console.log(`📊 [AchievementsScreen] Usuario tiene ${userAchievementsData.length} logros con progreso`);
-      console.log('📈 [AchievementsScreen] Estadísticas del usuario:', userStatsData.stats);
+      console.log('🏆 Loading achievements for user:', user.id);
       
-      // DEBUGGING DETALLADO CON CAMPOS CORREGIDOS
-      console.log('🔍 [AchievementsScreen] ===== DEBUGGING CON CAMPOS CORREGIDOS =====');
-      console.log('📋 PRIMER LOGRO DEL SERVIDOR (campos corregidos):');
-      if (allAchievementsData.length > 0) {
-        const firstAchievement = allAchievementsData[0];
-        console.log(`   ID: ${firstAchievement.ID}`);
-        console.log(`   Title: "${firstAchievement.title}"`);
-        console.log(`   Condition: "${firstAchievement.condition}"`);
-        console.log(`   Max Progress: ${firstAchievement.max_progress}`);
-        console.log(`   Points: ${firstAchievement.points}`);
-      }
+      // Initialize achievement service
+      await RealAchievementService.initializeAchievements();
       
-      console.log('📊 PRIMER LOGRO DEL USUARIO (campos corregidos):');
-      if (userAchievementsData.length > 0) {
-        const firstUserAchievement = userAchievementsData[0];
-        console.log(`   ID: ${firstUserAchievement.ID}`);
-        console.log(`   UserID: ${firstUserAchievement.UserID}`);
-        console.log(`   AchievementID: ${firstUserAchievement.AchievementID}`);
-        console.log(`   Is Unlocked: ${firstUserAchievement.is_unlocked}`);
-        console.log(`   Current Progress: ${firstUserAchievement.current_progress}`);
-        console.log(`   Achievement Title: "${firstUserAchievement.Achievement?.title}"`);
-      }
+      // Load achievements
+      await loadAchievements();
       
-      console.log('🔍 LOGROS DESBLOQUEADOS ENCONTRADOS:');
-      const unlockedAchievements = userAchievementsData.filter(ua => ua.is_unlocked);
-      unlockedAchievements.forEach((ua, index) => {
-        console.log(`   ${index + 1}. "${ua.Achievement?.title}" - ${ua.Achievement?.points} pts - Desbloqueado: ${ua.unlocked_at}`);
-      });
-      
-      console.log('===============================================');
-
-      setAllAchievements(allAchievementsData);
-      setAchievements(userAchievementsData);
-      setUserStats(userStatsData.stats);
-
-      // Calcular estadísticas DIRECTAMENTE de userAchievementsData con campos corregidos
-      const unlockedCount = userAchievementsData.filter(ua => ua.is_unlocked).length;
-      const totalCount = allAchievementsData.length;
-      const percentage = totalCount > 0 ? Math.round((unlockedCount / totalCount) * 100) : 0;
-      const totalPoints = userAchievementsData
-        .filter(ua => ua.is_unlocked)
-        .reduce((sum, ua) => sum + (ua.Achievement?.points || 0), 0);
-
-      setStats({
-        totalUnlocked: unlockedCount,
-        totalAchievements: totalCount,
-        completionPercentage: percentage,
-        totalPoints,
-      });
-
-      console.log('📈 [AchievementsScreen] Estadísticas calculadas (corregidas):', {
-        totalUnlocked: unlockedCount,
-        totalAchievements: totalCount,
-        completionPercentage: percentage,
-        totalPoints,
-        unlockedAchievements: userAchievementsData
-          .filter(ua => ua.is_unlocked)
-          .map(ua => `${ua.Achievement?.title || 'Sin título'} (${ua.Achievement?.points || 0} pts)`),
-      });
-
     } catch (error) {
-      console.error('❌ [AchievementsScreen] Error cargando logros:', error);
+      console.error('❌ Error initializing achievements:', error);
+      Alert.alert(
+        'Error de Conexión',
+        'No se pudieron cargar los logros. Verifica tu conexión a internet.',
+        [
+          { text: 'Reintentar', onPress: initializeAchievements },
+          { text: 'Volver', onPress: () => navigation.goBack() }
+        ]
+      );
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
+  };
+
+  const loadAchievements = async () => {
+    try {
+      console.log('📥 Fetching achievements from API...');
+      
+      // Get all achievements with user progress
+      const allAchievements = await RealAchievementService.getAllAchievements();
+      console.log('✅ Loaded achievements:', allAchievements.length);
+      
+      // Get achievement stats
+      const achievementStats = await RealAchievementService.getAchievementStats();
+      console.log('📊 Achievement stats:', achievementStats);
+      
+      setAchievements(allAchievements);
+      setStats({
+        totalUnlocked: achievementStats.unlocked,
+        totalAchievements: achievementStats.total,
+        completionPercentage: Math.round(achievementStats.completionRate),
+        totalPoints: achievementStats.unlockedPoints,
+      });
+      
+    } catch (error) {
+      console.error('❌ Error loading achievements:', error);
+      throw error;
+    }
+  };
+
+  const filterAchievements = () => {
+    // This will be handled by the render method
+    // since we're filtering in real-time based on selectedCategory
   };
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    // Forzar refresh del servicio antes de cargar
+    setIsRefreshing(true);
     try {
-      await RealAchievementServiceEnhanced.forceRefresh();
+      await RealAchievementService.forceRefresh();
+      await loadAchievements();
     } catch (error) {
-      console.error('❌ [AchievementsScreen] Error en force refresh:', error);
+      console.error('Error refreshing achievements:', error);
+      Alert.alert('Error', 'No se pudieron actualizar los logros');
+    } finally {
+      setIsRefreshing(false);
     }
-    await loadAchievements();
-    setRefreshing(false);
   };
 
-  const getAchievementData = (achievement: ServerAchievement) => {
-    // ✅ MAPEO CORREGIDO: Buscar por AchievementID en lugar de achievement_id
-    const userAchievement = achievements.find(ua => ua.AchievementID === achievement.ID);
-    
-    console.log(`🔍 Procesando logro ${achievement.ID} (${achievement.title}):`);
-    console.log(`   UserAchievement encontrado:`, userAchievement ? 'SÍ' : 'NO');
-    if (userAchievement) {
-      console.log(`   → Desbloqueado: ${userAchievement.is_unlocked}`);
-      console.log(`   → Progreso: ${userAchievement.current_progress}`);
-      console.log(`   → Fecha: ${userAchievement.unlocked_at || 'No desbloqueado'}`);
+  const getFilteredAchievements = () => {
+    if (selectedCategory === 'all') {
+      return achievements;
     }
-    
-    return {
-      ...achievement,
-      isUnlocked: userAchievement?.is_unlocked || false,
-      progress: userAchievement?.current_progress || 0,  // ✅ Usar current_progress
-      unlockedAt: userAchievement?.unlocked_at,
-    };
+    return achievements.filter(achievement => achievement.category === selectedCategory);
   };
 
   const getRarityColor = (rarity: string) => {
-    switch (rarity) {
-      case 'celebracion': return '#4caf50';
-      case 'genial': return '#2196f3';
-      case 'increible': return '#9c27b0';
-      case 'super_especial': return '#ff9800';
+    switch (rarity.toLowerCase()) {
       case 'common': return '#9ca3af';
       case 'rare': return '#3b82f6';
       case 'epic': return '#8b5cf6';
       case 'legendary': return '#f59e0b';
-      default: return '#4285f4';
+      default: return '#9ca3af';
     }
   };
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString || dateString === '0001-01-01T00:00:00Z') return '';
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+  const getRarityLabel = (rarity: string) => {
+    switch (rarity.toLowerCase()) {
+      case 'common': return 'C';
+      case 'rare': return 'R';
+      case 'epic': return 'E';
+      case 'legendary': return 'L';
+      default: return '?';
+    }
   };
 
-  const renderProgressBar = (progress: number, maxProgress: number, isUnlocked: boolean) => {
-    const percentage = maxProgress > 0 ? Math.min((progress / maxProgress) * 100, 100) : 0;
-    
-    return (
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View
-            style={[
-              styles.progressFill,
-              {
-                width: `${percentage}%`,
-                backgroundColor: isUnlocked ? '#4CAF50' : '#2196F3',
-              }
-            ]}
-          />
-        </View>
-        <Text style={styles.progressText}>
-          {progress}/{maxProgress} ({Math.round(percentage)}%)
-        </Text>
-      </View>
-    );
-  };
+  const renderAchievementCard = (achievement: AchievementWithProgress, index: number) => {
+    const progressPercentage = achievement.condition_value > 0 
+      ? Math.min((achievement.currentProgress / achievement.condition_value) * 100, 100)
+      : achievement.isUnlocked ? 100 : 0;
 
-  const renderAchievementCard = (achievementData: any) => {
-    const { isUnlocked, progress, unlockedAt } = achievementData;
-    
     return (
-      <View
-        key={achievementData.ID}
+      <Animated.View
+        key={achievement.ID}
         style={[
-          styles.achievementCard,
-          isUnlocked && styles.achievementCardUnlocked
+          styles.achievementCardContainer,
+          {
+            opacity: fadeAnim,
+            transform: [{
+              translateY: slideAnim.interpolate({
+                inputRange: [0, 1],
+                outputRange: [20, 0],
+              })
+            }]
+          }
         ]}
       >
-        {/* Header del logro */}
-        <View style={styles.achievementHeader}>
-          <View style={[
-            styles.achievementIcon,
-            { backgroundColor: getRarityColor(achievementData.rarity || 'common') + '20' }
-          ]}>
-            <Text style={styles.achievementIconText}>
-              {isUnlocked ? (achievementData.icon || '🏆') : '🔒'}
-            </Text>
-          </View>
-          
-          <View style={styles.achievementInfo}>
-            <Text style={[
-              styles.achievementTitle,
-              isUnlocked && styles.achievementTitleUnlocked
-            ]}>
-              {String(achievementData.title || `Logro #${achievementData.ID || 'N/A'}`)}
-            </Text>
-            <Text style={[
-              styles.achievementDescription,
-              isUnlocked && styles.achievementDescriptionUnlocked
-            ]}>
-              {String(achievementData.description || 'Sin descripción')}
-            </Text>
-            <Text style={styles.debugInfo}>
-              ID: {achievementData.ID || 'N/A'} | Condición: {String(achievementData.condition || 'N/A')}
-            </Text>
-          </View>
-          
-          <View style={styles.achievementReward}>
+        <View style={[
+          styles.achievementCard,
+          achievement.isUnlocked && styles.achievementCardUnlocked
+        ]}>
+          {/* Rarity Border */}
+          {achievement.isUnlocked && (
+            <View 
+              style={[
+                styles.rarityBorder,
+                { backgroundColor: getRarityColor(achievement.rarity) }
+              ]}
+            />
+          )}
+
+          <View style={styles.achievementHeader}>
             <View style={[
-              styles.pointsBadge,
-              { backgroundColor: getRarityColor(achievementData.rarity || 'common') }
+              styles.achievementIcon,
+              achievement.isUnlocked && styles.achievementIconUnlocked,
+              { backgroundColor: achievement.isUnlocked ? getRarityColor(achievement.rarity) + '20' : '#f3f4f6' }
             ]}>
-              <Text style={styles.pointsText}>+{Number(achievementData.points) || 0}</Text>
-            </View>
-            <Text style={styles.rarityText}>{String(achievementData.rarity || 'common')}</Text>
-          </View>
-        </View>
-
-        {/* Barra de progreso */}
-        {renderProgressBar(progress, achievementData.max_progress || 1, isUnlocked)}
-
-        {/* Estado del logro */}
-        <View style={styles.statusContainer}>
-          {isUnlocked ? (
-            <View style={styles.unlockedStatus}>
-              <Text style={styles.unlockedText}>
-                ✅ ¡DESBLOQUEADO! {unlockedAt ? `el ${formatDate(unlockedAt)}` : ''}
+              <Text style={styles.achievementIconText}>
+                {achievement.isUnlocked ? achievement.icon : '🔒'}
               </Text>
             </View>
-          ) : (
-            <View style={styles.lockedStatus}>
-              <Text style={styles.lockedText}>
-                🔒 Progreso: {progress}/{achievementData.max_progress || 1}
+            
+            <View style={styles.achievementInfo}>
+              <Text style={[
+                styles.achievementTitle,
+                achievement.isUnlocked && styles.achievementTitleUnlocked
+              ]}>
+                {achievement.name}
+              </Text>
+              <Text style={[
+                styles.achievementDescription,
+                achievement.isUnlocked && styles.achievementDescriptionUnlocked
+              ]}>
+                {achievement.description}
+              </Text>
+            </View>
+            
+            <View style={styles.achievementReward}>
+              <View style={[
+                styles.pointsBadge, 
+                { backgroundColor: getRarityColor(achievement.rarity) }
+              ]}>
+                <Text style={styles.rewardText}>+{achievement.points}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Progress Bar */}
+          {achievement.condition_value > 0 && (
+            <View style={styles.progressSection}>
+              <View style={styles.progressBar}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { 
+                      width: `${progressPercentage}%`,
+                      backgroundColor: achievement.isUnlocked ? '#4caf50' : '#e5e7eb'
+                    }
+                  ]}
+                />
+              </View>
+              <Text style={styles.progressText}>
+                {achievement.currentProgress}/{achievement.condition_value}
               </Text>
             </View>
           )}
+
+          {/* Unlock Date */}
+          {achievement.isUnlocked && achievement.unlockedAt && (
+            <View style={styles.unlockedSection}>
+              <Text style={styles.unlockedText}>
+                🎉 Desbloqueado el {new Date(achievement.unlockedAt).toLocaleDateString('es-ES')}
+              </Text>
+            </View>
+          )}
+
+          {/* Rarity Badge */}
+          <View style={[
+            styles.rarityBadge, 
+            { backgroundColor: getRarityColor(achievement.rarity) }
+          ]}>
+            <Text style={styles.rarityText}>{getRarityLabel(achievement.rarity)}</Text>
+          </View>
         </View>
-      </View>
+      </Animated.View>
     );
   };
 
+  const renderCategoryFilter = () => (
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      style={styles.categoryContainer}
+      contentContainerStyle={styles.categoryContent}
+    >
+      {categories.map((category) => (
+        <TouchableOpacity
+          key={category.key}
+          style={[
+            styles.categoryButton,
+            selectedCategory === category.key && [
+              styles.categoryButtonActive,
+              { backgroundColor: category.color }
+            ]
+          ]}
+          onPress={() => setSelectedCategory(category.key)}
+        >
+          <Text style={styles.categoryIcon}>{category.icon}</Text>
+          <Text style={[
+            styles.categoryLabel,
+            selectedCategory === category.key && styles.categoryLabelActive
+          ]}>
+            {category.label}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+
   const renderStatsHeader = () => (
     <View style={styles.statsHeader}>
-      <View style={[styles.statsCard, { backgroundColor: '#4CAF50' }]}>
+      <View style={[styles.statsCard, styles.statsCardBlue]}>
         <Text style={styles.statsNumber}>{stats.totalUnlocked}</Text>
-        <Text style={styles.statsLabel}>Desbloqueados</Text>
+        <Text style={styles.statsLabel}>Logros</Text>
       </View>
       
-      <View style={[styles.statsCard, { backgroundColor: '#2196F3' }]}>
+      <View style={[styles.statsCard, styles.statsCardRed]}>
         <Text style={styles.statsNumber}>{stats.completionPercentage}%</Text>
-        <Text style={styles.statsLabel}>Completado</Text>
+        <Text style={styles.statsLabel}>Progreso</Text>
       </View>
       
-      <View style={[styles.statsCard, { backgroundColor: '#FF9800' }]}>
+      <View style={[styles.statsCard, styles.statsCardOrange]}>
         <Text style={styles.statsNumber}>{stats.totalPoints}</Text>
         <Text style={styles.statsLabel}>Puntos</Text>
       </View>
     </View>
   );
 
-  if (loading) {
+  const renderLoadingState = () => (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#4285f4" />
+      <Text style={styles.loadingText}>Cargando logros...</Text>
+      <Text style={styles.loadingSubtext}>Conectando con el servidor</Text>
+    </View>
+  );
+
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4285f4" />
-          <Text style={styles.loadingText}>Cargando logros del servidor...</Text>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.backButtonText}>← Volver</Text>
+          </TouchableOpacity>
+          <Text style={styles.title}>🏆 Logros</Text>
+          <View style={styles.headerSpacer} />
         </View>
+        {renderLoadingState()}
       </SafeAreaView>
     );
   }
 
-  // Convertir todos los logros del servidor a formato de visualización
-  console.log('🎨 [AchievementsScreen] Convirtiendo logros para visualización (corregido)...');
-  const allAchievementsWithProgress = allAchievements.map(achievement => {
-    const result = getAchievementData(achievement);
-    console.log(`   → ${achievement.title}: ${result.isUnlocked ? 'DESBLOQUEADO' : 'BLOQUEADO'}`);
-    return result;
-  });
+  const filteredAchievements = getFilteredAchievements();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -374,51 +382,70 @@ const AchievementsScreen = () => {
         >
           <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>🏆 Mis Logros</Text>
+        <Text style={styles.title}>🏆 Logros</Text>
         <TouchableOpacity 
           style={styles.refreshButton}
           onPress={onRefresh}
+          disabled={isRefreshing}
         >
-          <Text style={styles.refreshButtonText}>🔄</Text>
+          <Text style={styles.refreshButtonText}>
+            {isRefreshing ? '⟳' : '🔄'}
+          </Text>
         </TouchableOpacity>
       </View>
 
-      {/* Stats */}
+      {/* Stats + Categories */}
       <View style={styles.topSection}>
         {renderStatsHeader()}
-        
-        {/* Debug info */}
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugTitle}>🔍 Debug Info (Auto-Refresh):</Text>
-          <Text style={styles.debugText}>
-            Logros del servidor: {allAchievements.length} | 
-            Logros del usuario: {achievements.length} | 
-            Desbloqueados: {achievements.filter(ua => ua.is_unlocked).length}
-          </Text>
-        </View>
+        {renderCategoryFilter()}
       </View>
 
-      {/* Lista de logros */}
+      {/* API Status */}
+      <View style={styles.apiStatus}>
+        <Text style={styles.apiStatusText}>
+          🌐 Conectado a API Real • {achievements.length} logros cargados
+        </Text>
+      </View>
+
+      {/* Achievements List */}
       <ScrollView 
         style={styles.achievementsList}
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.achievementsContent}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={isRefreshing}
             onRefresh={onRefresh}
             colors={['#4285f4']}
             tintColor="#4285f4"
           />
         }
       >
-        {allAchievementsWithProgress.length > 0 ? (
-          allAchievementsWithProgress.map(achievement => renderAchievementCard(achievement))
+        {filteredAchievements.length > 0 ? (
+          filteredAchievements.map((achievement, index) => renderAchievementCard(achievement, index))
         ) : (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateIcon}>🎯</Text>
-            <Text style={styles.emptyStateText}>No hay logros disponibles</Text>
-            <Text style={styles.emptyStateSubtext}>¡Sigue jugando para desbloquear logros!</Text>
-          </View>
+          <Animated.View 
+            style={[
+              styles.emptyState,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <View style={styles.emptyStateContainer}>
+              <Text style={styles.emptyStateIcon}>🎯</Text>
+              <Text style={styles.emptyStateText}>
+                {selectedCategory === 'all' 
+                  ? 'No hay logros disponibles' 
+                  : 'No hay logros en esta categoría'
+                }
+              </Text>
+              <Text style={styles.emptyStateSubtext}>
+                ¡Sigue jugando para desbloquear más logros!
+              </Text>
+            </View>
+          </Animated.View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -430,18 +457,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8faff',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6b7280',
-    fontWeight: '600',
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -451,111 +466,212 @@ const styles = StyleSheet.create({
     backgroundColor: '#4285f4',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
   backButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 10,
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   backButtonText: {
     color: '#ffffff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
   refreshButton: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 10,
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   refreshButtonText: {
     color: '#ffffff',
     fontSize: 16,
+    fontWeight: '600',
   },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#ffffff',
+  headerSpacer: {
+    width: 60,
   },
   topSection: {
     backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    marginTop: 12,
+    marginHorizontal: 15,
+    marginTop: 10,
     borderRadius: 16,
-    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 4,
+    paddingVertical: 15,
   },
   statsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 12,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    gap: 8,
   },
   statsCard: {
     flex: 1,
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statsCardBlue: {
+    backgroundColor: '#4285f4',
+  },
+  statsCardRed: {
+    backgroundColor: '#ff6b6b',
+  },
+  statsCardOrange: {
+    backgroundColor: '#ffa726',
   },
   statsNumber: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '900',
     color: '#ffffff',
-    marginBottom: 4,
+    marginBottom: 2,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
   },
   statsLabel: {
-    fontSize: 12,
+    fontSize: 10,
     color: 'rgba(255, 255, 255, 0.9)',
     fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
-  debugContainer: {
-    backgroundColor: '#f0f9ff',
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
+  categoryContainer: {
+    maxHeight: 50,
   },
-  debugTitle: {
-    fontSize: 14,
+  categoryContent: {
+    paddingHorizontal: 15,
+    gap: 8,
+    alignItems: 'center',
+  },
+  categoryButton: {
+    backgroundColor: '#f8faff',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    alignItems: 'center',
+    minWidth: 70,
+    borderWidth: 1.5,
+    borderColor: '#e8f0fe',
+  },
+  categoryButtonActive: {
+    borderColor: 'transparent',
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  categoryIcon: {
+    fontSize: 16,
+    marginBottom: 2,
+  },
+  categoryLabel: {
+    fontSize: 10,
     fontWeight: '700',
-    color: '#1e40af',
-    marginBottom: 4,
+    color: '#6b7280',
   },
-  debugText: {
-    fontSize: 12,
-    color: '#1e40af',
-    fontWeight: '500',
+  categoryLabelActive: {
+    color: '#ffffff',
+  },
+  apiStatus: {
+    backgroundColor: '#e8f5e8',
+    marginHorizontal: 15,
+    marginTop: 10,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+  },
+  apiStatusText: {
+    fontSize: 11,
+    color: '#2e7d32',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  loadingText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#4285f4',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginTop: 8,
+    textAlign: 'center',
   },
   achievementsList: {
     flex: 1,
-    marginTop: 12,
+    marginTop: 10,
   },
   achievementsContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
     paddingBottom: 20,
+  },
+  achievementCardContainer: {
+    marginBottom: 12,
   },
   achievementCard: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 16,
-    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 4,
     opacity: 0.7,
+    position: 'relative',
+    overflow: 'hidden',
   },
   achievementCardUnlocked: {
     opacity: 1,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-    backgroundColor: '#f8fff8',
+    shadowColor: '#4caf50',
+    shadowOpacity: 0.15,
+  },
+  rarityBorder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
   },
   achievementHeader: {
     flexDirection: 'row',
@@ -569,9 +685,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
+    position: 'relative',
+  },
+  achievementIconUnlocked: {
+    shadowColor: '#4caf50',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   achievementIconText: {
     fontSize: 24,
+    zIndex: 1,
   },
   achievementInfo: {
     flex: 1,
@@ -586,111 +711,121 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
   },
   achievementDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#9ca3af',
     lineHeight: 18,
-    marginBottom: 4,
   },
   achievementDescriptionUnlocked: {
     color: '#6b7280',
-  },
-  debugInfo: {
-    fontSize: 10,
-    color: '#9ca3af',
-    fontWeight: '500',
-    fontFamily: 'monospace',
   },
   achievementReward: {
     alignItems: 'center',
   },
   pointsBadge: {
     borderRadius: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    marginBottom: 4,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  pointsText: {
+  rewardText: {
     fontSize: 14,
     fontWeight: '900',
     color: '#ffffff',
   },
-  rarityText: {
-    fontSize: 10,
-    color: '#6b7280',
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  progressContainer: {
-    marginBottom: 12,
+  progressSection: {
+    marginBottom: 8,
   },
   progressBar: {
-    height: 8,
+    height: 6,
     backgroundColor: '#e5e7eb',
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
     marginBottom: 6,
   },
   progressFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 3,
   },
   progressText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#6b7280',
     textAlign: 'right',
     fontWeight: '600',
   },
-  statusContainer: {
-    marginTop: 8,
-  },
-  unlockedStatus: {
+  unlockedSection: {
     backgroundColor: '#f0fdf4',
     borderRadius: 8,
     padding: 8,
+    marginBottom: 6,
     borderWidth: 1,
     borderColor: '#bbf7d0',
   },
   unlockedText: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#16a34a',
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  lockedStatus: {
-    backgroundColor: '#f8faff',
-    borderRadius: 8,
-    padding: 8,
-    borderWidth: 1,
-    borderColor: '#e8f0fe',
-  },
-  lockedText: {
-    fontSize: 12,
-    color: '#6b7280',
     fontWeight: '600',
     textAlign: 'center',
+  },
+  rarityBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  rarityText: {
+    fontSize: 10,
+    color: '#ffffff',
+    fontWeight: '800',
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 40,
   },
+  emptyStateContainer: {
+    backgroundColor: '#f8faff',
+    borderRadius: 16,
+    padding: 30,
+    alignItems: 'center',
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#e8f0fe',
+  },
   emptyStateIcon: {
     fontSize: 48,
-    marginBottom: 16,
+    marginBottom: 15,
   },
   emptyStateText: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#1a1a1a',
     fontWeight: '700',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   emptyStateSubtext: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#6b7280',
     fontWeight: '500',
     textAlign: 'center',
   },
 });
 
-export default AchievementsScreen;
+export default RealAchievementsScreen;

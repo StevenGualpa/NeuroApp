@@ -3,25 +3,29 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
 
+// Pantallas principales
 import MainScreen from '../screens/MainScreen';
-import CategoryMenuScreen from '../screens/CategoryMenuScreen';
-import RealCategoryMenuScreen from '../screens/RealCategoryMenuScreen';
-import LessonScreen from '../screens/LessonScreen';
-import RealLessonScreen from '../screens/RealLessonScreen';
-import SubLessonListScreen from '../screens/SubLessonListScreen';
-import RealLessonListScreen from '../screens/RealLessonListScreen';
 import LoginScreen from '../screens/LoginScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
+
+// Pantallas de navegación
+import CategoryMenuScreen from '../screens/CategoryMenuScreen';
+import LessonListScreen from '../screens/LessonListScreen';
+import LessonScreen from '../screens/LessonScreen';
 import ActivityMenuScreen from '../screens/ActivityMenuScreen';
-import RealActivityMenuScreen from '../screens/RealActivityMenuScreen';
+
+// Pantallas de juegos
 import MemoryGameScreen from '../screens/MemoryGameScreen';
 import DragDropScreen from '../screens/DragDropScreen';
 import MatchScreen from '../screens/MatchScreen';
 import SelectOptionScreen from '../screens/SelectOptionScreen';
 import OrderStepsScreen from '../screens/OrderStepsScreen';
 import PatternRecognitionScreen from '../screens/PatternRecognitionScreen';
+
+// Pantallas adicionales
 import AchievementsScreen from '../screens/AchievementsScreen';
 import StatisticsScreen from '../screens/StatisticsScreen';
+import SettingsScreen from '../screens/SettingsScreen';
 
 import type { Lesson, Step } from '../data/lessons';
 
@@ -33,15 +37,11 @@ export type RootStackParamList = {
   login: undefined;
   onboarding: undefined;
   
-  // Pantallas de actividades
-  activityMenu: undefined;
-  realActivityMenu: undefined;
+  // Pantallas de navegación
   categoryMenu: { activityType?: string };
-  realCategoryMenu: { activityType?: string };
+  lessonList: { category: string; activityType?: string };
   lesson: { lesson: Lesson };
-  realLesson: { lesson: Lesson };
-  sublessonList: { category: string; activityType?: string };
-  realLessonList: { category: string; activityType?: string };
+  activityMenu: undefined;
   
   // Pantallas de juegos
   memoryGame: { step: Step; lessonTitle: string };
@@ -54,6 +54,7 @@ export type RootStackParamList = {
   // Pantallas adicionales
   Achievements: undefined;
   Statistics: undefined;
+  Settings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -71,15 +72,11 @@ const AppNavigator = () => (
       <Stack.Screen name="login" component={LoginScreen} />
       <Stack.Screen name="onboarding" component={OnboardingScreen} />
       
-      {/* Pantallas de Actividades */}
+      {/* Pantallas de Navegación */}
       <Stack.Screen name="activityMenu" component={ActivityMenuScreen} />
-      <Stack.Screen name="realActivityMenu" component={RealActivityMenuScreen} />
       <Stack.Screen name="categoryMenu" component={CategoryMenuScreen} />
-      <Stack.Screen name="realCategoryMenu" component={RealCategoryMenuScreen} />
-      <Stack.Screen name="sublessonList" component={SubLessonListScreen} />
-      <Stack.Screen name="realLessonList" component={RealLessonListScreen} />
+      <Stack.Screen name="lessonList" component={LessonListScreen} />
       <Stack.Screen name="lesson" component={LessonScreen} />
-      <Stack.Screen name="realLesson" component={RealLessonScreen} />
       
       {/* Pantallas de Juegos */}
       <Stack.Screen name="memoryGame" component={MemoryGameScreen} />
@@ -92,6 +89,7 @@ const AppNavigator = () => (
       {/* Pantallas Adicionales */}
       <Stack.Screen name="Achievements" component={AchievementsScreen} />
       <Stack.Screen name="Statistics" component={StatisticsScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
     </Stack.Navigator>
   </NavigationContainer>
 );

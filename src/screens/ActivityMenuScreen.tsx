@@ -8,15 +8,19 @@ import {
   ScrollView,
   Animated,
   Dimensions,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import ApiService, { Activity } from '../services/ApiService';
 import { AchievementService } from '../services/AchievementService';
 
 const { width } = Dimensions.get('window');
 
-// Configuración de actividades con colores y emojis únicos
+// Configuración de colores y emojis para las actividades
 const activityConfig = [
   { emoji: '🎯', color: '#FF6B6B', shadowColor: '#FF4757', gradient: ['#FF6B6B', '#FF5252'] },
   { emoji: '🔢', color: '#4ECDC4', shadowColor: '#26D0CE', gradient: ['#4ECDC4', '#26A69A'] },
@@ -25,80 +29,27 @@ const activityConfig = [
   { emoji: '🎵', color: '#AB47BC', shadowColor: '#9C27B0', gradient: ['#AB47BC', '#9C27B0'] },
   { emoji: '🌟', color: '#66BB6A', shadowColor: '#4CAF50', gradient: ['#66BB6A', '#4CAF50'] },
   { emoji: '🔍', color: '#FF9800', shadowColor: '#F57C00', gradient: ['#FF9800', '#F57C00'] },
+  { emoji: '🎪', color: '#E91E63', shadowColor: '#C2185B', gradient: ['#E91E63', '#C2185B'] },
+  { emoji: '🚀', color: '#9C27B0', shadowColor: '#7B1FA2', gradient: ['#9C27B0', '#7B1FA2'] },
+  { emoji: '⭐', color: '#FF5722', shadowColor: '#D84315', gradient: ['#FF5722', '#D84315'] },
 ];
-
-const activityTypes = [
-  {
-    id: 'select-option',
-    title: 'Selecciona la opción correcta',
-    shortTitle: 'Selección',
-    description: 'Elige la respuesta correcta',
-    difficulty: 'Fácil',
-    estimatedTime: '2-3 min'
-  },
-  {
-    id: 'order-steps',
-    title: 'Ordena los pasos',
-    shortTitle: 'Ordenar',
-    description: 'Organiza en el orden correcto',
-    difficulty: 'Medio',
-    estimatedTime: '3-4 min'
-  },
-  {
-    id: 'match-elements',
-    title: 'Asocia elementos',
-    shortTitle: 'Asociar',
-    description: 'Conecta elementos relacionados',
-    difficulty: 'Medio',
-    estimatedTime: '2-4 min'
-  },
-  {
-    id: 'visual-memory',
-    title: 'Memoria visual',
-    shortTitle: 'Memoria',
-    description: 'Recuerda patrones visuales',
-    difficulty: 'Difícil',
-    estimatedTime: '3-5 min'
-  },
-    {
-    id: 'drag-drop',
-    title: 'Arrastra y suelta',
-    shortTitle: 'Arrastrar',
-    description: 'Mueve elementos al lugar correcto',
-    difficulty: 'Fácil',
-    estimatedTime: '2-4 min'
-  },
-  {
-    id: 'pattern-recognition',
-    title: 'Reconocimiento de patrones',
-    shortTitle: 'Patrones',
-    description: 'Identifica secuencias y patrones',
-    difficulty: 'Medio',
-    estimatedTime: '3-4 min'
-  },
-] as const;
 
 const ActivityMenuScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  
+  // Estados
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [totalPoints, setTotalPoints] = useState(0);
   const [unlockedAchievements, setUnlockedAchievements] = useState(0);
   
-  const scaleValues = React.useRef(
-    activityTypes.map(() => new Animated.Value(1))
-  ).current;
-
+  // Animaciones
+  const scaleValues = React.useRef<Animated.Value[]>([]).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
 
-  // Load achievement stats
   useEffect(() => {
-    loadAchievementStats();
-    
-    // Animate cards on mount
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 800,
-      useNativeDriver: true,
-    }).start();
+    loadInitialData();
   }, []);
 
   // Reload stats when screen comes into focus
@@ -109,6 +60,49 @@ const ActivityMenuScreen = () => {
 
     return unsubscribe;
   }, [navigation]);
+
+  const loadInitialData = async () => {
+    await Promise.all([
+      loadActivities(),
+      loadAchievementStats()
+    ]);
+    
+    // Animate cards on mount
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const loadActivities = async () => {
+    try {
+      setLoading(true);
+      console.log('🎮 [ActivityMenuScreen] Cargando actividades desde API...');
+      const activitiesData = await ApiService.getActivities();
+      setActivities(activitiesData);
+      console.log(`✅ [ActivityMenuScreen] ${activitiesData.length} actividades cargadas`);
+      
+      // Initialize scale animations for each activity
+      scaleValues.length = 0;
+      activitiesData.forEach(() => {
+        scaleValues.push(new Animated.Value(1));
+      });
+      
+    } catch (error) {
+      console.error('❌ [ActivityMenuScreen] Error loading activities:', error);
+      Alert.alert(
+        'Error de Conexión',
+        'No se pudieron cargar las actividades. Verifica tu conexión a internet.',
+        [
+          { text: 'Reintentar', onPress: loadActivities },
+          { text: 'Cancelar', style: 'cancel' }
+        ]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const loadAchievementStats = async () => {
     try {
@@ -124,61 +118,94 @@ const ActivityMenuScreen = () => {
     }
   };
 
-  const goToActivityCategory = (activityType: string) => {
-    navigation.navigate('categoryMenu', { activityType });
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadActivities();
+    setRefreshing(false);
+  };
+
+  const goToActivityCategory = (activity: Activity) => {
+    console.log('🎯 [ActivityMenuScreen] Navegando a categorías para actividad:', activity.name);
+    // Navegar a la pantalla de categorías con el tipo de actividad
+    navigation.navigate('categoryMenu', { activityType: activity.name });
   };
 
   const goToAchievements = () => {
+    console.log('🏆 [ActivityMenuScreen] Navegando a logros');
     navigation.navigate('Achievements');
   };
 
   const goBack = () => {
+    console.log('⬅️ [ActivityMenuScreen] Volviendo al menú principal');
     navigation.goBack();
   };
 
   const handlePressIn = (index: number) => {
-    Animated.spring(scaleValues[index], {
-      toValue: 0.95,
-      useNativeDriver: true,
-      tension: 100,
-      friction: 7,
-    }).start();
+    if (scaleValues[index]) {
+      Animated.spring(scaleValues[index], {
+        toValue: 0.95,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 7,
+      }).start();
+    }
   };
 
   const handlePressOut = (index: number) => {
-    Animated.spring(scaleValues[index], {
-      toValue: 1,
-      useNativeDriver: true,
-      tension: 100,
-      friction: 7,
-    }).start();
+    if (scaleValues[index]) {
+      Animated.spring(scaleValues[index], {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 100,
+        friction: 7,
+      }).start();
+    }
   };
 
   const getActivityConfig = (index: number) => {
     return activityConfig[index % activityConfig.length];
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'Fácil': return '#4CAF50';
-      case 'Medio': return '#FF9800';
-      case 'Difícil': return '#F44336';
-      default: return '#9E9E9E';
-    }
+  const getActivityStatus = (activity: Activity) => {
+    return activity.is_active ? 'Activo' : 'Inactivo';
   };
 
-  const renderActivityCard = (activity: typeof activityTypes[0], index: number) => {
+  const getStatusColor = (activity: Activity) => {
+    return activity.is_active ? '#4CAF50' : '#F44336';
+  };
+
+  const renderLoadingState = () => (
+    <View style={styles.loadingContainer}>
+      <ActivityIndicator size="large" color="#4285f4" />
+      <Text style={styles.loadingText}>Cargando actividades...</Text>
+    </View>
+  );
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyIcon}>🎮</Text>
+      <Text style={styles.emptyTitle}>No hay actividades disponibles</Text>
+      <Text style={styles.emptyDescription}>
+        Parece que no hay actividades configuradas en el servidor.
+      </Text>
+      <TouchableOpacity style={styles.retryButton} onPress={loadActivities}>
+        <Text style={styles.retryButtonText}>Reintentar</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderActivityCard = (activity: Activity, index: number) => {
     const config = getActivityConfig(index);
     
     return (
       <Animated.View
-        key={activity.id}
+        key={activity.ID}
         style={[
           styles.cardContainer,
           {
             opacity: fadeAnim,
             transform: [
-              { scale: scaleValues[index] },
+              { scale: scaleValues[index] || new Animated.Value(1) },
               {
                 translateY: fadeAnim.interpolate({
                   inputRange: [0, 1],
@@ -197,17 +224,17 @@ const ActivityMenuScreen = () => {
               shadowColor: config.shadowColor,
             }
           ]}
-          onPress={() => goToActivityCategory(activity.title)}
+          onPress={() => goToActivityCategory(activity)}
           onPressIn={() => handlePressIn(index)}
           onPressOut={() => handlePressOut(index)}
           activeOpacity={0.9}
         >
-          {/* Difficulty Badge */}
+          {/* Status Badge */}
           <View style={[
-            styles.difficultyBadge,
-            { backgroundColor: getDifficultyColor(activity.difficulty) }
+            styles.statusBadge,
+            { backgroundColor: getStatusColor(activity) }
           ]}>
-            <Text style={styles.difficultyText}>{activity.difficulty}</Text>
+            <Text style={styles.statusText}>{getActivityStatus(activity)}</Text>
           </View>
 
           {/* Icon Container */}
@@ -219,19 +246,26 @@ const ActivityMenuScreen = () => {
 
           {/* Content */}
           <View style={styles.cardContent}>
-            <Text style={styles.cardTitle}>{activity.shortTitle}</Text>
-            <Text style={styles.cardDescription}>{activity.description}</Text>
+            <Text style={styles.cardTitle} numberOfLines={2}>
+              {activity.name}
+            </Text>
+            <Text style={styles.cardDescription} numberOfLines={3}>
+              {activity.description}
+            </Text>
             
-            {/* Time Estimate */}
-            <View style={styles.timeContainer}>
-              <Text style={styles.timeIcon}>⏱️</Text>
-              <Text style={styles.timeText}>{activity.estimatedTime}</Text>
+            {/* Activity ID */}
+            <View style={styles.idContainer}>
+              <Text style={styles.idIcon}>🆔</Text>
+              <Text style={styles.idText}>ID: {activity.ID}</Text>
             </View>
           </View>
 
           {/* Play Button */}
           <View style={styles.playButtonContainer}>
-            <View style={styles.playButton}>
+            <View style={[
+              styles.playButton,
+              { opacity: activity.is_active ? 1 : 0.5 }
+            ]}>
               <Text style={styles.playButtonText}>▶</Text>
             </View>
           </View>
@@ -244,21 +278,38 @@ const ActivityMenuScreen = () => {
     );
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <TouchableOpacity style={styles.backButton} onPress={goBack}>
+              <Text style={styles.backButtonText}>← Volver</Text>
+            </TouchableOpacity>
+            <View style={styles.titleSection}>
+              <Text style={styles.title}>🎮 Actividades</Text>
+              <Text style={styles.subtitle}>Cargando desde API...</Text>
+            </View>
+            <View style={styles.achievementsButton} />
+          </View>
+        </View>
+        {renderLoadingState()}
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header mejorado */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={goBack}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={goBack}>
             <Text style={styles.backButtonText}>← Volver</Text>
           </TouchableOpacity>
           
           <View style={styles.titleSection}>
             <Text style={styles.title}>🎮 Actividades</Text>
-            <Text style={styles.subtitle}>Elige tu desafío</Text>
+            <Text style={styles.subtitle}>Datos desde API</Text>
           </View>
           
           {/* Achievements Button */}
@@ -286,34 +337,50 @@ const ActivityMenuScreen = () => {
       {/* Stats Summary */}
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{activityTypes.length}</Text>
+          <Text style={styles.statNumber}>{activities.length}</Text>
           <Text style={styles.statLabel}>Actividades</Text>
+        </View>
+        <View style={styles.statDivider} />
+        <View style={styles.statItem}>
+          <Text style={styles.statNumber}>
+            {activities.filter(a => a.is_active).length}
+          </Text>
+          <Text style={styles.statLabel}>Activas</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>{totalPoints}</Text>
           <Text style={styles.statLabel}>Puntos</Text>
         </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{unlockedAchievements}</Text>
-          <Text style={styles.statLabel}>Logros</Text>
-        </View>
       </View>
       
       {/* Activities Grid */}
-      <ScrollView 
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.gridContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.grid}>
-          {activityTypes.map((activity, index) => renderActivityCard(activity, index))}
-        </View>
-      </ScrollView>
+      {activities.length === 0 ? (
+        renderEmptyState()
+      ) : (
+        <ScrollView 
+          style={styles.scrollContainer}
+          contentContainerStyle={styles.gridContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#4285f4']}
+              tintColor="#4285f4"
+            />
+          }
+        >
+          <View style={styles.grid}>
+            {activities.map((activity, index) => renderActivityCard(activity, index))}
+          </View>
+        </ScrollView>
+      )}
       
       <View style={styles.footer}>
-        <Text style={styles.footerText}>🚀 ¡Desafía tu mente y diviértete! 🧠</Text>
+        <Text style={styles.footerText}>
+          🚀 Datos cargados desde: facturago.onrender.com 🧠
+        </Text>
       </View>
     </SafeAreaView>
   );
@@ -472,6 +539,53 @@ const styles = StyleSheet.create({
     backgroundColor: '#e5e7eb',
     marginHorizontal: 10,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#2D3436',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emptyDescription: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#4285f4',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  retryButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   scrollContainer: {
     flex: 1,
     marginTop: 15,
@@ -487,13 +601,13 @@ const styles = StyleSheet.create({
     gap: 15,
   },
   cardContainer: {
-    width: (width - 55) / 2, // 20px padding + 15px gap
+    width: (width - 55) / 2,
     marginBottom: 15,
   },
   card: {
     borderRadius: 20,
     padding: 16,
-    minHeight: 180,
+    minHeight: 200,
     shadowOffset: {
       width: 0,
       height: 6,
@@ -504,7 +618,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
-  difficultyBadge: {
+  statusBadge: {
     position: 'absolute',
     top: 12,
     right: 12,
@@ -513,7 +627,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     zIndex: 2,
   },
-  difficultyText: {
+  statusText: {
     fontSize: 10,
     fontWeight: '700',
     color: '#ffffff',
@@ -543,7 +657,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
     color: '#ffffff',
     textAlign: 'center',
@@ -551,18 +665,20 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+    minHeight: 32,
   },
   cardDescription: {
-    fontSize: 12,
+    fontSize: 11,
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
     marginBottom: 8,
-    lineHeight: 16,
+    lineHeight: 14,
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
+    minHeight: 42,
   },
-  timeContainer: {
+  idContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
@@ -571,11 +687,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 8,
   },
-  timeIcon: {
+  idIcon: {
     fontSize: 12,
     marginRight: 4,
   },
-  timeText: {
+  idText: {
     fontSize: 11,
     color: '#ffffff',
     fontWeight: '600',
@@ -600,7 +716,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#2D3436',
     fontWeight: '800',
-    marginLeft: 2, // Adjust for visual centering
+    marginLeft: 2,
   },
   decorativeCircle1: {
     position: 'absolute',
@@ -627,7 +743,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   footerText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#636E72',
     textAlign: 'center',

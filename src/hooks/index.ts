@@ -29,6 +29,9 @@ export { default as useRealAchievements } from './useRealAchievements';
 export { default as useSettings } from './useSettings';
 export type { SettingsMap } from './useSettings';
 
+// Hooks de configuraciones de usuario
+export { default as useUserSettings } from './useUserSettings';
+
 // Hooks de estadísticas de usuario
 export { default as useUserStats } from './useUserStats';
 export type { StatsUpdate } from './useUserStats';

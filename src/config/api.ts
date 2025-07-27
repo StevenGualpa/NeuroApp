@@ -74,6 +74,13 @@ export const API_ENDPOINTS = {
   BULK_UPDATE_SETTINGS: '/settings/bulk',
   RESET_SETTINGS: '/settings/reset',
   
+  // User Settings
+  USER_SETTINGS: (userId: number) => `/user-settings/user/${userId}`,
+  USER_SETTING_BY_KEY: (userId: number, key: string) => `/user-settings/user/${userId}/key/${key}`,
+  USER_SETTINGS_MAP: (userId: number) => `/user-settings/user/${userId}/map`,
+  BULK_UPDATE_USER_SETTINGS: (userId: number) => `/user-settings/user/${userId}/bulk`,
+  INITIALIZE_USER_SETTINGS: (userId: number) => `/user-settings/user/${userId}/initialize`,
+  
   // Health
   HEALTH: '/',
 };

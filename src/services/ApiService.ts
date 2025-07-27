@@ -193,6 +193,19 @@ export interface AppSettings {
   sort_order: number;
 }
 
+export interface UserSettings {
+  ID: number;
+  CreatedAt: string;
+  UpdatedAt: string;
+  DeletedAt: string | null;
+  user_id: number;
+  key: string;
+  value: string;
+  category: string;
+  is_active: boolean;
+  User?: User;
+}
+
 export interface SessionStats {
   total_sessions: number;
   total_duration: number;
@@ -602,6 +615,58 @@ class ApiService {
 
   async resetSettings(): Promise<{ message: string }> {
     return this.makeRequest<{ message: string }>(API_ENDPOINTS.RESET_SETTINGS, {
+      method: 'POST',
+    });
+  }
+
+  // User Settings endpoints
+  async getUserSettings(userId: number, category?: string): Promise<{ user_id: number; settings: UserSettings[] }> {
+    const endpoint = category 
+      ? `${API_ENDPOINTS.USER_SETTINGS(userId)}?category=${category}`
+      : API_ENDPOINTS.USER_SETTINGS(userId);
+    return this.makeRequest<{ user_id: number; settings: UserSettings[] }>(endpoint);
+  }
+
+  async getUserSettingByKey(userId: number, key: string): Promise<UserSettings> {
+    return this.makeRequest<UserSettings>(API_ENDPOINTS.USER_SETTING_BY_KEY(userId, key));
+  }
+
+  async createUserSetting(userId: number, setting: Partial<UserSettings>): Promise<{ message: string; setting: UserSettings }> {
+    return this.makeRequest<{ message: string; setting: UserSettings }>(API_ENDPOINTS.USER_SETTINGS(userId), {
+      method: 'POST',
+      body: JSON.stringify(setting),
+    });
+  }
+
+  async updateUserSetting(userId: number, key: string, updateData: { value: string; category?: string; is_active?: boolean }): Promise<{ message: string; setting: UserSettings }> {
+    return this.makeRequest<{ message: string; setting: UserSettings }>(API_ENDPOINTS.USER_SETTING_BY_KEY(userId, key), {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    });
+  }
+
+  async deleteUserSetting(userId: number, key: string): Promise<{ message: string }> {
+    return this.makeRequest<{ message: string }>(API_ENDPOINTS.USER_SETTING_BY_KEY(userId, key), {
+      method: 'DELETE',
+    });
+  }
+
+  async getUserSettingsMap(userId: number, category?: string): Promise<{ user_id: number; settings: Record<string, string> }> {
+    const endpoint = category 
+      ? `${API_ENDPOINTS.USER_SETTINGS_MAP(userId)}?category=${category}`
+      : API_ENDPOINTS.USER_SETTINGS_MAP(userId);
+    return this.makeRequest<{ user_id: number; settings: Record<string, string> }>(endpoint);
+  }
+
+  async bulkUpdateUserSettings(userId: number, settings: Record<string, string>): Promise<{ message: string; user_id: number; updated_count: number }> {
+    return this.makeRequest<{ message: string; user_id: number; updated_count: number }>(API_ENDPOINTS.BULK_UPDATE_USER_SETTINGS(userId), {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+  }
+
+  async initializeUserSettings(userId: number): Promise<{ message: string; user_id: number }> {
+    return this.makeRequest<{ message: string; user_id: number }>(API_ENDPOINTS.INITIALIZE_USER_SETTINGS(userId), {
       method: 'POST',
     });
   }

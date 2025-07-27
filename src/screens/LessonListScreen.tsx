@@ -20,11 +20,11 @@ import ApiService, { Lesson, Category } from '../services/ApiService';
 
 const { width } = Dimensions.get('window');
 
-type RealLessonListScreenRouteProp = RouteProp<RootStackParamList, 'sublessonList'>;
+type LessonListScreenRouteProp = RouteProp<RootStackParamList, 'lessonList'>;
 
-const RealLessonListScreen = () => {
+const LessonListScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const route = useRoute<RealLessonListScreenRouteProp>();
+  const route = useRoute<LessonListScreenRouteProp>();
   const { category, activityType } = route.params;
 
   // Estados
@@ -73,32 +73,38 @@ const RealLessonListScreen = () => {
 
   const loadCategories = async () => {
     try {
+      console.log('📂 [LessonListScreen] Cargando categorías...');
       const categoriesData = await ApiService.getCategories();
       setCategories(categoriesData);
       
       // Encontrar la categoría seleccionada por nombre
       const foundCategory = categoriesData.find(cat => cat.name === category);
       setSelectedCategory(foundCategory || null);
+      console.log(`✅ [LessonListScreen] Categoría encontrada: ${foundCategory?.name || 'No encontrada'}`);
     } catch (error) {
-      console.error('Error loading categories:', error);
+      console.error('❌ [LessonListScreen] Error loading categories:', error);
     }
   };
 
   const loadLessons = async () => {
     try {
       setLoading(true);
+      console.log(`📚 [LessonListScreen] Cargando lecciones para categoría: ${category}`);
       
       // Primero obtener todas las categorías para encontrar el ID
       const categoriesData = await ApiService.getCategories();
       const foundCategory = categoriesData.find(cat => cat.name === category);
       
       if (foundCategory) {
+        console.log(`✅ [LessonListScreen] Categoría encontrada: ID ${foundCategory.ID}`);
         // Cargar lecciones por categoría
         const lessonsData = await ApiService.getLessonsByCategory(foundCategory.ID);
+        console.log(`📋 [LessonListScreen] ${lessonsData.length} lecciones cargadas`);
         
         // Filtrar por activityType si está presente
         let filteredLessons = lessonsData;
         if (activityType) {
+          console.log(`🎯 [LessonListScreen] Filtrando por tipo de actividad: ${activityType}`);
           // Aquí podrías implementar filtrado por tipo de actividad
           // Por ahora mostramos todas las lecciones de la categoría
           filteredLessons = lessonsData;
@@ -113,11 +119,13 @@ const RealLessonListScreen = () => {
         });
         
         setLessons(sortedLessons);
+        console.log(`✅ [LessonListScreen] ${sortedLessons.length} lecciones ordenadas`);
       } else {
+        console.log('❌ [LessonListScreen] Categoría no encontrada');
         setLessons([]);
       }
     } catch (error) {
-      console.error('Error loading lessons:', error);
+      console.error('❌ [LessonListScreen] Error loading lessons:', error);
       Alert.alert(
         'Error de Conexión',
         'No se pudieron cargar las lecciones. Verifica tu conexión a internet.',
@@ -138,6 +146,7 @@ const RealLessonListScreen = () => {
   };
 
   const goToLesson = (lesson: Lesson) => {
+    console.log(`📖 [LessonListScreen] Navegando a lección: ${lesson.title}`);
     // Convertir la lección de la API al formato esperado por la pantalla de lección
     const convertedLesson = {
       id: lesson.ID,
@@ -148,7 +157,7 @@ const RealLessonListScreen = () => {
       category: lesson.Category.name,
     };
     
-    navigation.navigate('realLesson', { lesson: convertedLesson });
+    navigation.navigate('lesson', { lesson: convertedLesson });
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -746,4 +755,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RealLessonListScreen;
+export default LessonListScreen;
