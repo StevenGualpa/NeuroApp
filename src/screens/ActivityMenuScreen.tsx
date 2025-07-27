@@ -17,6 +17,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import ApiService, { Activity } from '../services/ApiService';
 import { AchievementService } from '../services/AchievementService';
+import { useLanguage } from '../contexts/LanguageContext';
+import TranslationService from '../services/TranslationService';
 
 const { width } = Dimensions.get('window');
 
@@ -36,9 +38,11 @@ const activityConfig = [
 
 const ActivityMenuScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { t, language } = useLanguage();
   
   // Estados
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [originalActivities, setOriginalActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [totalPoints, setTotalPoints] = useState(0);
@@ -51,6 +55,16 @@ const ActivityMenuScreen = () => {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Traducir actividades cuando cambie el idioma
+  useEffect(() => {
+    if (originalActivities.length > 0) {
+      console.log(`🌍 [ActivityMenuScreen] Traduciendo ${originalActivities.length} actividades a ${language}`);
+      const translatedActivities = TranslationService.translateActivities(originalActivities, language);
+      setActivities(translatedActivities);
+      console.log('✅ [ActivityMenuScreen] Actividades traducidas:', translatedActivities.map(a => `${a.name} (${a.description})`));
+    }
+  }, [language, originalActivities]);
 
   // Reload stats when screen comes into focus
   useEffect(() => {
@@ -80,23 +94,35 @@ const ActivityMenuScreen = () => {
       setLoading(true);
       console.log('🎮 [ActivityMenuScreen] Cargando actividades desde API...');
       const activitiesData = await ApiService.getActivities();
-      setActivities(activitiesData);
-      console.log(`✅ [ActivityMenuScreen] ${activitiesData.length} actividades cargadas`);
+      
+      console.log('📋 [ActivityMenuScreen] Datos originales del servidor:', activitiesData.map(a => `${a.name} - ${a.description}`));
+      
+      // Guardar datos originales
+      setOriginalActivities(activitiesData);
+      
+      // Traducir inmediatamente
+      const translatedActivities = TranslationService.translateActivities(activitiesData, language);
+      setActivities(translatedActivities);
+      
+      console.log(`✅ [ActivityMenuScreen] ${activitiesData.length} actividades cargadas y traducidas a ${language}`);
+      console.log('🌍 [ActivityMenuScreen] Actividades traducidas:', translatedActivities.map(a => `${a.name} - ${a.description}`));
       
       // Initialize scale animations for each activity
       scaleValues.length = 0;
-      activitiesData.forEach(() => {
+      translatedActivities.forEach(() => {
         scaleValues.push(new Animated.Value(1));
       });
       
     } catch (error) {
       console.error('❌ [ActivityMenuScreen] Error loading activities:', error);
       Alert.alert(
-        'Error de Conexión',
-        'No se pudieron cargar las actividades. Verifica tu conexión a internet.',
+        t.errors.connectionError,
+        t.language === 'es' 
+          ? 'No se pudieron cargar las actividades. Verifica tu conexión a internet.'
+          : 'Could not load activities. Check your internet connection.',
         [
-          { text: 'Reintentar', onPress: loadActivities },
-          { text: 'Cancelar', style: 'cancel' }
+          { text: t.common.retry, onPress: loadActivities },
+          { text: t.common.cancel, style: 'cancel' }
         ]
       );
     } finally {
@@ -126,8 +152,10 @@ const ActivityMenuScreen = () => {
 
   const goToActivityCategory = (activity: Activity) => {
     console.log('🎯 [ActivityMenuScreen] Navegando a categorías para actividad:', activity.name);
-    // Navegar a la pantalla de categorías con el tipo de actividad
-    navigation.navigate('categoryMenu', { activityType: activity.name });
+    // Usar el nombre original para la navegación (el servidor espera el nombre original)
+    const originalActivity = originalActivities.find(orig => orig.ID === activity.ID);
+    const activityName = originalActivity ? originalActivity.name : activity.name;
+    navigation.navigate('categoryMenu', { activityType: activityName });
   };
 
   const goToAchievements = () => {
@@ -167,7 +195,7 @@ const ActivityMenuScreen = () => {
   };
 
   const getActivityStatus = (activity: Activity) => {
-    return activity.is_active ? 'Activo' : 'Inactivo';
+    return activity.is_active ? t.activities.active : t.activities.inactive;
   };
 
   const getStatusColor = (activity: Activity) => {
@@ -177,19 +205,24 @@ const ActivityMenuScreen = () => {
   const renderLoadingState = () => (
     <View style={styles.loadingContainer}>
       <ActivityIndicator size="large" color="#4285f4" />
-      <Text style={styles.loadingText}>Cargando actividades...</Text>
+      <Text style={styles.loadingText}>
+        {t.language === 'es' ? 'Cargando actividades...' : 'Loading activities...'}
+      </Text>
     </View>
   );
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyIcon}>🎮</Text>
-      <Text style={styles.emptyTitle}>No hay actividades disponibles</Text>
+      <Text style={styles.emptyTitle}>{t.activities.noActivities}</Text>
       <Text style={styles.emptyDescription}>
-        Parece que no hay actividades configuradas en el servidor.
+        {t.language === 'es' 
+          ? 'Parece que no hay actividades configuradas en el servidor.'
+          : 'It seems there are no activities configured on the server.'
+        }
       </Text>
       <TouchableOpacity style={styles.retryButton} onPress={loadActivities}>
-        <Text style={styles.retryButtonText}>Reintentar</Text>
+        <Text style={styles.retryButtonText}>{t.common.retry}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -252,12 +285,6 @@ const ActivityMenuScreen = () => {
             <Text style={styles.cardDescription} numberOfLines={3}>
               {activity.description}
             </Text>
-            
-            {/* Activity ID */}
-            <View style={styles.idContainer}>
-              <Text style={styles.idIcon}>🆔</Text>
-              <Text style={styles.idText}>ID: {activity.ID}</Text>
-            </View>
           </View>
 
           {/* Play Button */}
@@ -284,11 +311,10 @@ const ActivityMenuScreen = () => {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <TouchableOpacity style={styles.backButton} onPress={goBack}>
-              <Text style={styles.backButtonText}>← Volver</Text>
+              <Text style={styles.backButtonText}>← {t.common.back}</Text>
             </TouchableOpacity>
             <View style={styles.titleSection}>
-              <Text style={styles.title}>🎮 Actividades</Text>
-              <Text style={styles.subtitle}>Cargando desde API...</Text>
+              <Text style={styles.title}>🎮 {t.activities.title}</Text>
             </View>
             <View style={styles.achievementsButton} />
           </View>
@@ -304,12 +330,11 @@ const ActivityMenuScreen = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity style={styles.backButton} onPress={goBack}>
-            <Text style={styles.backButtonText}>← Volver</Text>
+            <Text style={styles.backButtonText}>← {t.common.back}</Text>
           </TouchableOpacity>
           
           <View style={styles.titleSection}>
-            <Text style={styles.title}>🎮 Actividades</Text>
-            <Text style={styles.subtitle}>Datos desde API</Text>
+            <Text style={styles.title}>🎮 {t.activities.title}</Text>
           </View>
           
           {/* Achievements Button */}
@@ -323,7 +348,9 @@ const ActivityMenuScreen = () => {
             </View>
             <View style={styles.achievementsInfo}>
               <Text style={styles.achievementsPoints}>{totalPoints}</Text>
-              <Text style={styles.achievementsLabel}>pts</Text>
+              <Text style={styles.achievementsLabel}>
+                {t.language === 'es' ? 'pts' : 'pts'}
+              </Text>
             </View>
             {unlockedAchievements > 0 && (
               <View style={styles.achievementsBadge}>
@@ -331,26 +358,6 @@ const ActivityMenuScreen = () => {
               </View>
             )}
           </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Stats Summary */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{activities.length}</Text>
-          <Text style={styles.statLabel}>Actividades</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>
-            {activities.filter(a => a.is_active).length}
-          </Text>
-          <Text style={styles.statLabel}>Activas</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{totalPoints}</Text>
-          <Text style={styles.statLabel}>Puntos</Text>
         </View>
       </View>
       
@@ -376,12 +383,6 @@ const ActivityMenuScreen = () => {
           </View>
         </ScrollView>
       )}
-      
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          🚀 Datos cargados desde: facturago.onrender.com 🧠
-        </Text>
-      </View>
     </SafeAreaView>
   );
 };
@@ -439,16 +440,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
     color: '#2D3436',
-    marginBottom: 4,
     textShadowColor: 'rgba(0, 0, 0, 0.1)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    color: '#636E72',
   },
   achievementsButton: {
     backgroundColor: '#4285f4',
@@ -501,43 +495,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: '#ffffff',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    marginTop: 15,
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#4285f4',
-    marginBottom: 2,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '600',
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: '#e5e7eb',
-    marginHorizontal: 10,
   },
   loadingContainer: {
     flex: 1,
@@ -607,7 +564,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 20,
     padding: 16,
-    minHeight: 200,
+    minHeight: 180,
     shadowOffset: {
       width: 0,
       height: 6,
@@ -678,24 +635,6 @@ const styles = StyleSheet.create({
     textShadowRadius: 1,
     minHeight: 42,
   },
-  idContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  idIcon: {
-    fontSize: 12,
-    marginRight: 4,
-  },
-  idText: {
-    fontSize: 11,
-    color: '#ffffff',
-    fontWeight: '600',
-  },
   playButtonContainer: {
     alignItems: 'center',
   },
@@ -735,17 +674,5 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  footer: {
-    alignItems: 'center',
-    paddingBottom: 15,
-    paddingTop: 10,
-    paddingHorizontal: 20,
-  },
-  footerText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#636E72',
-    textAlign: 'center',
   },
 });

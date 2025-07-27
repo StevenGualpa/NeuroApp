@@ -21,13 +21,14 @@ interface MenuOption {
 interface MenuGridProps {
   menuOptions: MenuOption[];
   onMenuPress: (option: string) => void;
+  language?: 'es' | 'en';
 }
 
 export interface MenuGridRef {
   restartAnimations: () => void;
 }
 
-const MenuGrid = forwardRef<MenuGridRef, MenuGridProps>(({ menuOptions, onMenuPress }, ref) => {
+const MenuGrid = forwardRef<MenuGridRef, MenuGridProps>(({ menuOptions, onMenuPress, language = 'es' }, ref) => {
   const scaleValues = useRef(
     menuOptions.map(() => new Animated.Value(1))
   ).current;
@@ -102,6 +103,25 @@ const MenuGrid = forwardRef<MenuGridRef, MenuGridProps>(({ menuOptions, onMenuPr
     }).start();
   };
 
+  // Textos traducidos
+  const getWelcomeTitle = () => {
+    return language === 'es' 
+      ? '🌟 Bienvenido a NeuroApp 🌟'
+      : '🌟 Welcome to NeuroApp 🌟';
+  };
+
+  const getWelcomeSubtitle = () => {
+    return language === 'es'
+      ? '¿Qué quieres hacer hoy?'
+      : 'What do you want to do today?';
+  };
+
+  const getFooterText = () => {
+    return language === 'es'
+      ? '🚀 ¡Tu aventura de aprendizaje comienza aquí! 🧠'
+      : '🚀 Your learning adventure starts here! 🧠';
+  };
+
   return (
     <View style={styles.contentContainer}>
       {/* Sección de bienvenida con animaciones */}
@@ -114,8 +134,8 @@ const MenuGrid = forwardRef<MenuGridRef, MenuGridProps>(({ menuOptions, onMenuPr
           }
         ]}
       >
-        <Text style={styles.welcomeTitle}>🌟 Bienvenido a NeuroApp 🌟</Text>
-        <Text style={styles.welcomeSubtitle}>¿Qué quieres hacer hoy?</Text>
+        <Text style={styles.welcomeTitle}>{getWelcomeTitle()}</Text>
+        <Text style={styles.welcomeSubtitle}>{getWelcomeSubtitle()}</Text>
       </Animated.View>
       
       {/* Grid de menú */}
@@ -176,7 +196,7 @@ const MenuGrid = forwardRef<MenuGridRef, MenuGridProps>(({ menuOptions, onMenuPr
           }
         ]}
       >
-        <Text style={styles.footerText}>🚀 ¡Tu aventura de aprendizaje comienza aquí! 🧠</Text>
+        <Text style={styles.footerText}>{getFooterText()}</Text>
       </Animated.View>
     </View>
   );

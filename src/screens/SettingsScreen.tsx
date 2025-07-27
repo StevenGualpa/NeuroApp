@@ -17,6 +17,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import ApiService, { UserSettings } from '../services/ApiService';
 import { useAuth } from '../hooks';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -40,6 +41,7 @@ interface SettingItem {
 const SettingsScreen = () => {
   const navigation = useNavigation<SettingsNavigationProp>();
   const { user } = useAuth();
+  const { language, t, changeLanguage } = useLanguage();
   
   // State
   const [settings, setSettings] = useState<SettingItem[]>([]);
@@ -49,16 +51,16 @@ const SettingsScreen = () => {
   const [error, setError] = useState<string | null>(null);
   const [celebrationAnim] = useState(new Animated.Value(0));
   
-  // Categories organized by real backend categories with child-friendly names
+  // Categories with translations
   const categories = [
-    { key: 'all', title: 'Todas', icon: '📋', color: '#4285F4' },
-    { key: 'audio', title: 'Sonidos', icon: '🔊', color: '#FF6B6B' },
-    { key: 'gameplay', title: 'Juegos', icon: '🎮', color: '#4ECDC4' },
-    { key: 'progress', title: 'Progreso', icon: '🏆', color: '#FECA57' },
-    { key: 'appearance', title: 'Pantalla', icon: '🎨', color: '#96CEB4' },
-    { key: 'general', title: 'Idioma', icon: '🌍', color: '#A8A8F0' },
-    { key: 'accessibility', title: 'Ayuda', icon: '🤝', color: '#45B7D1' },
-    { key: 'parental', title: 'Papás', icon: '👨‍����‍👧‍👦', color: '#FF9800' },
+    { key: 'all', title: t.settings.categories.all, icon: '📋', color: '#4285F4' },
+    { key: 'audio', title: t.settings.categories.audio, icon: '🔊', color: '#FF6B6B' },
+    { key: 'gameplay', title: t.settings.categories.gameplay, icon: '🎮', color: '#4ECDC4' },
+    { key: 'progress', title: t.settings.categories.progress, icon: '🏆', color: '#FECA57' },
+    { key: 'appearance', title: t.settings.categories.appearance, icon: '🎨', color: '#96CEB4' },
+    { key: 'general', title: t.settings.categories.language, icon: '🌍', color: '#A8A8F0' },
+    { key: 'accessibility', title: t.settings.categories.accessibility, icon: '🤝', color: '#45B7D1' },
+    { key: 'parental', title: t.settings.categories.parental, icon: '👨‍👩‍👧‍👦', color: '#FF9800' },
   ];
 
   // Load user settings
@@ -116,95 +118,97 @@ const SettingsScreen = () => {
     }
   }, [user?.id]);
 
-  // Setting metadata with child-friendly descriptions
+  // Setting metadata with translations
   const getSettingTitle = (key: string): string => {
-    const titles: Record<string, string> = {
+    switch (key) {
       // Audio
-      'sound_effects_enabled': 'Sonidos Divertidos',
-      'voice_help_enabled': 'Voz Amiga',
-      'voice_speed': 'Velocidad de Voz',
-      'audio_volume': 'Volumen',
+      case 'sound_effects_enabled': return t.settings.audio.soundEffects.title;
+      case 'voice_help_enabled': return t.settings.audio.voiceHelp.title;
+      case 'voice_speed': return t.settings.audio.voiceSpeed.title;
+      case 'audio_volume': return t.settings.audio.volume.title;
       
       // Gameplay
-      'help_delay_seconds': 'Tiempo de Ayuda',
-      'max_attempts_per_activity': 'Intentos',
-      'auto_advance_enabled': 'Continuar Solo',
-      'celebration_animations': 'Celebraciones',
-      'hint_button_visible': 'Botón de Pista',
+      case 'help_delay_seconds': return t.settings.gameplay.helpDelay.title;
+      case 'max_attempts_per_activity': return t.settings.gameplay.maxAttempts.title;
+      case 'auto_advance_enabled': return t.settings.gameplay.autoAdvance.title;
+      case 'celebration_animations': return t.settings.gameplay.celebrations.title;
+      case 'hint_button_visible': return t.settings.gameplay.hintButton.title;
       
       // Accessibility
-      'font_size': 'Tamaño de Letras',
-      'high_contrast_mode': 'Colores Fuertes',
-      'animation_speed': 'Velocidad de Animación',
-      'button_size': 'Tamaño de Botones',
+      case 'font_size': return t.settings.accessibility.fontSize.title;
+      case 'high_contrast_mode': return t.settings.accessibility.highContrast.title;
+      case 'animation_speed': return t.settings.accessibility.animationSpeed.title;
+      case 'button_size': return t.settings.accessibility.buttonSize.title;
       
       // Progress
-      'daily_goal_minutes': 'Meta del Día',
-      'show_progress_bar': 'Barra de Progreso',
-      'show_stars_count': 'Contar Estrellas',
-      'achievement_notifications': 'Avisos de Logros',
+      case 'daily_goal_minutes': return t.settings.progress.dailyGoal.title;
+      case 'show_progress_bar': return t.settings.progress.progressBar.title;
+      case 'show_stars_count': return t.settings.progress.starsCount.title;
+      case 'achievement_notifications': return t.settings.progress.notifications.title;
       
       // Appearance
-      'theme_mode': 'Tema',
-      'color_scheme': 'Colores',
-      'show_background_patterns': 'Decoraciones',
+      case 'theme_mode': return t.settings.appearance.theme.title;
+      case 'color_scheme': return t.settings.appearance.colorScheme.title;
+      case 'show_background_patterns': return t.settings.appearance.backgroundPatterns.title;
       
-      // General (Language)
-      'app_language': 'Idioma de la App',
-      'voice_language': 'Idioma de Voz',
+      // Language
+      case 'app_language': return t.settings.language.appLanguage.title;
+      case 'voice_language': return t.settings.language.voiceLanguage.title;
       
       // Parental
-      'parental_mode_enabled': 'Modo Papás',
-      'session_time_limit': 'Tiempo Máximo',
-      'break_reminder_enabled': 'Recordar Descansos',
-      'break_reminder_minutes': 'Cada Cuánto Descansar',
-    };
-    return titles[key] || key;
+      case 'parental_mode_enabled': return t.settings.parental.parentalMode.title;
+      case 'session_time_limit': return t.settings.parental.timeLimit.title;
+      case 'break_reminder_enabled': return t.settings.parental.breakReminder.title;
+      case 'break_reminder_minutes': return t.settings.parental.breakInterval.title;
+      
+      default: return key;
+    }
   };
 
   const getSettingDescription = (key: string): string => {
-    const descriptions: Record<string, string> = {
+    switch (key) {
       // Audio
-      'sound_effects_enabled': 'Escuchar sonidos cuando tocas',
-      'voice_help_enabled': 'Una voz te ayuda a jugar',
-      'voice_speed': 'Qué tan rápido habla',
-      'audio_volume': 'Qué tan fuerte suena',
+      case 'sound_effects_enabled': return t.settings.audio.soundEffects.description;
+      case 'voice_help_enabled': return t.settings.audio.voiceHelp.description;
+      case 'voice_speed': return t.settings.audio.voiceSpeed.description;
+      case 'audio_volume': return t.settings.audio.volume.description;
       
       // Gameplay
-      'help_delay_seconds': 'Cuánto esperar antes de ayudar',
-      'max_attempts_per_activity': 'Cuántas veces puedes intentar',
-      'auto_advance_enabled': 'Pasar al siguiente solo',
-      'celebration_animations': 'Animaciones cuando ganas',
-      'hint_button_visible': 'Botón para pedir ayuda',
+      case 'help_delay_seconds': return t.settings.gameplay.helpDelay.description;
+      case 'max_attempts_per_activity': return t.settings.gameplay.maxAttempts.description;
+      case 'auto_advance_enabled': return t.settings.gameplay.autoAdvance.description;
+      case 'celebration_animations': return t.settings.gameplay.celebrations.description;
+      case 'hint_button_visible': return t.settings.gameplay.hintButton.description;
       
       // Accessibility
-      'font_size': 'Qué tan grandes son las letras',
-      'high_contrast_mode': 'Colores más fáciles de ver',
-      'animation_speed': 'Qué tan rápido se mueven las cosas',
-      'button_size': 'Qué tan grandes son los botones',
+      case 'font_size': return t.settings.accessibility.fontSize.description;
+      case 'high_contrast_mode': return t.settings.accessibility.highContrast.description;
+      case 'animation_speed': return t.settings.accessibility.animationSpeed.description;
+      case 'button_size': return t.settings.accessibility.buttonSize.description;
       
       // Progress
-      'daily_goal_minutes': 'Cuánto jugar cada día',
-      'show_progress_bar': 'Ver tu progreso',
-      'show_stars_count': 'Ver cuántas estrellas tienes',
-      'achievement_notifications': 'Te avisa cuando logras algo',
+      case 'daily_goal_minutes': return t.settings.progress.dailyGoal.description;
+      case 'show_progress_bar': return t.settings.progress.progressBar.description;
+      case 'show_stars_count': return t.settings.progress.starsCount.description;
+      case 'achievement_notifications': return t.settings.progress.notifications.description;
       
       // Appearance
-      'theme_mode': 'Colores claros u oscuros',
-      'color_scheme': 'Qué colores usar',
-      'show_background_patterns': 'Dibujos de fondo',
+      case 'theme_mode': return t.settings.appearance.theme.description;
+      case 'color_scheme': return t.settings.appearance.colorScheme.description;
+      case 'show_background_patterns': return t.settings.appearance.backgroundPatterns.description;
       
-      // General (Language)
-      'app_language': 'En qué idioma está la app',
-      'voice_language': 'En qué idioma habla la voz',
+      // Language
+      case 'app_language': return t.settings.language.appLanguage.description;
+      case 'voice_language': return t.settings.language.voiceLanguage.description;
       
       // Parental
-      'parental_mode_enabled': 'Controles especiales para papás',
-      'session_time_limit': 'Cuánto tiempo puedes jugar',
-      'break_reminder_enabled': 'Te recuerda tomar descansos',
-      'break_reminder_minutes': 'Cada cuántos minutos descansar',
-    };
-    return descriptions[key] || '';
+      case 'parental_mode_enabled': return t.settings.parental.parentalMode.description;
+      case 'session_time_limit': return t.settings.parental.timeLimit.description;
+      case 'break_reminder_enabled': return t.settings.parental.breakReminder.description;
+      case 'break_reminder_minutes': return t.settings.parental.breakInterval.description;
+      
+      default: return '';
+    }
   };
 
   const getSettingIcon = (key: string): string => {
@@ -384,7 +388,7 @@ const SettingsScreen = () => {
     return steps[key];
   };
 
-  // Update setting with celebration
+  // Update setting with celebration and language handling
   const updateSetting = useCallback(async (key: string, value: string) => {
     if (!user?.id) return;
     
@@ -395,7 +399,13 @@ const SettingsScreen = () => {
       Vibration.vibrate(50);
       
       console.log(`🔄 [SettingsScreen] Actualizando ${key} = ${value}`);
-      await ApiService.updateUserSetting(user.id, key, { value });
+      
+      // Special handling for app_language
+      if (key === 'app_language') {
+        await changeLanguage(value as 'es' | 'en');
+      } else {
+        await ApiService.updateUserSetting(user.id, key, { value });
+      }
       
       // Update local state
       setSettings(prev => prev.map(setting => 
@@ -420,11 +430,11 @@ const SettingsScreen = () => {
       
     } catch (error) {
       console.error('❌ [SettingsScreen] Error updating setting:', error);
-      Alert.alert('¡Ups!', 'No se pudo guardar. ¿Intentamos de nuevo?');
+      Alert.alert(t.errors.somethingWrong, t.settings.messages.error);
     } finally {
       setSaving(false);
     }
-  }, [user?.id, celebrationAnim]);
+  }, [user?.id, celebrationAnim, changeLanguage, t]);
 
   // Filter settings by category
   const filteredSettings = selectedCategory === 'all' 
@@ -452,7 +462,7 @@ const SettingsScreen = () => {
         styles.booleanText,
         { color: setting.value === 'true' ? '#FFFFFF' : '#666666' }
       ]}>
-        {setting.value === 'true' ? 'SÍ' : 'NO'}
+        {setting.value === 'true' ? t.common.yes : t.common.no}
       </Text>
     </TouchableOpacity>
   );
@@ -558,23 +568,31 @@ const SettingsScreen = () => {
   );
 
   const getOptionLabel = (option: string): string => {
-    const labels: Record<string, string> = {
-      'es': 'Español',
-      'en': 'English',
-      'slow': 'Lento',
-      'normal': 'Normal',
-      'fast': 'Rápido',
-      'small': 'Pequeño',
-      'medium': 'Mediano',
-      'large': 'Grande',
-      'light': 'Claro',
-      'dark': 'Oscuro',
-      'default': 'Normal',
-      'blue': 'Azul',
-      'green': 'Verde',
-      'purple': 'Morado',
-    };
-    return labels[option] || option;
+    // Language options
+    if (option === 'es') return t.settings.language.options.spanish;
+    if (option === 'en') return t.settings.language.options.english;
+    
+    // Voice speed options
+    if (option === 'slow') return t.settings.audio.voiceSpeed.options.slow;
+    if (option === 'normal') return t.settings.audio.voiceSpeed.options.normal;
+    if (option === 'fast') return t.settings.audio.voiceSpeed.options.fast;
+    
+    // Size options
+    if (option === 'small') return t.settings.accessibility.fontSize.options.small;
+    if (option === 'medium') return t.settings.accessibility.fontSize.options.medium;
+    if (option === 'large') return t.settings.accessibility.fontSize.options.large;
+    
+    // Theme options
+    if (option === 'light') return t.settings.appearance.theme.options.light;
+    if (option === 'dark') return t.settings.appearance.theme.options.dark;
+    
+    // Color scheme options
+    if (option === 'default') return t.settings.appearance.colorScheme.options.default;
+    if (option === 'blue') return t.settings.appearance.colorScheme.options.blue;
+    if (option === 'green') return t.settings.appearance.colorScheme.options.green;
+    if (option === 'purple') return t.settings.appearance.colorScheme.options.purple;
+    
+    return option;
   };
 
   if (loading) {
@@ -582,7 +600,7 @@ const SettingsScreen = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingIcon}>⚙️</Text>
-          <Text style={styles.loadingTitle}>Preparando tus configuraciones...</Text>
+          <Text style={styles.loadingTitle}>{t.settings.messages.loadingSettings}</Text>
           <ActivityIndicator size="large" color="#4ECDC4" />
         </View>
       </SafeAreaView>
@@ -594,11 +612,11 @@ const SettingsScreen = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <Text style={styles.errorIcon}>😕</Text>
-          <Text style={styles.errorTitle}>¡Ups! Algo salió mal</Text>
-          <Text style={styles.errorText}>No pudimos cargar tus configuraciones</Text>
+          <Text style={styles.errorTitle}>{t.errors.somethingWrong}</Text>
+          <Text style={styles.errorText}>{t.settings.messages.error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={loadSettings}>
             <Text style={styles.retryIcon}>🔄</Text>
-            <Text style={styles.retryText}>Intentar de nuevo</Text>
+            <Text style={styles.retryText}>{t.common.retry}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -614,9 +632,9 @@ const SettingsScreen = () => {
           onPress={() => navigation.goBack()}
         >
           <Text style={styles.backIcon}>←</Text>
-          <Text style={styles.backText}>Volver</Text>
+          <Text style={styles.backText}>{t.common.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>⚙️ Mis Configuraciones</Text>
+        <Text style={styles.headerTitle}>⚙️ {t.settings.title}</Text>
       </View>
 
       {/* Compact Category Tabs */}
@@ -656,8 +674,8 @@ const SettingsScreen = () => {
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>🔍</Text>
-            <Text style={styles.emptyTitle}>No hay configuraciones aquí</Text>
-            <Text style={styles.emptyText}>Prueba otra categoría</Text>
+            <Text style={styles.emptyTitle}>{t.settings.messages.noSettings}</Text>
+            <Text style={styles.emptyText}>{t.settings.messages.tryOtherCategory}</Text>
           </View>
         )}
         
@@ -669,7 +687,7 @@ const SettingsScreen = () => {
         <View style={styles.savingOverlay}>
           <View style={styles.savingContainer}>
             <Text style={styles.savingIcon}>💾</Text>
-            <Text style={styles.savingText}>Guardando...</Text>
+            <Text style={styles.savingText}>{t.settings.messages.saving}</Text>
           </View>
         </View>
       )}

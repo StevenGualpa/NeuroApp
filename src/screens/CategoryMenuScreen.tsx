@@ -17,6 +17,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import ApiService, { Category, Lesson, Step } from '../services/ApiService';
 import { AchievementService } from '../services/AchievementService';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -30,6 +31,7 @@ type CategoryMenuScreenRouteProp = {
 const CategoryMenuScreen = () => {
   const navigation = useNavigation<CategoryMenuScreenNavigationProp>();
   const route = useRoute<CategoryMenuScreenRouteProp>();
+  const { t } = useLanguage();
   const { activityType } = route.params || {};
   
   // Estados
@@ -80,7 +82,7 @@ const CategoryMenuScreen = () => {
       
       // Si hay un tipo de actividad específico, filtrar categorías
       if (activityType) {
-        console.log(`�� [CategoryMenuScreen] Filtrando categorías para actividad: ${activityType}`);
+        console.log(`🎯 [CategoryMenuScreen] Filtrando categorías para actividad: ${activityType}`);
         // Obtener todas las actividades para encontrar el ID del tipo de actividad
         const activities = await ApiService.getActivities();
         const selectedActivity = activities.find(activity => activity.name === activityType);
@@ -150,11 +152,11 @@ const CategoryMenuScreen = () => {
     } catch (error) {
       console.error('❌ [CategoryMenuScreen] Error loading categories:', error);
       Alert.alert(
-        'Error de Conexión',
-        'No se pudieron cargar las categorías. Verifica tu conexión a internet.',
+        t.errors.connectionError,
+        t.categories.noCategories,
         [
-          { text: 'Reintentar', onPress: loadCategories },
-          { text: 'Cancelar', style: 'cancel' }
+          { text: t.common.retry, onPress: loadCategories },
+          { text: t.common.cancel, style: 'cancel' }
         ]
       );
     } finally {
@@ -183,7 +185,7 @@ const CategoryMenuScreen = () => {
   };
 
   const goToSubLessons = (category: Category) => {
-    console.log(`��� [CategoryMenuScreen] Navegando a lecciones para categoría: ${category.name}`);
+    console.log(`📚 [CategoryMenuScreen] Navegando a lecciones para categoría: ${category.name}`);
     // Navegar a la pantalla de lecciones con la categoría seleccionada
     navigation.navigate('lessonList', { 
       category: category.name, 
@@ -224,7 +226,9 @@ const CategoryMenuScreen = () => {
   };
 
   const getCategoryStatus = (category: Category) => {
-    return category.is_active ? 'Activa' : 'Inactiva';
+    return category.is_active 
+      ? (t.language === 'es' ? 'Activa' : 'Active')
+      : (t.language === 'es' ? 'Inactiva' : 'Inactive');
   };
 
   const getStatusColor = (category: Category) => {
@@ -234,7 +238,9 @@ const CategoryMenuScreen = () => {
   const renderLoadingState = () => (
     <View style={styles.loadingContainer}>
       <ActivityIndicator size="large" color="#4285f4" />
-      <Text style={styles.loadingText}>Cargando categorías...</Text>
+      <Text style={styles.loadingText}>
+        {t.language === 'es' ? 'Cargando categorías...' : 'Loading categories...'}
+      </Text>
     </View>
   );
 
@@ -243,25 +249,31 @@ const CategoryMenuScreen = () => {
       <Text style={styles.emptyIcon}>📂</Text>
       <Text style={styles.emptyTitle}>
         {activityType 
-          ? `No hay categorías para "${activityType}"`
-          : 'No hay categorías disponibles'
+          ? (t.language === 'es' 
+              ? `No hay categorías para "${activityType}"`
+              : `No categories for "${activityType}"`)
+          : t.categories.noCategories
         }
       </Text>
       <Text style={styles.emptyDescription}>
         {activityType 
-          ? `No se encontraron categorías que contengan lecciones con actividades de tipo "${activityType}". Intenta con otro tipo de actividad.`
-          : 'Parece que no hay categorías configuradas en el servidor.'
+          ? (t.language === 'es' 
+              ? `No se encontraron categorías que contengan lecciones con actividades de tipo "${activityType}". Intenta con otro tipo de actividad.`
+              : `No categories found containing lessons with "${activityType}" activities. Try another activity type.`)
+          : (t.language === 'es'
+              ? 'Parece que no hay categorías configuradas en el servidor.'
+              : 'It seems there are no categories configured on the server.')
         }
       </Text>
       <TouchableOpacity style={styles.retryButton} onPress={loadCategories}>
-        <Text style={styles.retryButtonText}>Reintentar</Text>
+        <Text style={styles.retryButtonText}>{t.common.retry}</Text>
       </TouchableOpacity>
       {activityType && (
         <TouchableOpacity 
           style={[styles.retryButton, { backgroundColor: '#6b7280', marginTop: 10 }]} 
           onPress={goBack}
         >
-          <Text style={styles.retryButtonText}>← Volver a Actividades</Text>
+          <Text style={styles.retryButtonText}>← {t.common.back} {t.navigation.activities}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -323,18 +335,6 @@ const CategoryMenuScreen = () => {
             <Text style={styles.cardDescription} numberOfLines={3}>
               {category.description}
             </Text>
-            
-            {/* Category Info */}
-            <View style={styles.infoContainer}>
-              <View style={styles.infoItem}>
-                <Text style={styles.infoIcon}>🆔</Text>
-                <Text style={styles.infoText}>ID: {category.ID}</Text>
-              </View>
-              <View style={styles.infoItem}>
-                <Text style={styles.infoIcon}>📊</Text>
-                <Text style={styles.infoText}>Orden: {category.sort_order}</Text>
-              </View>
-            </View>
           </View>
 
           {/* Play Button */}
@@ -361,11 +361,10 @@ const CategoryMenuScreen = () => {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <TouchableOpacity style={styles.backButton} onPress={goBack}>
-              <Text style={styles.backButtonText}>← Volver</Text>
+              <Text style={styles.backButtonText}>← {t.common.back}</Text>
             </TouchableOpacity>
             <View style={styles.titleSection}>
-              <Text style={styles.title}>📂 Categorías</Text>
-              <Text style={styles.subtitle}>Cargando desde API...</Text>
+              <Text style={styles.title}>📂 {t.categories.title}</Text>
             </View>
             <View style={styles.achievementsButton} />
           </View>
@@ -381,14 +380,11 @@ const CategoryMenuScreen = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity style={styles.backButton} onPress={goBack}>
-            <Text style={styles.backButtonText}>← Volver</Text>
+            <Text style={styles.backButtonText}>← {t.common.back}</Text>
           </TouchableOpacity>
           
           <View style={styles.titleSection}>
-            <Text style={styles.title}>📂 Categorías</Text>
-            <Text style={styles.subtitle}>
-              {activityType ? `Para: ${activityType}` : 'Todas las categorías'}
-            </Text>
+            <Text style={styles.title}>📂 {t.categories.title}</Text>
           </View>
           
           {/* Achievements Button */}
@@ -402,7 +398,9 @@ const CategoryMenuScreen = () => {
             </View>
             <View style={styles.achievementsInfo}>
               <Text style={styles.achievementsPoints}>{totalPoints}</Text>
-              <Text style={styles.achievementsLabel}>pts</Text>
+              <Text style={styles.achievementsLabel}>
+                {t.language === 'es' ? 'pts' : 'pts'}
+              </Text>
             </View>
             {unlockedAchievements > 0 && (
               <View style={styles.achievementsBadge}>
@@ -410,26 +408,6 @@ const CategoryMenuScreen = () => {
               </View>
             )}
           </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Stats Summary */}
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{categories.length}</Text>
-          <Text style={styles.statLabel}>Categorías</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>
-            {categories.filter(c => c.is_active).length}
-          </Text>
-          <Text style={styles.statLabel}>Activas</Text>
-        </View>
-        <View style={styles.statDivider} />
-        <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{totalPoints}</Text>
-          <Text style={styles.statLabel}>Puntos</Text>
         </View>
       </View>
       
@@ -455,12 +433,6 @@ const CategoryMenuScreen = () => {
           </View>
         </ScrollView>
       )}
-      
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          📂 Categorías desde: facturago.onrender.com 🎯
-        </Text>
-      </View>
     </SafeAreaView>
   );
 };
@@ -518,16 +490,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     textAlign: 'center',
     color: '#2D3436',
-    marginBottom: 4,
     textShadowColor: 'rgba(0, 0, 0, 0.1)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
-  },
-  subtitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-    color: '#636E72',
   },
   achievementsButton: {
     backgroundColor: '#4285f4',
@@ -580,43 +545,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: '#ffffff',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    marginTop: 15,
-    borderRadius: 16,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 3,
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#4285f4',
-    marginBottom: 2,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    fontWeight: '600',
-  },
-  statDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: '#e5e7eb',
-    marginHorizontal: 10,
   },
   loadingContainer: {
     flex: 1,
@@ -686,7 +614,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 20,
     padding: 16,
-    minHeight: 220,
+    minHeight: 180,
     shadowOffset: {
       width: 0,
       height: 6,
@@ -757,28 +685,6 @@ const styles = StyleSheet.create({
     textShadowRadius: 1,
     minHeight: 42,
   },
-  infoContainer: {
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  infoIcon: {
-    fontSize: 12,
-    marginRight: 4,
-  },
-  infoText: {
-    fontSize: 11,
-    color: '#ffffff',
-    fontWeight: '600',
-  },
   playButtonContainer: {
     alignItems: 'center',
   },
@@ -818,17 +724,5 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  footer: {
-    alignItems: 'center',
-    paddingBottom: 15,
-    paddingTop: 10,
-    paddingHorizontal: 20,
-  },
-  footerText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#636E72',
-    textAlign: 'center',
   },
 });

@@ -18,6 +18,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import AuthService from '../services/AuthService';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -32,6 +33,7 @@ const LoginScreen = () => {
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { t } = useLanguage();
 
   // Animation refs
   const logoAnimation = useRef(new Animated.Value(0)).current;
@@ -63,43 +65,43 @@ const LoginScreen = () => {
 
   const validateForm = () => {
     if (!email.trim()) {
-      Alert.alert('Error', 'Por favor ingresa tu correo electrónico');
+      Alert.alert(t.common.error, t.language === 'es' ? 'Por favor ingresa tu correo electrónico' : 'Please enter your email');
       return false;
     }
 
     if (!validateEmail(email.trim())) {
-      Alert.alert('Error', 'Por favor ingresa un correo electrónico válido');
+      Alert.alert(t.common.error, t.language === 'es' ? 'Por favor ingresa un correo electrónico válido' : 'Please enter a valid email');
       return false;
     }
 
     if (!password.trim()) {
-      Alert.alert('Error', 'Por favor ingresa tu contraseña');
+      Alert.alert(t.common.error, t.language === 'es' ? 'Por favor ingresa tu contraseña' : 'Please enter your password');
       return false;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
+      Alert.alert(t.common.error, t.language === 'es' ? 'La contraseña debe tener al menos 6 caracteres' : 'Password must be at least 6 characters');
       return false;
     }
 
     if (isRegisterMode) {
       if (!name.trim()) {
-        Alert.alert('Error', 'Por favor ingresa tu nombre');
+        Alert.alert(t.common.error, t.language === 'es' ? 'Por favor ingresa tu nombre' : 'Please enter your name');
         return false;
       }
 
       if (name.trim().length < 2) {
-        Alert.alert('Error', 'El nombre debe tener al menos 2 caracteres');
+        Alert.alert(t.common.error, t.language === 'es' ? 'El nombre debe tener al menos 2 caracteres' : 'Name must be at least 2 characters');
         return false;
       }
 
       if (!confirmPassword.trim()) {
-        Alert.alert('Error', 'Por favor confirma tu contraseña');
+        Alert.alert(t.common.error, t.language === 'es' ? 'Por favor confirma tu contraseña' : 'Please confirm your password');
         return false;
       }
 
       if (password !== confirmPassword) {
-        Alert.alert('Error', 'Las contraseñas no coinciden');
+        Alert.alert(t.common.error, t.language === 'es' ? 'Las contraseñas no coinciden' : 'Passwords do not match');
         return false;
       }
     }
@@ -160,11 +162,13 @@ const LoginScreen = () => {
           setIsLoading(false);
           
           Alert.alert(
-            '¡Registro exitoso!',
-            'Tu cuenta ha sido creada correctamente. Ahora puedes iniciar sesión.',
+            t.language === 'es' ? '¡Registro exitoso!' : 'Registration successful!',
+            t.language === 'es' 
+              ? 'Tu cuenta ha sido creada correctamente. Ahora puedes iniciar sesión.'
+              : 'Your account has been created successfully. You can now sign in.',
             [
               {
-                text: 'OK',
+                text: t.common.ok,
                 onPress: () => {
                   // Switch to login mode
                   setIsRegisterMode(false);
@@ -176,7 +180,7 @@ const LoginScreen = () => {
             ]
           );
         } else {
-          throw new Error(result.message || 'Error en el registro');
+          throw new Error(result.message || (t.language === 'es' ? 'Error en el registro' : 'Registration error'));
         }
       } else {
         console.log('🔐 [LoginScreen] Intentando login con:', { email: email.trim() });
@@ -201,7 +205,7 @@ const LoginScreen = () => {
             navigation.replace('onboarding');
           });
         } else {
-          throw new Error(result.message || 'Credenciales incorrectas');
+          throw new Error(result.message || (t.language === 'es' ? 'Credenciales incorrectas' : 'Invalid credentials'));
         }
       }
     } catch (error) {
@@ -221,13 +225,19 @@ const LoginScreen = () => {
       // Show error
       const errorMessage = error instanceof Error ? error.message : 
         (isRegisterMode 
-          ? 'No se pudo crear la cuenta. Es posible que el correo ya esté registrado.'
-          : 'Correo electrónico o contraseña incorrectos. Por favor verifica tus credenciales.');
+          ? (t.language === 'es' 
+              ? 'No se pudo crear la cuenta. Es posible que el correo ya esté registrado.'
+              : 'Could not create account. Email might already be registered.')
+          : (t.language === 'es'
+              ? 'Correo electrónico o contraseña incorrectos. Por favor verifica tus credenciales.'
+              : 'Incorrect email or password. Please check your credentials.'));
       
       Alert.alert(
-        isRegisterMode ? 'Error de registro' : 'Error de inicio de sesión',
+        isRegisterMode 
+          ? (t.language === 'es' ? 'Error de registro' : 'Registration error')
+          : (t.language === 'es' ? 'Error de inicio de sesión' : 'Sign in error'),
         errorMessage,
-        [{ text: 'OK' }]
+        [{ text: t.common.ok }]
       );
       
       shakeForm();
@@ -268,9 +278,11 @@ const LoginScreen = () => {
 
   const handleForgotPassword = () => {
     Alert.alert(
-      'Recuperar contraseña',
-      'Para recuperar tu contraseña, contacta al administrador del sistema.',
-      [{ text: 'OK' }]
+      t.language === 'es' ? 'Recuperar contraseña' : 'Recover password',
+      t.language === 'es' 
+        ? 'Para recuperar tu contraseña, contacta al administrador del sistema.'
+        : 'To recover your password, contact the system administrator.',
+      [{ text: t.common.ok }]
     );
   };
 
@@ -304,15 +316,18 @@ const LoginScreen = () => {
           >
             <View style={styles.logoContainer}>
               <Text style={styles.logoIcon}>🧠</Text>
-              <Text style={styles.logoText}>NeuroApp</Text>
+              <Text style={styles.logoText}>{t.mainScreen.title}</Text>
             </View>
             <Text style={styles.welcomeText}>
-              {isRegisterMode ? '¡Únete a nosotros!' : '¡Bienvenido de vuelta!'}
+              {isRegisterMode 
+                ? (t.language === 'es' ? '¡Únete a nosotros!' : 'Join us!')
+                : t.login.welcome
+              }
             </Text>
             <Text style={styles.subtitleText}>
               {isRegisterMode 
-                ? 'Crea tu cuenta y comienza a aprender'
-                : 'Continúa tu aventura de aprendizaje'
+                ? (t.language === 'es' ? 'Crea tu cuenta y comienza a aprender' : 'Create your account and start learning')
+                : t.login.subtitle
               }
             </Text>
           </Animated.View>
@@ -352,7 +367,7 @@ const LoginScreen = () => {
                   <Text style={styles.inputIcon}>👤</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="Nombre completo"
+                    placeholder={t.language === 'es' ? 'Nombre completo' : 'Full name'}
                     placeholderTextColor="#9ca3af"
                     autoCapitalize="words"
                     autoCorrect={false}
@@ -368,7 +383,7 @@ const LoginScreen = () => {
                 <Text style={styles.inputIcon}>📧</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Correo electrónico"
+                  placeholder={t.login.email}
                   placeholderTextColor="#9ca3af"
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -384,7 +399,7 @@ const LoginScreen = () => {
                 <Text style={styles.inputIcon}>🔒</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Contraseña"
+                  placeholder={t.login.password}
                   placeholderTextColor="#9ca3af"
                   secureTextEntry={!showPassword}
                   value={password}
@@ -420,7 +435,7 @@ const LoginScreen = () => {
                   <Text style={styles.inputIcon}>🔐</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="Confirmar contraseña"
+                    placeholder={t.login.confirmPassword}
                     placeholderTextColor="#9ca3af"
                     secureTextEntry={!showConfirmPassword}
                     value={confirmPassword}
@@ -446,7 +461,7 @@ const LoginScreen = () => {
                 onPress={handleForgotPassword}
                 disabled={isLoading}
               >
-                <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
+                <Text style={styles.forgotPasswordText}>{t.login.forgotPassword}</Text>
               </TouchableOpacity>
             )}
 
@@ -476,7 +491,10 @@ const LoginScreen = () => {
                       <Text style={styles.loadingIcon}>⚡</Text>
                     </Animated.View>
                     <Text style={styles.submitButtonText}>
-                      {isRegisterMode ? 'Creando cuenta...' : 'Iniciando sesión...'}
+                      {isRegisterMode 
+                        ? (t.language === 'es' ? 'Creando cuenta...' : 'Creating account...')
+                        : (t.language === 'es' ? 'Iniciando sesión...' : 'Signing in...')
+                      }
                     </Text>
                   </View>
                 ) : (
@@ -485,7 +503,7 @@ const LoginScreen = () => {
                       {isRegisterMode ? '📝' : '🚀'}
                     </Text>
                     <Text style={styles.submitButtonText}>
-                      {isRegisterMode ? 'Crear Cuenta' : 'Iniciar Sesión'}
+                      {isRegisterMode ? t.login.register : t.login.login}
                     </Text>
                   </>
                 )}
@@ -495,10 +513,7 @@ const LoginScreen = () => {
             {/* Mode Toggle */}
             <View style={styles.modeToggleContainer}>
               <Text style={styles.modeToggleText}>
-                {isRegisterMode 
-                  ? '¿Ya tienes una cuenta?' 
-                  : '¿No tienes una cuenta?'
-                }
+                {isRegisterMode ? t.login.loginMode : t.login.registerMode}
               </Text>
               <TouchableOpacity
                 style={styles.modeToggleButton}
@@ -506,7 +521,7 @@ const LoginScreen = () => {
                 disabled={isLoading}
               >
                 <Text style={styles.modeToggleButtonText}>
-                  {isRegisterMode ? 'Iniciar Sesión' : 'Crear Cuenta'}
+                  {isRegisterMode ? t.login.login : t.login.register}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -515,10 +530,13 @@ const LoginScreen = () => {
           {/* Footer */}
           <View style={styles.footer}>
             <Text style={styles.footerText}>
-              🌟 Aprende, juega y crece con NeuroApp ✨
+              {t.language === 'es' 
+                ? '🌟 Aprende, juega y crece con NeuroApp ✨'
+                : '🌟 Learn, play and grow with NeuroApp ✨'
+              }
             </Text>
             <Text style={styles.versionText}>
-              Versión 1.0.0
+              {t.language === 'es' ? 'Versión 1.0.0' : 'Version 1.0.0'}
             </Text>
           </View>
         </ScrollView>

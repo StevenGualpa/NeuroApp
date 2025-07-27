@@ -17,6 +17,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ApiService, { Lesson, Category } from '../services/ApiService';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -25,6 +26,7 @@ type LessonListScreenRouteProp = RouteProp<RootStackParamList, 'lessonList'>;
 const LessonListScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<LessonListScreenRouteProp>();
+  const { t } = useLanguage();
   const { category, activityType } = route.params;
 
   // Estados
@@ -127,11 +129,11 @@ const LessonListScreen = () => {
     } catch (error) {
       console.error('❌ [LessonListScreen] Error loading lessons:', error);
       Alert.alert(
-        'Error de Conexión',
-        'No se pudieron cargar las lecciones. Verifica tu conexión a internet.',
+        t.errors.connectionError,
+        t.lessons.noLessons,
         [
-          { text: 'Reintentar', onPress: loadLessons },
-          { text: 'Cancelar', style: 'cancel' }
+          { text: t.common.retry, onPress: loadLessons },
+          { text: t.common.cancel, style: 'cancel' }
         ]
       );
     } finally {
@@ -171,10 +173,10 @@ const LessonListScreen = () => {
 
   const getDifficultyLabel = (difficulty: string) => {
     switch (difficulty) {
-      case 'easy': return 'Fácil';
-      case 'medium': return 'Medio';
-      case 'hard': return 'Difícil';
-      default: return 'Normal';
+      case 'easy': return t.language === 'es' ? 'Fácil' : 'Easy';
+      case 'medium': return t.language === 'es' ? 'Medio' : 'Medium';
+      case 'hard': return t.language === 'es' ? 'Difícil' : 'Hard';
+      default: return t.language === 'es' ? 'Normal' : 'Normal';
     }
   };
 
@@ -190,7 +192,7 @@ const LessonListScreen = () => {
       <View style={[styles.header, { backgroundColor: categoryColor }]}>
         <View style={styles.headerTop}>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backButtonText}>← Volver</Text>
+            <Text style={styles.backButtonText}>← {t.common.back}</Text>
           </TouchableOpacity>
         </View>
         <View style={styles.headerContent}>
@@ -200,14 +202,18 @@ const LessonListScreen = () => {
             </View>
             <View style={styles.titleInfo}>
               <Text style={styles.categoryTitle}>{category}</Text>
-              <Text style={styles.categorySubtitle}>Cargando lecciones...</Text>
+              <Text style={styles.categorySubtitle}>
+                {t.language === 'es' ? 'Cargando lecciones...' : 'Loading lessons...'}
+              </Text>
             </View>
           </View>
         </View>
       </View>
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4285f4" />
-        <Text style={styles.loadingText}>Cargando lecciones...</Text>
+        <Text style={styles.loadingText}>
+          {t.language === 'es' ? 'Cargando lecciones...' : 'Loading lessons...'}
+        </Text>
       </View>
     </SafeAreaView>
   );
@@ -217,14 +223,20 @@ const LessonListScreen = () => {
       <Text style={styles.emptyStateIcon}>📚</Text>
       <Text style={styles.emptyStateTitle}>
         {activityType 
-          ? 'No hay lecciones para esta actividad'
-          : 'No hay lecciones disponibles'
+          ? (t.language === 'es' 
+              ? 'No hay lecciones para esta actividad'
+              : 'No lessons for this activity')
+          : t.lessons.noLessons
         }
       </Text>
       <Text style={styles.emptyStateText}>
         {activityType 
-          ? `No se encontraron lecciones de "${activityType}" en la categoría "${category}". ¡Pronto agregaremos más contenido!`
-          : 'Pronto agregaremos más contenido para esta categoría'
+          ? (t.language === 'es' 
+              ? `No se encontraron lecciones de "${activityType}" en la categoría "${category}". ¡Pronto agregaremos más contenido!`
+              : `No "${activityType}" lessons found in category "${category}". We'll add more content soon!`)
+          : (t.language === 'es'
+              ? 'Pronto agregaremos más contenido para esta categoría'
+              : 'We will add more content for this category soon')
         }
       </Text>
       {activityType && (
@@ -232,7 +244,9 @@ const LessonListScreen = () => {
           style={styles.emptyStateButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.emptyStateButtonText}>← Volver a Categorías</Text>
+          <Text style={styles.emptyStateButtonText}>
+            ← {t.common.back} {t.categories.title}
+          </Text>
         </TouchableOpacity>
       )}
     </View>
@@ -268,7 +282,7 @@ const LessonListScreen = () => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backButtonText}>← Volver</Text>
+            <Text style={styles.backButtonText}>← {t.common.back}</Text>
           </TouchableOpacity>
           
           <View style={styles.progressBadge}>
@@ -285,10 +299,7 @@ const LessonListScreen = () => {
             <View style={styles.titleInfo}>
               <Text style={styles.categoryTitle}>{category}</Text>
               <Text style={styles.categorySubtitle}>
-                {activityType 
-                  ? `${activityType} • ${completedLessons}/${lessons.length} completadas`
-                  : `${completedLessons}/${lessons.length} completadas • API`
-                }
+                {completedLessons}/{lessons.length} {t.language === 'es' ? 'completadas' : 'completed'}
               </Text>
             </View>
           </View>
@@ -344,13 +355,13 @@ const LessonListScreen = () => {
             <View style={styles.filterIndicator}>
               <Text style={styles.filterIcon}>🎯</Text>
               <Text style={styles.filterText}>
-                Filtrando por: {activityType}
+                {t.language === 'es' ? 'Filtrando por' : 'Filtering by'}: {activityType}
               </Text>
             </View>
           )}
 
           <Text style={styles.sectionTitle}>
-            Lecciones Disponibles ({lessons.length})
+            {t.lessons.available} ({lessons.length})
           </Text>
           
           {lessons.length === 0 ? (
@@ -402,19 +413,14 @@ const LessonListScreen = () => {
                     
                     <View style={styles.lessonMeta}>
                       <View style={styles.lessonMetaItem}>
-                        <Text style={styles.lessonMetaIcon}>🆔</Text>
-                        <Text style={styles.lessonMetaText}>ID: {lesson.ID}</Text>
-                      </View>
-                      <View style={styles.lessonMetaItem}>
-                        <Text style={styles.lessonMetaIcon}>📊</Text>
-                        <Text style={styles.lessonMetaText}>Orden: {lesson.sort_order}</Text>
-                      </View>
-                      <View style={styles.lessonMetaItem}>
                         <Text style={styles.lessonMetaIcon}>
                           {lesson.is_active ? '✅' : '❌'}
                         </Text>
                         <Text style={styles.lessonMetaText}>
-                          {lesson.is_active ? 'Activa' : 'Inactiva'}
+                          {lesson.is_active 
+                            ? (t.language === 'es' ? 'Activa' : 'Active')
+                            : (t.language === 'es' ? 'Inactiva' : 'Inactive')
+                          }
                         </Text>
                       </View>
                     </View>
@@ -423,11 +429,11 @@ const LessonListScreen = () => {
                   <View style={styles.lessonActions}>
                     {lesson.is_active ? (
                       <View style={[styles.startButton, { backgroundColor: categoryColor }]}>
-                        <Text style={styles.startButtonText}>Iniciar</Text>
+                        <Text style={styles.startButtonText}>{t.lessons.start}</Text>
                       </View>
                     ) : (
                       <View style={styles.inactiveButton}>
-                        <Text style={styles.inactiveButtonText}>No disponible</Text>
+                        <Text style={styles.inactiveButtonText}>{t.lessons.notAvailable}</Text>
                       </View>
                     )}
                   </View>

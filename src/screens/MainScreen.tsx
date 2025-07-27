@@ -13,95 +13,96 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import MenuGrid, { MenuGridRef } from '../components/MenuGrid';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
 type MainScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-const creditsData = [
-  {
-    category: 'Desarrollo',
-    items: [
-      { name: 'Desarrollador Principal', value: 'Steven Gualpa' },
-      { name: 'Diseño UI/UX', value: 'Steven Gualpa' },
-      { name: 'Programación', value: 'Yolo Team' },
-    ],
-  },
-  {
-    category: 'Contenido',
-    items: [
-      { name: 'Contenido Educativo', value: 'Especialistas en Educación' },
-      { name: 'Ilustraciones', value: 'Artistas Gráficos' },
-      { name: 'Sonidos', value: 'Equipo de Audio' },
-    ],
-  },
-  {
-    category: 'Agradecimientos',
-    items: [
-      { name: 'Beta Testers', value: 'Comunidad de Usuarios' },
-      { name: 'Feedback', value: 'Padres y Educadores' },
-      { name: 'Inspiración', value: 'Niños de Todo el Mundo' },
-    ],
-  },
-];
-
 const MainScreen = () => {
   const navigation = useNavigation<MainScreenNavigationProp>();
+  const { t } = useLanguage();
   const [showCredits, setShowCredits] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const menuGridRef = useRef<MenuGridRef>(null);
 
+  // Credits data with translations
+  const creditsData = [
+    {
+      category: t.language === 'es' ? 'Desarrollo' : 'Development',
+      items: [
+        { name: t.language === 'es' ? 'Desarrollador Principal' : 'Lead Developer', value: 'Steven Gualpa' },
+        { name: t.language === 'es' ? 'Diseño UI/UX' : 'UI/UX Design', value: 'Steven Gualpa' },
+        { name: t.language === 'es' ? 'Programación' : 'Programming', value: 'Yolo Team' },
+      ],
+    },
+    {
+      category: t.language === 'es' ? 'Contenido' : 'Content',
+      items: [
+        { name: t.language === 'es' ? 'Contenido Educativo' : 'Educational Content', value: t.language === 'es' ? 'Especialistas en Educación' : 'Education Specialists' },
+        { name: t.language === 'es' ? 'Ilustraciones' : 'Illustrations', value: t.language === 'es' ? 'Artistas Gráficos' : 'Graphic Artists' },
+        { name: t.language === 'es' ? 'Sonidos' : 'Sounds', value: t.language === 'es' ? 'Equipo de Audio' : 'Audio Team' },
+      ],
+    },
+    {
+      category: t.language === 'es' ? 'Agradecimientos' : 'Acknowledgments',
+      items: [
+        { name: 'Beta Testers', value: t.language === 'es' ? 'Comunidad de Usuarios' : 'User Community' },
+        { name: 'Feedback', value: t.language === 'es' ? 'Padres y Educadores' : 'Parents and Educators' },
+        { name: t.language === 'es' ? 'Inspiraci��n' : 'Inspiration', value: t.language === 'es' ? 'Niños de Todo el Mundo' : 'Children Around the World' },
+      ],
+    },
+  ];
+
+  // Opciones del menú en el orden correcto
   const menuOptions = [
     { 
-      key: 'home', 
-      label: 'Home', 
-      icon: '🏠', 
-      color: '#4ECDC4',
-      shadowColor: '#26D0CE',
-    },
-    { 
       key: 'actividades', 
-      label: 'Actividades', 
+      label: t.navigation.activities, 
       icon: '🎮', 
       color: '#FF6B6B',
       shadowColor: '#FF4757',
     },
     { 
       key: 'logros', 
-      label: 'Logros', 
+      label: t.navigation.achievements, 
       icon: '🏆', 
       color: '#45B7D1',
       shadowColor: '#3742FA',
     },
     { 
       key: 'estadisticas', 
-      label: 'Estadísticas', 
+      label: t.navigation.statistics, 
       icon: '📊', 
       color: '#9C27B0',
       shadowColor: '#7B1FA2',
     },
     { 
       key: 'opciones', 
-      label: 'Opciones', 
+      label: t.navigation.settings, 
       icon: '⚙️', 
       color: '#66BB6A',
       shadowColor: '#4CAF50',
     },
     { 
       key: 'creditos', 
-      label: 'Créditos', 
+      label: t.navigation.credits, 
       icon: '👥', 
       color: '#FFA726',
       shadowColor: '#FF9800',
+    },
+    { 
+      key: 'salir', 
+      label: t.language === 'es' ? 'Salir' : 'Exit', 
+      icon: '🚪', 
+      color: '#F44336',
+      shadowColor: '#D32F2F',
     },
   ];
 
   const handleMenuPress = (option: string) => {
     console.log('🎯 [MainScreen] Navegando a:', option);
     switch (option) {
-      case 'home':
-        navigation.navigate('login');
-        break;
       case 'actividades':
         console.log('🎮 [MainScreen] Navegando a menú de actividades');
         navigation.navigate('activityMenu');
@@ -127,6 +128,10 @@ const MainScreen = () => {
           friction: 8,
         }).start();
         break;
+      case 'salir':
+        console.log('🚪 [MainScreen] Saliendo a login');
+        navigation.navigate('login');
+        break;
     }
   };
 
@@ -146,10 +151,12 @@ const MainScreen = () => {
           style={styles.backButton}
           onPress={handleBackFromCredits}
         >
-          <Text style={styles.backButtonText}>← Volver</Text>
+          <Text style={styles.backButtonText}>← {t.common.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.creditsTitle}>👥 Créditos</Text>
-        <Text style={styles.creditsSubtitle}>Equipo detrás de la aplicación</Text>
+        <Text style={styles.creditsTitle}>👥 {t.navigation.credits}</Text>
+        <Text style={styles.creditsSubtitle}>
+          {t.language === 'es' ? 'Equipo detrás de la aplicación' : 'Team behind the application'}
+        </Text>
       </View>
       
       <ScrollView 
@@ -169,27 +176,43 @@ const MainScreen = () => {
         ))}
         
         <View style={styles.appInfoSection}>
-          <Text style={styles.appInfoTitle}>📱 Información de la App</Text>
+          <Text style={styles.appInfoTitle}>
+            📱 {t.language === 'es' ? 'Información de la App' : 'App Information'}
+          </Text>
           <View style={styles.appInfoItem}>
-            <Text style={styles.appInfoLabel}>Versión</Text>
+            <Text style={styles.appInfoLabel}>
+              {t.language === 'es' ? 'Versión' : 'Version'}
+            </Text>
             <Text style={styles.appInfoValue}>1.0.0</Text>
           </View>
           <View style={styles.appInfoItem}>
-            <Text style={styles.appInfoLabel}>Última actualización</Text>
-            <Text style={styles.appInfoValue}>Diciembre 2024</Text>
+            <Text style={styles.appInfoLabel}>
+              {t.language === 'es' ? 'Última actualización' : 'Last update'}
+            </Text>
+            <Text style={styles.appInfoValue}>
+              {t.language === 'es' ? 'Diciembre 2024' : 'December 2024'}
+            </Text>
           </View>
           <View style={styles.appInfoItem}>
-            <Text style={styles.appInfoLabel}>Plataforma</Text>
+            <Text style={styles.appInfoLabel}>
+              {t.language === 'es' ? 'Plataforma' : 'Platform'}
+            </Text>
             <Text style={styles.appInfoValue}>React Native</Text>
           </View>
         </View>
 
         <View style={styles.thankYouSection}>
           <Text style={styles.thankYouText}>
-            ❤️ Gracias por usar nuestra aplicación educativa
+            ❤️ {t.language === 'es' 
+              ? 'Gracias por usar nuestra aplicación educativa'
+              : 'Thank you for using our educational app'
+            }
           </Text>
           <Text style={styles.thankYouSubtext}>
-            Juntos hacemos el aprendizaje más divertido
+            {t.language === 'es'
+              ? 'Juntos hacemos el aprendizaje más divertido'
+              : 'Together we make learning more fun'
+            }
           </Text>
         </View>
       </ScrollView>
@@ -199,8 +222,8 @@ const MainScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>NeuroApp</Text>
-        <Text style={styles.headerSubtitle}>Aprendizaje Divertido</Text>
+        <Text style={styles.headerTitle}>{t.mainScreen.title}</Text>
+        <Text style={styles.headerSubtitle}>{t.mainScreen.subtitle}</Text>
       </View>
 
       <Animated.View 
@@ -216,13 +239,24 @@ const MainScreen = () => {
           }
         ]}
       >
+        {/* Main Menu Screen con ScrollView */}
         <View style={styles.screenContainer}>
-          <MenuGrid 
-            ref={menuGridRef}
-            menuOptions={menuOptions}
-            onMenuPress={handleMenuPress}
-          />
+          <ScrollView 
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            bounces={true}
+            contentContainerStyle={styles.scrollContent}
+          >
+            <MenuGrid 
+              ref={menuGridRef}
+              menuOptions={menuOptions}
+              onMenuPress={handleMenuPress}
+              language={t.language}
+            />
+          </ScrollView>
         </View>
+        
+        {/* Credits Screen */}
         <View style={styles.screenContainer}>
           {renderCreditsContent()}
         </View>
@@ -269,6 +303,13 @@ const styles = StyleSheet.create({
   screenContainer: {
     width: width,
     flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
   },
   contentContainer: {
     flex: 1,
