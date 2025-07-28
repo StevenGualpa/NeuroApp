@@ -18,7 +18,7 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import ApiService, { Activity } from '../services/ApiService';
 import { AchievementService } from '../services/AchievementService';
 import { useLanguage } from '../contexts/LanguageContext';
-import TranslationService from '../services/TranslationService';
+import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 
 const { width } = Dimensions.get('window');
 
@@ -42,7 +42,7 @@ const ActivityMenuScreen = () => {
   
   // Estados
   const [activities, setActivities] = useState<Activity[]>([]);
-  const [originalActivities, setOriginalActivities] = useState<Activity[]>([]);
+  const [rawActivities, setRawActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [totalPoints, setTotalPoints] = useState(0);
@@ -56,15 +56,13 @@ const ActivityMenuScreen = () => {
     loadInitialData();
   }, []);
 
-  // Traducir actividades cuando cambie el idioma
+  // Procesar actividades cuando cambie el idioma
   useEffect(() => {
-    if (originalActivities.length > 0) {
-      console.log(`🌍 [ActivityMenuScreen] Traduciendo ${originalActivities.length} actividades a ${language}`);
-      const translatedActivities = TranslationService.translateActivities(originalActivities, language);
-      setActivities(translatedActivities);
-      console.log('✅ [ActivityMenuScreen] Actividades traducidas:', translatedActivities.map(a => `${a.name} (${a.description})`));
+    if (rawActivities.length > 0) {
+      console.log(`🌍 [ActivityMenuScreen] Procesando ${rawActivities.length} actividades para idioma: ${language}`);
+      processActivitiesForLanguage();
     }
-  }, [language, originalActivities]);
+  }, [language, rawActivities]);
 
   // Reload stats when screen comes into focus
   useEffect(() => {
@@ -95,34 +93,40 @@ const ActivityMenuScreen = () => {
       console.log('🎮 [ActivityMenuScreen] Cargando actividades desde API...');
       const activitiesData = await ApiService.getActivities();
       
-      console.log('📋 [ActivityMenuScreen] Datos originales del servidor:', activitiesData.map(a => `${a.name} - ${a.description}`));
+      console.log('📋 [ActivityMenuScreen] Datos originales del servidor:');
+      activitiesData.forEach((activity, index) => {
+        console.log(`  ${index + 1}. ID: ${activity.ID}`);
+        console.log(`     Name: "${activity.name}"`);
+        console.log(`     Description: "${activity.description}"`);
+        console.log(`     Has colon in name: ${activity.name?.includes(':') || false}`);
+        console.log(`     Has colon in description: ${activity.description?.includes(':') || false}`);
+        console.log(`     Is active: ${activity.is_active}`);
+      });
       
       // Guardar datos originales
-      setOriginalActivities(activitiesData);
+      setRawActivities(activitiesData);
       
-      // Traducir inmediatamente
-      const translatedActivities = TranslationService.translateActivities(activitiesData, language);
-      setActivities(translatedActivities);
+      // Procesar inmediatamente para el idioma actual
+      processActivitiesForLanguage(activitiesData);
       
-      console.log(`✅ [ActivityMenuScreen] ${activitiesData.length} actividades cargadas y traducidas a ${language}`);
-      console.log('🌍 [ActivityMenuScreen] Actividades traducidas:', translatedActivities.map(a => `${a.name} - ${a.description}`));
+      console.log(`✅ [ActivityMenuScreen] ${activitiesData.length} actividades cargadas desde servidor`);
       
       // Initialize scale animations for each activity
       scaleValues.length = 0;
-      translatedActivities.forEach(() => {
+      activitiesData.forEach(() => {
         scaleValues.push(new Animated.Value(1));
       });
       
     } catch (error) {
       console.error('❌ [ActivityMenuScreen] Error loading activities:', error);
       Alert.alert(
-        t.errors.connectionError,
-        t.language === 'es' 
+        t.errors?.connectionError || 'Error de conexión',
+        language === 'es' 
           ? 'No se pudieron cargar las actividades. Verifica tu conexión a internet.'
           : 'Could not load activities. Check your internet connection.',
         [
-          { text: t.common.retry, onPress: loadActivities },
-          { text: t.common.cancel, style: 'cancel' }
+          { text: t.common?.retry || 'Reintentar', onPress: loadActivities },
+          { text: t.common?.cancel || 'Cancelar', style: 'cancel' }
         ]
       );
     } finally {
@@ -130,11 +134,55 @@ const ActivityMenuScreen = () => {
     }
   };
 
+  const processActivitiesForLanguage = (activitiesToProcess?: Activity[]) => {
+    const sourceActivities = activitiesToProcess || rawActivities;
+    
+    console.log(`🌍 [ActivityMenuScreen] NUEVO PROCESAMIENTO - ${sourceActivities.length} actividades para idioma: ${language}`);
+    console.log(`🔧 [ActivityMenuScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
+    
+    if (sourceActivities.length === 0) {
+      console.log('⚠️ [ActivityMenuScreen] No hay actividades para procesar');
+      return;
+    }
+    
+    // Procesar textos bilingües
+    const processedActivities = sourceActivities.map((activity, index) => {
+      const originalName = activity.name || '';
+      const originalDescription = activity.description || '';
+      
+      console.log(`🧪 [ActivityMenuScreen] ANTES del procesamiento ${index + 1}:`);
+      console.log(`   Original name: "${originalName}"`);
+      console.log(`   Tiene colon: ${originalName.includes(':')}`);
+      
+      const processedName = BilingualTextProcessor.extractText(originalName, language);
+      const processedDescription = BilingualTextProcessor.extractText(originalDescription, language);
+      
+      console.log(`🎯 [ActivityMenuScreen] DESPUÉS del procesamiento ${index + 1}:`);
+      console.log(`   Processed name: "${processedName}"`);
+      console.log(`   Language usado: ${language}`);
+      console.log(`   Cambió: ${originalName !== processedName ? 'SÍ' : 'NO'}`);
+      
+      return {
+        ...activity,
+        name: processedName,
+        description: processedDescription,
+      };
+    });
+    
+    console.log(`✅ [ActivityMenuScreen] RESULTADO FINAL - Actividades procesadas para idioma: ${language}`);
+    console.log('📋 [ActivityMenuScreen] Lista completa procesada:');
+    processedActivities.forEach((activity, index) => {
+      console.log(`  ${index + 1}. "${activity.name}"`);
+    });
+    
+    setActivities(processedActivities);
+  };
+
   const loadAchievementStats = async () => {
     try {
       await AchievementService.initializeAchievements();
-      const points = await AchievementService.getTotalPoints();
-      const achievements = await AchievementService.getAllAchievements();
+      const points = await AchievementService.getTotalPoints(language);
+      const achievements = await AchievementService.getAllAchievements(language);
       const unlocked = achievements.filter(a => a.isUnlocked).length;
       
       setTotalPoints(points);
@@ -153,7 +201,7 @@ const ActivityMenuScreen = () => {
   const goToActivityCategory = (activity: Activity) => {
     console.log('🎯 [ActivityMenuScreen] Navegando a categorías para actividad:', activity.name);
     // Usar el nombre original para la navegación (el servidor espera el nombre original)
-    const originalActivity = originalActivities.find(orig => orig.ID === activity.ID);
+    const originalActivity = rawActivities.find(orig => orig.ID === activity.ID);
     const activityName = originalActivity ? originalActivity.name : activity.name;
     navigation.navigate('categoryMenu', { activityType: activityName });
   };
@@ -195,7 +243,9 @@ const ActivityMenuScreen = () => {
   };
 
   const getActivityStatus = (activity: Activity) => {
-    return activity.is_active ? t.activities.active : t.activities.inactive;
+    return activity.is_active 
+      ? (language === 'es' ? 'Activo' : 'Active')
+      : (language === 'es' ? 'Inactivo' : 'Inactive');
   };
 
   const getStatusColor = (activity: Activity) => {
@@ -206,7 +256,7 @@ const ActivityMenuScreen = () => {
     <View style={styles.loadingContainer}>
       <ActivityIndicator size="large" color="#4285f4" />
       <Text style={styles.loadingText}>
-        {t.language === 'es' ? 'Cargando actividades...' : 'Loading activities...'}
+        {language === 'es' ? 'Cargando actividades...' : 'Loading activities...'}
       </Text>
     </View>
   );
@@ -214,15 +264,19 @@ const ActivityMenuScreen = () => {
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
       <Text style={styles.emptyIcon}>🎮</Text>
-      <Text style={styles.emptyTitle}>{t.activities.noActivities}</Text>
+      <Text style={styles.emptyTitle}>
+        {language === 'es' ? 'No hay actividades' : 'No activities'}
+      </Text>
       <Text style={styles.emptyDescription}>
-        {t.language === 'es' 
+        {language === 'es' 
           ? 'Parece que no hay actividades configuradas en el servidor.'
           : 'It seems there are no activities configured on the server.'
         }
       </Text>
       <TouchableOpacity style={styles.retryButton} onPress={loadActivities}>
-        <Text style={styles.retryButtonText}>{t.common.retry}</Text>
+        <Text style={styles.retryButtonText}>
+          {language === 'es' ? 'Reintentar' : 'Retry'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -311,10 +365,14 @@ const ActivityMenuScreen = () => {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <TouchableOpacity style={styles.backButton} onPress={goBack}>
-              <Text style={styles.backButtonText}>← {t.common.back}</Text>
+              <Text style={styles.backButtonText}>
+                ← {language === 'es' ? 'Volver' : 'Back'}
+              </Text>
             </TouchableOpacity>
             <View style={styles.titleSection}>
-              <Text style={styles.title}>🎮 {t.activities.title}</Text>
+              <Text style={styles.title}>
+                🎮 {language === 'es' ? 'Actividades' : 'Activities'}
+              </Text>
             </View>
             <View style={styles.achievementsButton} />
           </View>
@@ -330,11 +388,15 @@ const ActivityMenuScreen = () => {
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity style={styles.backButton} onPress={goBack}>
-            <Text style={styles.backButtonText}>← {t.common.back}</Text>
+            <Text style={styles.backButtonText}>
+              ← {language === 'es' ? 'Volver' : 'Back'}
+            </Text>
           </TouchableOpacity>
           
           <View style={styles.titleSection}>
-            <Text style={styles.title}>🎮 {t.activities.title}</Text>
+            <Text style={styles.title}>
+              🎮 {language === 'es' ? 'Actividades' : 'Activities'}
+            </Text>
           </View>
           
           {/* Achievements Button */}
@@ -349,7 +411,7 @@ const ActivityMenuScreen = () => {
             <View style={styles.achievementsInfo}>
               <Text style={styles.achievementsPoints}>{totalPoints}</Text>
               <Text style={styles.achievementsLabel}>
-                {t.language === 'es' ? 'pts' : 'pts'}
+                {language === 'es' ? 'pts' : 'pts'}
               </Text>
             </View>
             {unlockedAchievements > 0 && (
@@ -359,6 +421,16 @@ const ActivityMenuScreen = () => {
             )}
           </TouchableOpacity>
         </View>
+      </View>
+
+      {/* Status */}
+      <View style={styles.statusContainer}>
+        <Text style={styles.statusText}>
+          🌍 {language === 'es' 
+            ? `Actividades bilingües • Idioma: Español • ${activities.length} actividades`
+            : `Bilingual activities • Language: English • ${activities.length} activities`
+          }
+        </Text>
       </View>
       
       {/* Activities Grid */}
@@ -496,6 +568,22 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffffff',
   },
+  statusContainer: {
+    backgroundColor: '#e8f5e8',
+    marginHorizontal: 15,
+    marginTop: 10,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+  },
+  statusText: {
+    fontSize: 11,
+    color: '#2e7d32',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -583,11 +671,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     zIndex: 2,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#ffffff',
   },
   iconContainer: {
     alignItems: 'center',

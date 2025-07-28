@@ -18,6 +18,7 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ApiService, { Lesson, Category } from '../services/ApiService';
 import { useLanguage } from '../contexts/LanguageContext';
+import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 
 const { width } = Dimensions.get('window');
 
@@ -26,11 +27,12 @@ type LessonListScreenRouteProp = RouteProp<RootStackParamList, 'lessonList'>;
 const LessonListScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<LessonListScreenRouteProp>();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { category, activityType } = route.params;
 
   // Estados
   const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [rawLessons, setRawLessons] = useState<Lesson[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,6 +46,14 @@ const LessonListScreen = () => {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Procesar lecciones cuando cambie el idioma
+  useEffect(() => {
+    if (rawLessons.length > 0) {
+      console.log(`🌍 [LessonListScreen] Procesando ${rawLessons.length} lecciones para idioma: ${language}`);
+      processLessonsForLanguage();
+    }
+  }, [language, rawLessons]);
 
   const loadInitialData = async () => {
     await Promise.all([
@@ -103,6 +113,16 @@ const LessonListScreen = () => {
         const lessonsData = await ApiService.getLessonsByCategory(foundCategory.ID);
         console.log(`📋 [LessonListScreen] ${lessonsData.length} lecciones cargadas`);
         
+        console.log('📋 [LessonListScreen] Datos originales del servidor:');
+        lessonsData.forEach((lesson, index) => {
+          console.log(`  ${index + 1}. ID: ${lesson.ID}`);
+          console.log(`     Title: "${lesson.title}"`);
+          console.log(`     Description: "${lesson.description}"`);
+          console.log(`     Has colon in title: ${lesson.title?.includes(':') || false}`);
+          console.log(`     Has colon in description: ${lesson.description?.includes(':') || false}`);
+          console.log(`     Is active: ${lesson.is_active}`);
+        });
+        
         // Filtrar por activityType si está presente
         let filteredLessons = lessonsData;
         if (activityType) {
@@ -120,8 +140,13 @@ const LessonListScreen = () => {
           return a.title.localeCompare(b.title);
         });
         
-        setLessons(sortedLessons);
-        console.log(`✅ [LessonListScreen] ${sortedLessons.length} lecciones ordenadas`);
+        // Guardar datos originales
+        setRawLessons(sortedLessons);
+        
+        // Procesar inmediatamente para el idioma actual
+        processLessonsForLanguage(sortedLessons);
+        
+        console.log(`✅ [LessonListScreen] ${sortedLessons.length} lecciones cargadas desde servidor`);
       } else {
         console.log('❌ [LessonListScreen] Categoría no encontrada');
         setLessons([]);
@@ -141,6 +166,50 @@ const LessonListScreen = () => {
     }
   };
 
+  const processLessonsForLanguage = (lessonsToProcess?: Lesson[]) => {
+    const sourceLessons = lessonsToProcess || rawLessons;
+    
+    console.log(`🌍 [LessonListScreen] NUEVO PROCESAMIENTO - ${sourceLessons.length} lecciones para idioma: ${language}`);
+    console.log(`🔧 [LessonListScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
+    
+    if (sourceLessons.length === 0) {
+      console.log('⚠️ [LessonListScreen] No hay lecciones para procesar');
+      return;
+    }
+    
+    // Procesar textos bilingües
+    const processedLessons = sourceLessons.map((lesson, index) => {
+      const originalTitle = lesson.title || '';
+      const originalDescription = lesson.description || '';
+      
+      console.log(`🧪 [LessonListScreen] ANTES del procesamiento ${index + 1}:`);
+      console.log(`   Original title: "${originalTitle}"`);
+      console.log(`   Tiene colon: ${originalTitle.includes(':')}`);
+      
+      const processedTitle = BilingualTextProcessor.extractText(originalTitle, language);
+      const processedDescription = BilingualTextProcessor.extractText(originalDescription, language);
+      
+      console.log(`🎯 [LessonListScreen] DESPUÉS del procesamiento ${index + 1}:`);
+      console.log(`   Processed title: "${processedTitle}"`);
+      console.log(`   Language usado: ${language}`);
+      console.log(`   Cambió: ${originalTitle !== processedTitle ? 'SÍ' : 'NO'}`);
+      
+      return {
+        ...lesson,
+        title: processedTitle,
+        description: processedDescription,
+      };
+    });
+    
+    console.log(`✅ [LessonListScreen] RESULTADO FINAL - Lecciones procesadas para idioma: ${language}`);
+    console.log('📋 [LessonListScreen] Lista completa procesada:');
+    processedLessons.forEach((lesson, index) => {
+      console.log(`  ${index + 1}. "${lesson.title}"`);
+    });
+    
+    setLessons(processedLessons);
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadLessons();
@@ -149,10 +218,14 @@ const LessonListScreen = () => {
 
   const goToLesson = (lesson: Lesson) => {
     console.log(`📖 [LessonListScreen] Navegando a lección: ${lesson.title}`);
+    // Usar el título original para la navegación (el servidor espera el título original)
+    const originalLesson = rawLessons.find(orig => orig.ID === lesson.ID);
+    const lessonTitle = originalLesson ? originalLesson.title : lesson.title;
+    
     // Convertir la lección de la API al formato esperado por la pantalla de lección
     const convertedLesson = {
       id: lesson.ID,
-      title: lesson.title,
+      title: lessonTitle,
       icon: lesson.icon,
       completed: false, // Por ahora, todas las lecciones están incompletas
       steps: [], // Los pasos se cargarían desde la API
@@ -359,6 +432,16 @@ const LessonListScreen = () => {
               </Text>
             </View>
           )}
+
+          {/* Status */}
+          <View style={styles.statusContainer}>
+            <Text style={styles.statusText}>
+              🌍 {language === 'es' 
+                ? `Lecciones bilingües • Idioma: Español • ${lessons.length} lecciones`
+                : `Bilingual lessons • Language: English • ${lessons.length} lessons`
+              }
+            </Text>
+          </View>
 
           <Text style={styles.sectionTitle}>
             {t.lessons.available} ({lessons.length})
@@ -582,6 +665,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#4285f4',
+  },
+  statusContainer: {
+    backgroundColor: '#e8f5e8',
+    marginHorizontal: 0,
+    marginBottom: 16,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+  },
+  statusText: {
+    fontSize: 11,
+    color: '#2e7d32',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 18,

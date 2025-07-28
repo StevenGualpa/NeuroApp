@@ -1,7 +1,7 @@
 // src/hooks/useRealAchievements.ts
 import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
-import RealAchievementService from '../services/RealAchievementService';
+import { AchievementService } from '../services/AchievementService';
 import { Achievement } from '../services/ApiService';
 
 interface GameCompletionData {
@@ -43,7 +43,7 @@ export const useRealAchievements = (): UseRealAchievementsReturn => {
     
     try {
       console.log('🏆 Initializing Real Achievement Service...');
-      await RealAchievementService.initializeAchievements();
+      await AchievementService.initializeAchievements();
       setIsInitialized(true);
       console.log('✅ Real Achievement Service initialized');
     } catch (error) {
@@ -84,7 +84,8 @@ export const useRealAchievements = (): UseRealAchievementsReturn => {
       console.log('🎮 Recording game completion with Real Achievement Service...');
       console.log('📊 Game data:', gameData);
 
-      const newlyUnlocked = await RealAchievementService.recordGameCompletion(gameData);
+      // const newlyUnlocked = await RealAchievementService.recordGameCompletion(gameData);
+      const newlyUnlocked: Achievement[] = []; // Temporalmente deshabilitado
       
       if (newlyUnlocked.length > 0) {
         console.log(`🏆 Unlocked ${newlyUnlocked.length} new achievements:`, newlyUnlocked.map(a => a.name));

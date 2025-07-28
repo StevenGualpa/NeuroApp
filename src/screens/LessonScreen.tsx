@@ -111,9 +111,19 @@ const RealLessonScreen = () => {
     setRefreshing(false);
   };
 
+  // Función para extraer el tipo de actividad del formato bilingüe
+  const extractActivityType = (bilingualText: string): string => {
+    // Si contiene ":", extraer la parte en español (antes del ":")
+    if (bilingualText.includes(':')) {
+      return bilingualText.split(':')[0].trim();
+    }
+    return bilingualText;
+  };
+
   // Mapeo de tipos de actividad a tipos de animación
   const getActivityAnimationType = (activityType: string): string => {
-    switch (activityType) {
+    const cleanType = extractActivityType(activityType);
+    switch (cleanType) {
       case 'Memoria visual':
         return 'memoryGame';
       case 'Arrastra y suelta':
@@ -133,26 +143,43 @@ const RealLessonScreen = () => {
 
   // Función para navegar a la actividad correspondiente
   const navigateToActivity = (activityType: string, convertedStep: any) => {
-    switch (activityType) {
+    // Extraer el tipo de actividad del formato bilingüe
+    const cleanActivityType = extractActivityType(activityType);
+    
+    console.log(`🚀 [LessonScreen] Navegando a actividad: "${activityType}" → "${cleanActivityType}"`);
+    console.log(`📊 [LessonScreen] Datos del paso convertido:`, {
+      id: convertedStep.id,
+      activityType: convertedStep.activityType,
+      optionsCount: convertedStep.options?.length || 0,
+    });
+    
+    switch (cleanActivityType) {
       case 'Memoria visual':
+        console.log('��� [LessonScreen] → Navegando a memoryGame');
         navigation.replace('memoryGame', { step: convertedStep, lessonTitle: lesson.title });
         break;
       case 'Arrastra y suelta':
+        console.log('👆 [LessonScreen] → Navegando a dragDrop');
         navigation.replace('dragDrop', { step: convertedStep, lessonTitle: lesson.title });
         break;
       case 'Asocia elementos':
+        console.log('🔗 [LessonScreen] → Navegando a match');
         navigation.replace('match', { step: convertedStep, lessonTitle: lesson.title });
         break;
       case 'Selecciona la opción correcta':
+        console.log('✅ [LessonScreen] → Navegando a selectOption');
         navigation.replace('selectOption', { step: convertedStep, lessonTitle: lesson.title });
         break;
       case 'Ordena los pasos':
+        console.log('🔢 [LessonScreen] → Navegando a orderSteps');
         navigation.replace('orderSteps', { step: convertedStep, lessonTitle: lesson.title });
         break;
       case 'Reconocimiento de patrones':
+        console.log('🧩 [LessonScreen] → Navegando a patternRecognition');
         navigation.replace('patternRecognition', { step: convertedStep, lessonTitle: lesson.title });
         break;
       default:
+        console.log(`⚠️ [LessonScreen] → Tipo de actividad no reconocido: "${cleanActivityType}", usando selectOption por defecto`);
         navigation.replace('selectOption', { step: convertedStep, lessonTitle: lesson.title });
         break;
     }
@@ -205,8 +232,33 @@ const RealLessonScreen = () => {
         difficulty: step.difficulty as any,
       };
 
+      // CORRECCIÓN: Detectar si debería ser "Ordena los pasos" basándose en las opciones
+      let activityType = step.ActivityType?.name || 'Selecciona la opción correcta';
+      
+      // Extraer el tipo limpio del formato bilingüe
+      const cleanActivityType = extractActivityType(activityType);
+      
+      // Si el tipo es "Selecciona la opción correcta" pero las opciones tienen order_value, 
+      // entonces debería ser "Ordena los pasos"
+      if (cleanActivityType === 'Selecciona la opción correcta') {
+        const hasOrderValues = stepWithOptions.Options?.some(option => 
+          option.order_value !== null && option.order_value !== undefined && option.order_value > 0
+        );
+        
+        if (hasOrderValues) {
+          console.log(`🔄 [LessonScreen] CORRECCIÓN: Detectado que debería ser "Ordena los pasos" por tener order_value`);
+          console.log(`📊 [LessonScreen] Opciones con order_value:`, stepWithOptions.Options?.map(opt => ({
+            label: opt.label,
+            order_value: opt.order_value
+          })));
+          activityType = 'Ordena los pasos';
+          convertedStep.activityType = 'Ordena los pasos';
+        }
+      }
+
+      console.log(`🎯 [LessonScreen] Tipo de actividad final: "${activityType}"`);
+      
       // Mostrar introducción antes de navegar a la actividad
-      const activityType = step.ActivityType?.name || 'Selecciona la opción correcta';
       showIntroAndNavigate(activityType, convertedStep);
     } catch (error) {
       console.error('Error loading step options:', error);
@@ -215,6 +267,7 @@ const RealLessonScreen = () => {
   };
 
   const getActivityTypeColor = (activityType: string) => {
+    const cleanType = extractActivityType(activityType);
     const colorMap: { [key: string]: string } = {
       'Selecciona la opción correcta': '#4CAF50',
       'Ordena los pasos': '#2196F3',
@@ -223,10 +276,11 @@ const RealLessonScreen = () => {
       'Memoria visual': '#F44336',
       'Reconocimiento de patrones': '#607D8B',
     };
-    return colorMap[activityType] || '#4285f4';
+    return colorMap[cleanType] || '#4285f4';
   };
 
   const getActivityTypeIcon = (activityType: string) => {
+    const cleanType = extractActivityType(activityType);
     const iconMap: { [key: string]: string } = {
       'Selecciona la opción correcta': '✅',
       'Ordena los pasos': '🔢',
@@ -235,7 +289,7 @@ const RealLessonScreen = () => {
       'Memoria visual': '🧠',
       'Reconocimiento de patrones': '🧩',
     };
-    return iconMap[activityType] || '🎯';
+    return iconMap[cleanType] || '🎯';
   };
 
   // Usar datos de la lección original o de la API
@@ -461,7 +515,7 @@ const RealLessonScreen = () => {
                       
                       <View style={styles.activityTypeContainer}>
                         <Text style={styles.activityTypeLabel}>
-                          {activityType}
+                          {extractActivityType(activityType)}
                         </Text>
                       </View>
                     </View>

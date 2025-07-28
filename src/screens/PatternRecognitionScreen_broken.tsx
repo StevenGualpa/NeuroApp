@@ -1,15 +1,15 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
-  Animated,
-  ScrollView,
-  Dimensions,
-  Vibration,
   Alert,
+  Animated,
+  Dimensions,
+  SafeAreaView,
+  ScrollView,
+  Vibration,
 } from 'react-native';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -27,9 +27,7 @@ import { useRealProgress } from '../hooks/useRealProgress';
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 
-const { width } = Dimensions.get('window');
-
-type SelectOptionRouteProp = RouteProp<RootStackParamList, 'selectOption'>;
+type PatternRecognitionRouteProp = RouteProp<RootStackParamList, 'patternRecognition'>;
 
 interface GameStats {
   totalAttempts: number;
@@ -42,11 +40,12 @@ interface GameStats {
   efficiency: number;
   usedHelp?: boolean;
   helpActivations?: number;
+  patternComplexity?: string;
 }
 
 interface ServerAchievement {
   ID: number;
-  name: string;
+  title: string;
   description: string;
   icon: string;
   rarity: string;
@@ -54,8 +53,10 @@ interface ServerAchievement {
   category: string;
 }
 
-const SelectOptionScreen = () => {
-  const route = useRoute<SelectOptionRouteProp>();
+const { width } = Dimensions.get('window');
+
+const PatternRecognitionScreen = () => {
+  const route = useRoute<PatternRecognitionRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
   const { t, language } = useLanguage();
@@ -66,9 +67,10 @@ const SelectOptionScreen = () => {
   // Bilingual states
   const [processedStep, setProcessedStep] = useState(step);
   const [rawStep] = useState(step); // Keep original data
+  const [processedOptions, setProcessedOptions] = useState(step.options || []);
 
   // Game state
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [isAnswered, setIsAnswered] = useState(false);
   const [gameCompleted, setGameCompleted] = useState(false);
   const [score, setScore] = useState(0);
@@ -98,11 +100,16 @@ const SelectOptionScreen = () => {
     efficiency: 100,
     usedHelp: false,
     helpActivations: 0,
+    patternComplexity: step.difficulty || 'medium',
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
 
   // Animation refs
+  const [animatedValues] = useState(
+    step.sequence?.map(() => new Animated.Value(0)) || []
+  );
+  const [pulseAnimation] = useState(new Animated.Value(1));
   const [optionScales] = useState(
     step.options?.map(() => new Animated.Value(1)) || []
   );
@@ -115,60 +122,47 @@ const SelectOptionScreen = () => {
   const audioService = useRef(AudioService.getInstance());
 
   // Memoized values
-  const totalOptions = useMemo(() => step.options?.length || 0, [step.options]);
-  const totalItems = 1; // Solo una respuesta correcta en selección
+  const totalItems = 1; // Solo una respuesta correcta en reconocimiento de patrones
 
   // Process step content when language changes
   useEffect(() => {
-    console.log(`🌍 [SelectOptionScreen] Procesando contenido para idioma: ${language}`);
+    console.log(`🌍 [PatternRecognitionScreen] Procesando contenido para idioma: ${language}`);
     processStepForLanguage();
   }, [language]);
 
-  // Initialize achievements service
-  useEffect(() => {
-    const initAchievements = async () => {
-      try {
-        console.log('🏆 [SelectOptionScreen] Inicializando servicio de logros mejorado...');
-        await AchievementService.initializeAchievements();
-        console.log('✅ [SelectOptionScreen] Servicio de logros inicializado');
-      } catch (error) {
-        console.error('❌ [SelectOptionScreen] Error inicializando logros:', error);
-      }
-    };
-    initAchievements();
-  }, []);
-
   // Process step content for current language
   const processStepForLanguage = useCallback(() => {
-    console.log(`🌍 [SelectOptionScreen] NUEVO PROCESAMIENTO - Contenido para idioma: ${language}`);
-    console.log(`🔧 [SelectOptionScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
+    console.log(`🌍 [PatternRecognitionScreen] NUEVO PROCESAMIENTO - Contenido para idioma: ${language}`);
+    console.log(`🔧 [PatternRecognitionScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
     
-    // Process step text
+    // Process step text and description
     const originalText = rawStep.text || '';
-    const originalHelpMessage = rawStep.helpMessage || '';
+    const originalDescription = rawStep.description || '';
     
-    console.log(`🧪 [SelectOptionScreen] ANTES del procesamiento:`);
+    console.log(`🧪 [PatternRecognitionScreen] ANTES del procesamiento:`);
     console.log(`   Original text: "${originalText}"`);
-    console.log(`   Original helpMessage: "${originalHelpMessage}"`);
+    console.log(`   Original description: "${originalDescription}"`);
     console.log(`   Tiene colon en text: ${originalText.includes(':')}`);
-    console.log(`   Tiene colon en helpMessage: ${originalHelpMessage.includes(':')}`);
+    console.log(`   Tiene colon en description: ${originalDescription.includes(':')}`);
     
     const processedText = BilingualTextProcessor.extractText(originalText, language);
-    const processedHelpMessage = BilingualTextProcessor.extractText(originalHelpMessage, language);
+    const processedDescription = BilingualTextProcessor.extractText(originalDescription, language);
     
     // Process options
-    const processedOptions = rawStep.options?.map((option, index) => {
+    const newProcessedOptions = rawStep.options?.map((option, index) => {
       const originalLabel = option.label || '';
       
-      console.log(`🧪 [SelectOptionScreen] ANTES del procesamiento opción ${index + 1}:`);
+      console.log(`🧪 [PatternRecognitionScreen] ANTES del procesamiento opción ${index + 1}:`);
       console.log(`   Original label: "${originalLabel}"`);
-      console.log(`   Tiene colon: ${originalLabel.includes(':')}`);
+      console.log(`   Icon: "${option.icon}"`);
+      console.log(`   Correct: ${option.correct}`);
+      console.log(`   Tiene colon en label: ${originalLabel.includes(':')}`);
       
       const processedLabel = BilingualTextProcessor.extractText(originalLabel, language);
       
-      console.log(`🎯 [SelectOptionScreen] DESPUÉS del procesamiento opción ${index + 1}:`);
+      console.log(`🎯 [PatternRecognitionScreen] DESPUÉS del procesamiento opción ${index + 1}:`);
       console.log(`   Processed label: "${processedLabel}"`);
-      console.log(`   Cambió: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
+      console.log(`   Label cambió: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
       
       return {
         ...option,
@@ -176,46 +170,53 @@ const SelectOptionScreen = () => {
       };
     }) || [];
     
-    console.log(`🎯 [SelectOptionScreen] DESPUÉS del procesamiento principal:`);
+    console.log(`🎯 [PatternRecognitionScreen] DESPUÉS del procesamiento principal:`);
     console.log(`   Processed text: "${processedText}"`);
-    console.log(`   Processed helpMessage: "${processedHelpMessage}"`);
+    console.log(`   Processed description: "${processedDescription}"`);
     console.log(`   Language usado: ${language}`);
     console.log(`   Text cambió: ${originalText !== processedText ? 'SÍ' : 'NO'}`);
-    console.log(`   HelpMessage cambió: ${originalHelpMessage !== processedHelpMessage ? 'SÍ' : 'NO'}`);
+    console.log(`   Description cambió: ${originalDescription !== processedDescription ? 'SÍ' : 'NO'}`);
     
-    // Update processed step
+    // Update processed step and options
     const newProcessedStep = {
       ...rawStep,
       text: processedText,
-      helpMessage: processedHelpMessage,
-      options: processedOptions,
+      description: processedDescription,
+      options: newProcessedOptions,
     };
     
     setProcessedStep(newProcessedStep);
+    setProcessedOptions(newProcessedOptions);
     
-    console.log(`✅ [SelectOptionScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
-    console.log('📋 [SelectOptionScreen] Opciones procesadas:');
-    processedOptions.forEach((option, index) => {
-      console.log(`  ${index + 1}. "${option.label}" (${option.correct ? 'Correcta' : 'Incorrecta'})`);
+    console.log(`✅ [PatternRecognitionScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
+    console.log('🎯 [PatternRecognitionScreen] Opciones procesadas:');
+    newProcessedOptions.forEach((option, index) => {
+      console.log(`  ${index + 1}. "${option.icon}" - "${option.label}" (correct: ${option.correct})`);
     });
   }, [rawStep, language]);
 
+  // Initialize achievements service
+  useEffect(() => {
+    const initAchievements = async () => {
+      try {
+        console.log('🏆 [PatternRecognitionScreen] Inicializando servicio de logros mejorado...');
+        await AchievementService.initializeAchievements();
+        console.log('✅ [PatternRecognitionScreen] Servicio de logros inicializado');
+      } catch (error) {
+        console.error('❌ [PatternRecognitionScreen] Error inicializando logros:', error);
+      }
+    };
+    initAchievements();
+  }, []);
+
   // Initialize adaptive reinforcement service
   useEffect(() => {
-    const correctOptionIndex = step.options?.findIndex(option => option.correct) ?? -1;
-    
     adaptiveService.current.initialize(
-      (helpOptionIndex) => {
-        // NO ACTIVAR SI EL JUEGO YA TERMINÓ
-        if (gameCompleted || score === 1) {
-          console.log('🛑 [SelectOptionScreen] Juego completado, ignorando ayuda');
-          return;
-        }
-        
+      (helpOptionIndex: number) => {
         // Handle help trigger
         if (helpOptionIndex === -1) {
           // Inactivity help - find correct option
-          const correctIndex = step.options?.findIndex(option => option.correct) ?? -1;
+          const correctIndex = processedOptions.findIndex(option => option.correct) ?? -1;
           if (correctIndex !== -1) {
             triggerHelpForOption(correctIndex);
           }
@@ -224,18 +225,12 @@ const SelectOptionScreen = () => {
           triggerHelpForOption(helpOptionIndex);
         }
       },
-      (message, activityType) => {
-        // NO REPRODUCIR SI EL JUEGO YA TERMINÓ
-        if (gameCompleted || score === 1) {
-          console.log('🛑 [SelectOptionScreen] Juego completado, ignorando audio de ayuda');
-          return;
-        }
-        
+      (message: string, activityType: string) => {
         // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
-        if (step.helpMessage) {
-          helpMessage = step.helpMessage;
+        if (processedStep.helpMessage) {
+          helpMessage = processedStep.helpMessage;
           console.log(`🔊 Using custom lesson help: ${helpMessage}`);
         } else {
           helpMessage = message;
@@ -249,36 +244,50 @@ const SelectOptionScreen = () => {
     );
 
     return () => {
-      console.log(`🔊 SelectOptionScreen: Cleaning up services`);
+      console.log(`🔊 PatternRecognitionScreen: Cleaning up services`);
       adaptiveService.current.cleanup();
       audioService.current.cleanup();
     };
-  }, [step, gameCompleted, score]);
+  }, [processedStep, processedOptions, step.activityType]);
 
-  // Calculate stars based on performance
-  const calculateStars = useCallback((errors: number, completionTime: number, firstTry: boolean): number => {
-    const maxTime = 30000; // 30 seconds as baseline
-    const timeBonus = completionTime < maxTime * 0.5 ? 1 : 0;
+  useEffect(() => {
+    // Animación de entrada para la secuencia
+    const animations = animatedValues.map((value, index) =>
+      Animated.timing(value, {
+        toValue: 1,
+        duration: 300,
+        delay: index * 200,
+        useNativeDriver: true,
+      })
+    );
 
-    if (firstTry && errors === 0) {
-      return 3; // Perfect performance - first try success
-    } else if (errors === 0) {
-      return 2 + timeBonus; // Good performance - no errors
-    } else if (errors <= 1) {
-      return 1 + timeBonus; // Acceptable performance - max 1 error
-    } else {
-      return 1; // Minimum star for completion
-    }
+    Animated.stagger(200, animations).start();
+
+    // Animación de pulso para el elemento faltante
+    const pulseAnimationLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnimation, {
+          toValue: 1.2,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnimation, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    pulseAnimationLoop.start();
+
+    return () => {
+      pulseAnimationLoop.stop();
+    };
   }, []);
 
   // Helper function to trigger help for a specific option
   const triggerHelpForOption = useCallback((optionIndex: number) => {
-    // NO ACTIVAR AYUDA SI EL JUEGO YA TERMINÓ
-    if (gameCompleted || score === 1) {
-      console.log('🛑 [SelectOptionScreen] Juego completado, no activando ayuda');
-      return;
-    }
-    
     setIsHelpActive(true);
     setBlinkingOptionIndex(optionIndex);
     
@@ -303,7 +312,7 @@ const SelectOptionScreen = () => {
           useNativeDriver: true,
         }),
       ]).start(() => {
-        if (isHelpActive && !gameCompleted && score !== 1) {
+        if (isHelpActive) {
           blinkAnimation();
         }
       });
@@ -317,7 +326,23 @@ const SelectOptionScreen = () => {
       setBlinkingOptionIndex(null);
       helpBlinkAnimation.setValue(1);
     }, 5000);
-  }, [helpBlinkAnimation, isHelpActive, gameCompleted, score]);
+  }, [helpBlinkAnimation, isHelpActive]);
+
+  // Calculate stars based on performance
+  const calculateStars = useCallback((errors: number, completionTime: number, firstTry: boolean): number => {
+    const maxTime = 30000; // 30 seconds as baseline
+    const timeBonus = completionTime < maxTime * 0.5 ? 1 : 0;
+
+    if (firstTry && errors === 0) {
+      return 3; // Perfect performance - first try success
+    } else if (errors === 0) {
+      return 2 + timeBonus; // Good performance - no errors
+    } else if (errors <= 1) {
+      return 1 + timeBonus; // Acceptable performance - max 1 error
+    } else {
+      return 1; // Minimum star for completion
+    }
+  }, []);
 
   const showFeedbackAnimation = useCallback((type: 'success' | 'error' | 'winner' | 'loser') => {
     setAnimationType(type);
@@ -355,7 +380,7 @@ const SelectOptionScreen = () => {
   // Save progress to backend
   const saveProgressToBackend = useCallback(async (finalStats: GameStats) => {
     try {
-      console.log('💾 [SelectOptionScreen] Guardando progreso en backend...');
+      console.log('💾 [PatternRecognitionScreen] Guardando progreso en backend...');
       
       const progressData = {
         lessonId: (step as any).lesson_id || 1,
@@ -369,7 +394,7 @@ const SelectOptionScreen = () => {
         perfectRun: finalStats.perfectRun,
       };
 
-      console.log('📊 [SelectOptionScreen] ===== DATOS ENVIADOS AL SERVIDOR =====');
+      console.log('📊 [PatternRecognitionScreen] ===== DATOS ENVIADOS AL SERVIDOR =====');
       console.log('🎯 Lección ID:', progressData.lessonId);
       console.log('📝 Paso ID:', progressData.stepId);
       console.log('⭐ Estrellas ganadas:', progressData.stars);
@@ -384,12 +409,12 @@ const SelectOptionScreen = () => {
       const success = await completeStep(progressData);
 
       if (success) {
-        console.log('✅ [SelectOptionScreen] ¡PROGRESO GUARDADO EXITOSAMENTE EN EL SERVIDOR!');
-        console.log('📊 [SelectOptionScreen] Todos los datos fueron enviados y procesados correctamente');
+        console.log('✅ [PatternRecognitionScreen] ¡PROGRESO GUARDADO EXITOSAMENTE EN EL SERVIDOR!');
+        console.log('📊 [PatternRecognitionScreen] Todos los datos fueron enviados y procesados correctamente');
       } else {
-        console.warn('⚠️ [SelectOptionScreen] No se pudo guardar el progreso en backend');
+        console.warn('⚠️ [PatternRecognitionScreen] No se pudo guardar el progreso en backend');
         if (progressError) {
-          console.error('❌ [SelectOptionScreen] Error específico:', progressError);
+          console.error('❌ [PatternRecognitionScreen] Error específico:', progressError);
           Alert.alert(
             language === 'es' ? 'Error de Conexión' : 'Connection Error',
             language === 'es' 
@@ -400,7 +425,7 @@ const SelectOptionScreen = () => {
         }
       }
     } catch (error) {
-      console.error('❌ [SelectOptionScreen] Error guardando progreso:', error);
+      console.error('❌ [PatternRecognitionScreen] Error guardando progreso:', error);
       Alert.alert(
         language === 'es' ? 'Error' : 'Error',
         language === 'es' 
@@ -414,7 +439,7 @@ const SelectOptionScreen = () => {
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
-      console.log('🎮 [SelectOptionScreen] Registrando finalización del juego...');
+      console.log('🎮 [PatternRecognitionScreen] Registrando finalización del juego...');
 
       // 1. Save progress to backend first
       await saveProgressToBackend(finalStats);
@@ -425,7 +450,7 @@ const SelectOptionScreen = () => {
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
         errors: finalStats.errors,
-        activityType: 'Selecciona la opción correcta',
+        activityType: 'Reconocimiento de patrones',
         showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
         usedHelp: finalStats.usedHelp || false,
         tookTime: finalStats.completionTime > 60000,
@@ -433,21 +458,21 @@ const SelectOptionScreen = () => {
         stepId: (step as any).ID || step.id,
       };
 
-      console.log('🏆 [SelectOptionScreen] Verificando logros con datos:', gameData);
+      console.log('🏆 [PatternRecognitionScreen] Verificando logros con datos:', gameData);
 
       // const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
       const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
       if (newlyUnlocked.length > 0) {
-        console.log(`🎉 [SelectOptionScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
+        console.log(`🎉 [PatternRecognitionScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
         newlyUnlocked.forEach((achievement, index) => {
-          console.log(`   ${index + 1}. 🏆 ${achievement.name} - ${achievement.description}`);
+          console.log(`   ${index + 1}. 🏆 ${achievement.title} - ${achievement.description}`);
         });
         
         // Convert to server achievement format for celebration
         const serverAchievements: ServerAchievement[] = newlyUnlocked.map(achievement => ({
           ID: achievement.ID || 0,
-          name: achievement.name,
+          title: achievement.title,
           description: achievement.description,
           icon: achievement.icon,
           rarity: achievement.rarity || 'common',
@@ -463,11 +488,11 @@ const SelectOptionScreen = () => {
         }, 1500);
         
       } else {
-        console.log('📊 [SelectOptionScreen] No se desbloquearon nuevos logros esta vez');
-        console.log('💡 [SelectOptionScreen] Esto puede ser normal si ya tienes logros desbloqueados');
+        console.log('📊 [PatternRecognitionScreen] No se desbloquearon nuevos logros esta vez');
+        console.log('💡 [PatternRecognitionScreen] Esto puede ser normal si ya tienes logros desbloqueados');
       }
     } catch (error) {
-      console.error('❌ [SelectOptionScreen] Error registrando finalización:', error);
+      console.error('❌ [PatternRecognitionScreen] Error registrando finalización:', error);
       Alert.alert(
         language === 'es' ? 'Error' : 'Error',
         language === 'es' 
@@ -478,27 +503,10 @@ const SelectOptionScreen = () => {
     }
   }, [saveProgressToBackend, step, language]);
 
-  // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
-    console.log(`🎬 [SelectOptionScreen] Animación terminada: ${animationType}, score: ${score}, gameCompleted: ${gameCompleted}`);
     setShowAnimation(false);
     
-    // CONDICIÓN CORREGIDA: Verificar que el score sea 1 (ganó)
-    if (animationType === 'success' && score === 1 && !gameCompleted) {
-      console.log('🎯 [SelectOptionScreen] ¡JUEGO COMPLETADO! Iniciando secuencia de finalización...');
-      
-      // IMPORTANTE: Limpiar toda la ayuda activa inmediatamente
-      if (isHelpActive) {
-        console.log('🛑 [SelectOptionScreen] Limpiando ayuda activa...');
-        setIsHelpActive(false);
-        setBlinkingOptionIndex(null);
-        helpBlinkAnimation.setValue(1);
-      }
-      
-      // Detener servicios de ayuda
-      adaptiveService.current.cleanup();
-      audioService.current.cleanup();
-      
+    if (animationType === 'success' && !gameCompleted) {
       setGameCompleted(true);
       
       // Calculate final stats
@@ -510,7 +518,7 @@ const SelectOptionScreen = () => {
       };
       setGameStats(finalStats);
 
-      console.log('📈 [SelectOptionScreen] Estadísticas finales calculadas:', {
+      console.log('📈 [PatternRecognitionScreen] Estadísticas finales calculadas:', {
         totalAttempts: finalStats.totalAttempts,
         errors: finalStats.errors,
         stars: finalStats.stars,
@@ -519,68 +527,54 @@ const SelectOptionScreen = () => {
         firstTrySuccess: finalStats.firstTrySuccess,
         usedHelp: finalStats.usedHelp,
         helpActivations: finalStats.helpActivations,
+        patternComplexity: finalStats.patternComplexity,
       });
       
       // Record game completion (includes backend save and achievement check)
       recordGameCompletion(finalStats);
       
-      // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
+      // Small delay before showing winner animation
       setTimeout(() => {
-        console.log('🏆 [SelectOptionScreen] Mostrando modal de finalización directamente...');
-        setShowStars(true);
-        console.log('⭐ [SelectOptionScreen] Modal debería aparecer ahora');
-        console.log(`🎯 [SelectOptionScreen] Estados para modal: score=${score}, gameCompleted=true, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
-      }, 800);
-    } else if (animationType === 'winner') {
-      console.log('🏆 [SelectOptionScreen] Animación de ganador terminada, mostrando modal...');
-      // Show modal after winner animation
-      setTimeout(() => {
-        setShowStars(true);
-        console.log('⭐ [SelectOptionScreen] Modal mostrado después de animación winner');
-        console.log(`🎯 [SelectOptionScreen] Estados para modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${false}, showStars=true, showCelebration=${showCelebration}`);
+        showFeedbackAnimation('winner');
       }, 300);
+    } else if (animationType === 'winner') {
+      // Show stars after winner animation
+      setTimeout(() => {
+        setShowStars(true);
+      }, 500);
     }
-  }, [animationType, score, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation, isHelpActive, helpBlinkAnimation]);
+  }, [animationType, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation]);
 
-  const handlePress = useCallback((correct: boolean, index: number) => {
+  const handleAnswerSelect = useCallback((selectedIcon: string, index: number) => {
     if (isAnswered || gameCompleted) return;
 
-    console.log(`🎯 [SelectOptionScreen] Usuario seleccionó opción ${index + 1}: ${correct ? 'Correcta' : 'Incorrecta'}`);
-
     // Record action in adaptive reinforcement service
-    const correctOptionIndex = step.options?.findIndex(option => option.correct) ?? -1;
+    const correctOptionIndex = processedOptions.findIndex(option => option.correct) ?? -1;
+    const correctOption = processedOptions.find(option => option.correct);
+    const correct = selectedIcon === correctOption?.icon;
+    
     adaptiveService.current.recordAction(correct, correctOptionIndex, step.activityType);
 
-    // Clear any active help INMEDIATAMENTE
+    // Clear any active help
     if (isHelpActive) {
-      console.log('🛑 [SelectOptionScreen] Limpiando ayuda activa por respuesta...');
       setIsHelpActive(false);
       setBlinkingOptionIndex(null);
       helpBlinkAnimation.setValue(1);
     }
 
-    setSelectedOption(index);
+    setSelectedAnswer(selectedIcon);
     setIsAnswered(true);
 
     // Update stats
     const isFirstAttempt = gameStats.totalAttempts === 0;
-    const newStats = {
-      ...gameStats,
-      totalAttempts: gameStats.totalAttempts + 1,
-      errors: correct ? gameStats.errors : gameStats.errors + 1,
-      perfectRun: correct ? gameStats.perfectRun : false,
+    setGameStats(prev => ({
+      ...prev,
+      totalAttempts: prev.totalAttempts + 1,
+      errors: correct ? prev.errors : prev.errors + 1,
+      perfectRun: correct ? prev.perfectRun : false,
       firstTrySuccess: correct && isFirstAttempt,
-      dragCount: gameStats.dragCount + 1,
-    };
-    
-    setGameStats(newStats);
-
-    console.log('📊 [SelectOptionScreen] Estadísticas actualizadas:', {
-      totalAttempts: newStats.totalAttempts,
-      errors: newStats.errors,
-      perfectRun: newStats.perfectRun,
-      firstTrySuccess: newStats.firstTrySuccess,
-    });
+      dragCount: prev.dragCount + 1,
+    }));
 
     // Animate the selected option
     Animated.sequence([
@@ -597,19 +591,17 @@ const SelectOptionScreen = () => {
 
     setTimeout(() => {
       if (correct) {
-        console.log('✅ [SelectOptionScreen] ¡Respuesta correcta! Estableciendo score = 1');
         setScore(1);
         showFeedbackAnimation('success');
         // Play encouragement audio
         audioService.current.playEncouragementMessage();
       } else {
-        console.log('❌ [SelectOptionScreen] Respuesta incorrecta, permitiendo reintento...');
         showFeedbackAnimation('error');
         // Play error guidance audio
         audioService.current.playErrorGuidanceMessage();
         setTimeout(() => {
           setIsAnswered(false);
-          setSelectedOption(null);
+          setSelectedAnswer(null);
           // Reset animation
           Animated.timing(optionScales[index], {
             toValue: 1,
@@ -619,22 +611,16 @@ const SelectOptionScreen = () => {
         }, 1500);
       }
     }, 600);
-  }, [isAnswered, gameCompleted, gameStats, optionScales, showFeedbackAnimation, step.options, step.activityType, isHelpActive, helpBlinkAnimation]);
+  }, [isAnswered, gameCompleted, gameStats, optionScales, showFeedbackAnimation, processedOptions, step.activityType, isHelpActive, helpBlinkAnimation]);
 
   const handleOptionPressIn = useCallback((index: number) => {
     if (isAnswered) return;
-    
-    // Record user interaction for inactivity tracking - SOLO SI NO HA GANADO
-    if (!gameCompleted && score !== 1) {
-      adaptiveService.current.recordInactivity();
-    }
-    
     Animated.timing(optionScales[index], {
       toValue: 0.95,
       duration: 100,
       useNativeDriver: true,
     }).start();
-  }, [isAnswered, optionScales, gameCompleted, score]);
+  }, [isAnswered, optionScales]);
 
   const handleOptionPressOut = useCallback((index: number) => {
     if (isAnswered) return;
@@ -645,8 +631,7 @@ const SelectOptionScreen = () => {
   }, [isAnswered, optionScales]);
 
   const resetGame = useCallback(() => {
-    console.log('🔄 [SelectOptionScreen] Reiniciando juego...');
-    setSelectedOption(null);
+    setSelectedAnswer(null);
     setIsAnswered(false);
     setGameCompleted(false);
     setShowStars(false);
@@ -662,6 +647,7 @@ const SelectOptionScreen = () => {
       efficiency: 100,
       usedHelp: false,
       helpActivations: 0,
+      patternComplexity: step.difficulty || 'medium',
     });
 
     // Reset all animations
@@ -672,61 +658,131 @@ const SelectOptionScreen = () => {
         useNativeDriver: true,
       }).start();
     });
-  }, [optionScales]);
+  }, [optionScales, step.difficulty]);
+
+  const getDifficultyColor = () => {
+    switch (step.difficulty) {
+      case 'easy':
+        return '#4CAF50';
+      case 'medium':
+        return '#FF9800';
+      case 'hard':
+        return '#F44336';
+      default:
+        return '#2196F3';
+    }
+  };
+
+  const getPatternTypeLabel = () => {
+    switch (step.patternType) {
+      case 'visual':
+        return language === 'es' ? 'Patrón Visual' : 'Visual Pattern';
+      case 'auditory':
+        return language === 'es' ? 'Patrón Auditivo' : 'Auditory Pattern';
+      case 'conceptual':
+        return language === 'es' ? 'Patrón Conceptual' : 'Conceptual Pattern';
+      case 'behavioral':
+        return language === 'es' ? 'Patrón de Comportamiento' : 'Behavioral Pattern';
+      default:
+        return language === 'es' ? 'Patrón' : 'Pattern';
+    }
+  };
 
   const getOptionStyle = useCallback((index: number, correct: boolean) => {
-    if (!isAnswered) {
-      // Add help highlighting if this option is blinking - SOLO SI NO HA GANADO
-      if (isHelpActive && blinkingOptionIndex === index && !gameCompleted && score !== 1) {
-        return [styles.optionButton, styles.optionButtonHelp];
-      }
-      return styles.optionButton;
-    }
+    if (!isAnswered) return styles.optionButton;
     
-    if (selectedOption === index) {
+    if (selectedAnswer === processedOptions[index]?.icon) {
       return correct ? styles.optionButtonCorrect : styles.optionButtonIncorrect;
     }
     
     return styles.optionButtonDisabled;
-  }, [isAnswered, selectedOption, isHelpActive, blinkingOptionIndex, gameCompleted, score]);
+  }, [isAnswered, selectedAnswer, processedOptions]);
 
   const getOptionTextStyle = useCallback((index: number, correct: boolean) => {
     if (!isAnswered) return styles.optionLabel;
     
-    if (selectedOption === index) {
+    if (selectedAnswer === processedOptions[index]?.icon) {
       return correct ? styles.optionLabelCorrect : styles.optionLabelIncorrect;
     }
     
     return styles.optionLabelDisabled;
-  }, [isAnswered, selectedOption]);
+  }, [isAnswered, selectedAnswer, processedOptions]);
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, firstTry: boolean) => {
     if (language === 'es') {
       if (perfectRun && stars === 3 && firstTry) {
-        return "¡Perfecto! Primera vez sin errores 🏆";
+        return "¡Perfecto! Patrón identificado a la primera 🧠🏆";
       } else if (perfectRun && stars === 3) {
-        return "¡Excelente! Sin errores 🌟";
+        return "¡Excelente! Patrón identificado sin errores 🌟";
       } else if (stars === 3) {
         return "¡Muy bien hecho! 👏";
       } else if (stars === 2) {
-        return "¡Buen trabajo! Sigue así 💪";
+        return "¡Buen trabajo! Sigue practicando 💪";
       } else {
-        return "¡Completado! Puedes mejorar 📈";
+        return "¡Completado! Tu reconocimiento mejorará 📈";
       }
     } else {
       if (perfectRun && stars === 3 && firstTry) {
-        return "Perfect! First time without errors 🏆";
+        return "Perfect! Pattern identified on first try 🧠🏆";
       } else if (perfectRun && stars === 3) {
-        return "Excellent! No errors 🌟";
+        return "Excellent! Pattern identified without errors 🌟";
       } else if (stars === 3) {
         return "Very well done! 👏";
       } else if (stars === 2) {
-        return "Good job! Keep it up 💪";
+        return "Good job! Keep practicing 💪";
       } else {
-        return "Completed! You can improve 📈";
+        return "Completed! Your recognition will improve 📈";
       }
     }
   }, [language]);
+
+  const handleCelebrationClose = useCallback(() => {
+    setShowCelebration(false);
+    setUnlockedAchievements([]);
+  }, []);
+
+  const renderSequenceItem = (item: string, index: number) => {
+    const isMissing = index === step.missingPosition;
+    
+    if (isMissing) {
+      return (
+        <Animated.View
+          key={index}
+          style={[
+            styles.sequenceItem,
+            styles.missingItem,
+            {
+              transform: [{ scale: pulseAnimation }],
+            },
+          ]}
+        >
+          <Text style={styles.missingText}>?</Text>
+        </Animated.View>
+      );
+    }
+
+    return (
+      <Animated.View
+        key={index}
+        style={[
+          styles.sequenceItem,
+          {
+            opacity: animatedValues[index],
+            transform: [
+              {
+                translateY: animatedValues[index].interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [50, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <Text style={styles.sequenceIcon}>{item}</Text>
+      </Animated.View>
+    );
+  };
 
   const handleBackPress = useCallback(() => {
     if (gameStats.totalAttempts > 0 && !gameCompleted) {
@@ -745,11 +801,6 @@ const SelectOptionScreen = () => {
     }
   }, [gameStats.totalAttempts, gameCompleted, navigation, language]);
 
-  const handleCelebrationClose = useCallback(() => {
-    setShowCelebration(false);
-    setUnlockedAchievements([]);
-  }, []);
-
   // Process achievement queue when it changes
   useEffect(() => {
     processAchievementQueue();
@@ -757,32 +808,16 @@ const SelectOptionScreen = () => {
 
   // Log component mount
   useEffect(() => {
-    console.log('🎮 [SelectOptionScreen] Componente montado');
-    console.log('📝 [SelectOptionScreen] Datos del paso:', {
+    console.log('🎮 [PatternRecognitionScreen] Componente montado');
+    console.log('📝 [PatternRecognitionScreen] Datos del paso:', {
       stepId: (step as any).ID || step.id,
       lessonId: (step as any).lesson_id,
       text: step.text,
       optionsCount: step.options?.length || 0,
+      difficulty: step.difficulty,
+      patternType: step.patternType,
     });
   }, [step]);
-
-  // Log state changes for debugging
-  useEffect(() => {
-    console.log(`🎯 [SelectOptionScreen] Estado del modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}, showCelebration=${showCelebration}`);
-    
-    // Log modal visibility condition
-    const modalShouldBeVisible = score === 1 && gameCompleted && !showAnimation && showStars && !showCelebration;
-    console.log(`🎯 [SelectOptionScreen] ¿Modal debería ser visible? ${modalShouldBeVisible ? 'SÍ' : 'NO'}`);
-    
-    if (score === 1 && gameCompleted && showStars && !showCelebration) {
-      console.log(`🎯 [SelectOptionScreen] ✅ Condiciones principales cumplidas para mostrar modal`);
-      if (showAnimation) {
-        console.log(`�� [SelectOptionScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
-      } else {
-        console.log(`🎯 [SelectOptionScreen] ✅ Modal debería estar visible ahora!`);
-      }
-    }
-  }, [score, gameCompleted, showAnimation, showStars, showCelebration]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -814,28 +849,14 @@ const SelectOptionScreen = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
         onTouchStart={() => {
-          // Record user interaction for inactivity tracking - SOLO SI NO HA GANADO
-          if (!gameCompleted && score !== 1) {
-            adaptiveService.current.recordInactivity();
-          }
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
         }}
         onScrollBeginDrag={() => {
-          // Record user interaction for inactivity tracking - SOLO SI NO HA GANADO
-          if (!gameCompleted && score !== 1) {
-            adaptiveService.current.recordInactivity();
-          }
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
         }}
       >
-
-        {/* Status bilingüe */}
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>
-            🌍 {language === 'es' 
-              ? `Actividad bilingüe • Idioma: Español • Selecciona la opción correcta`
-              : `Bilingual activity • Language: English • Select the correct option`
-            }
-          </Text>
-        </View>
 
         {/* Progreso del juego */}
         <ProgressSection 
@@ -843,6 +864,16 @@ const SelectOptionScreen = () => {
           totalItems={totalItems}
           gameStats={gameStats}
         />
+
+        {/* Status bilingüe */}
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>
+            🌍 {language === 'es' 
+              ? `Actividad bilingüe • Idioma: Español • Reconoce patrones`
+              : `Bilingual activity • Language: English • Recognize patterns`
+            }
+          </Text>
+        </View>
 
         {/* Pregunta */}
         <View style={styles.questionContainer}>
@@ -852,65 +883,83 @@ const SelectOptionScreen = () => {
           <Text style={styles.questionText}>{processedStep.text}</Text>
         </View>
 
+        {/* Descripción adicional si existe */}
+        {processedStep.description && (
+          <View style={styles.descriptionContainer}>
+            <Text style={styles.descriptionText}>{processedStep.description}</Text>
+          </View>
+        )}
+
+        {/* Secuencia del patrón */}
+        <View style={styles.sequenceContainer}>
+          <Text style={styles.sectionTitle}>
+            {language === 'es' ? 'Secuencia del patrón:' : 'Pattern sequence:'}
+          </Text>
+          <View style={styles.sequenceRow}>
+            {step.sequence?.map((item, index) => renderSequenceItem(item, index))}
+          </View>
+        </View>
+
         {/* Opciones de respuesta */}
         <View style={styles.optionsContainer}>
           <Text style={styles.sectionTitle}>
             {language === 'es' ? 'Opciones disponibles:' : 'Available options:'}
           </Text>
           <View style={styles.optionsGrid}>
-            {processedStep.options?.map((option, idx) => {
-              const isBlinking = isHelpActive && blinkingOptionIndex === idx && !gameCompleted && score !== 1;
+            {processedOptions.map((option, index) => {
+              const isBlinking = isHelpActive && blinkingOptionIndex === index;
               return (
                 <Animated.View
-                  key={idx}
+                  key={index}
                   style={[
                     styles.optionWrapper,
                     { 
-                      transform: [{ scale: optionScales[idx] || 1 }],
+                      transform: [{ scale: optionScales[index] || 1 }],
                       opacity: isBlinking ? helpBlinkAnimation : 1
                     }
                   ]}
                 >
                   <TouchableOpacity
-                    style={getOptionStyle(idx, option.correct || false)}
+                    style={[
+                      getOptionStyle(index, option.correct || false),
+                      isBlinking && styles.optionButtonHelp
+                    ]}
                     onPress={() => {
-                      // Record user interaction for inactivity tracking - SOLO SI NO HA GANADO
-                      if (!gameCompleted && score !== 1) {
-                        adaptiveService.current.recordInactivity();
-                      }
-                      handlePress(option.correct || false, idx);
+                      // Record user interaction for inactivity tracking
+                      adaptiveService.current.recordInactivity();
+                      handleAnswerSelect(option.icon, index);
                     }}
-                    onPressIn={() => handleOptionPressIn(idx)}
-                    onPressOut={() => handleOptionPressOut(idx)}
+                    onPressIn={() => handleOptionPressIn(index)}
+                    onPressOut={() => handleOptionPressOut(index)}
                     activeOpacity={0.8}
                     disabled={isAnswered}
                   >
-                    <View style={styles.optionContent}>
-                      <View style={[
-                        styles.iconContainer,
-                        isAnswered && selectedOption === idx && option.correct && styles.iconContainerCorrect,
-                        isAnswered && selectedOption === idx && !option.correct && styles.iconContainerIncorrect,
+                  <View style={styles.optionContent}>
+                    <View style={[
+                      styles.iconContainer,
+                      isAnswered && selectedAnswer === option.icon && option.correct && styles.iconContainerCorrect,
+                      isAnswered && selectedAnswer === option.icon && !option.correct && styles.iconContainerIncorrect,
+                    ]}>
+                      <Text style={styles.optionIcon}>{option.icon}</Text>
+                    </View>
+                    <Text style={getOptionTextStyle(index, option.correct || false)}>
+                      {option.label}
+                    </Text>
+                  </View>
+                  
+                  {isAnswered && selectedAnswer === option.icon && (
+                    <View style={[
+                      styles.resultIndicator,
+                      option.correct ? styles.resultIndicatorCorrect : styles.resultIndicatorIncorrect
+                    ]}>
+                      <Text style={[
+                        styles.resultIcon,
+                        option.correct ? styles.resultIconCorrect : styles.resultIconIncorrect
                       ]}>
-                        <Text style={styles.optionIcon}>{option.icon}</Text>
-                      </View>
-                      <Text style={getOptionTextStyle(idx, option.correct || false)}>
-                        {option.label}
+                        {option.correct ? '✓' : '✗'}
                       </Text>
                     </View>
-                    
-                    {isAnswered && selectedOption === idx && (
-                      <View style={[
-                        styles.resultIndicator,
-                        option.correct ? styles.resultIndicatorCorrect : styles.resultIndicatorIncorrect
-                      ]}>
-                        <Text style={[
-                          styles.resultIcon,
-                          option.correct ? styles.resultIconCorrect : styles.resultIconIncorrect
-                        ]}>
-                          {option.correct ? '✓' : '✗'}
-                        </Text>
-                      </View>
-                    )}
+                  )}
                   </TouchableOpacity>
                 </Animated.View>
               );
@@ -924,8 +973,8 @@ const SelectOptionScreen = () => {
             <Text style={styles.motivationIcon}>⭐</Text>
             <Text style={styles.footerText}>
               {score === 0 
-                ? (language === 'es' ? '¡Piensa bien antes de elegir!' : 'Think carefully before choosing!')
-                : (language === 'es' ? '¡Increíble! Lo lograste' : 'Amazing! You did it!')
+                ? (language === 'es' ? '¡Busca el patrón y complétalo!' : 'Find the pattern and complete it!')
+                : (language === 'es' ? '¡Increíble! Has identificado el patrón' : 'Amazing! You identified the pattern')
               }
             </Text>
             <Text style={styles.motivationIcon}>⭐</Text>
@@ -935,8 +984,8 @@ const SelectOptionScreen = () => {
           <View style={styles.encouragementFooter}>
             <Text style={styles.encouragementFooterText}>
               {language === 'es' 
-                ? '🧠 Cada decisión te hace más sabio ✨'
-                : '🧠 Every decision makes you wiser ✨'
+                ? '🧠 Cada patrón te hace más inteligente ✨'
+                : '🧠 Every pattern makes you smarter ✨'
               }
             </Text>
           </View>
@@ -945,22 +994,26 @@ const SelectOptionScreen = () => {
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
-      {/* Game Complete Modal - CONDICIÓN ARREGLADA */}
+      {/* Game Complete Modal usando componente reutilizable - ARREGLADO */}
       <GameCompletionModal
         visible={score === 1 && gameCompleted && !showAnimation && showStars && !showCelebration}
         stats={gameStats}
         onReset={resetGame}
         onContinue={() => navigation.goBack()}
         performanceMessage={getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.firstTrySuccess)}
-        gameType="selection"
+        gameType="pattern"
         customStats={[
           { 
             label: language === 'es' ? 'Intentos totales' : 'Total attempts', 
             value: gameStats.totalAttempts 
           },
           { 
-            label: language === 'es' ? 'Respuesta correcta' : 'Correct answer', 
+            label: language === 'es' ? 'Patrón identificado' : 'Pattern identified', 
             value: score === 1 ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No')
+          },
+          { 
+            label: language === 'es' ? 'Tipo de patrón' : 'Pattern type', 
+            value: getPatternTypeLabel() 
           },
           { 
             label: language === 'es' ? 'Ayuda usada' : 'Help used', 
@@ -973,7 +1026,7 @@ const SelectOptionScreen = () => {
               : (language === 'es' ? 'Guardado ✅' : 'Saved ✅')
           },
         ]}
-        bonusMessage={gameStats.firstTrySuccess ? (language === 'es' ? "🎯 ¡Primera vez perfecto!" : "🎯 Perfect first time!") : undefined}
+        bonusMessage={gameStats.firstTrySuccess ? (language === 'es' ? "🔍 ¡Patrón perfecto!" : "🔍 Perfect pattern!") : undefined}
       />
 
       {/* Feedback Animation */}
@@ -1095,6 +1148,70 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 12,
     textAlign: 'center',
+  },
+  descriptionContainer: {
+    backgroundColor: '#f0f9ff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: '#1e40af',
+    textAlign: 'center',
+    fontWeight: '600',
+    fontStyle: 'italic',
+  },
+  sequenceContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: '#9c27b0',
+  },
+  sequenceRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sequenceItem: {
+    width: 50,
+    height: 50,
+    backgroundColor: '#ffffff',
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 2,
+    borderColor: '#e8f0fe',
+  },
+  missingItem: {
+    backgroundColor: '#fff3e0',
+    borderWidth: 2,
+    borderColor: '#ff9800',
+    borderStyle: 'dashed',
+  },
+  sequenceIcon: {
+    fontSize: 20,
+  },
+  missingText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#ff9800',
   },
   optionsContainer: {
     marginBottom: 16,
@@ -1284,4 +1401,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SelectOptionScreen;
+export default PatternRecognitionScreen;

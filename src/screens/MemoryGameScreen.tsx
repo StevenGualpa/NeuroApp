@@ -21,10 +21,12 @@ import AchievementCelebration from '../components/AchievementCelebration';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
-import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
+// import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
+import { useLanguage } from '../contexts/LanguageContext';
+import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 
 type MemoryGameRouteProp = RouteProp<RootStackParamList, 'memoryGame'>;
 
@@ -68,9 +70,15 @@ const MemoryGameScreen = () => {
   const route = useRoute<MemoryGameRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
+  const { t, language } = useLanguage();
 
   // Real progress hook
   const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
+
+  // Bilingual states
+  const [processedStep, setProcessedStep] = useState(step);
+  const [rawStep] = useState(step); // Keep original data
+  const [processedOptions, setProcessedOptions] = useState(step.options || []);
 
   // Game state
   const [cards, setCards] = useState<Card[]>([]);
@@ -120,15 +128,85 @@ const MemoryGameScreen = () => {
   const audioService = useRef(AudioService.getInstance());
 
   // Memoized values
-  const totalPairs = useMemo(() => step.options?.length || 0, [step.options]);
+  const totalPairs = useMemo(() => processedOptions.length || 0, [processedOptions]);
   const totalItems = totalPairs; // Para compatibilidad con ProgressSection
+
+  // Process step content when language changes
+  useEffect(() => {
+    console.log(`🌍 [MemoryGameScreen] Procesando contenido para idioma: ${language}`);
+    processStepForLanguage();
+  }, [language]);
+
+  // Process step content for current language
+  const processStepForLanguage = useCallback(() => {
+    console.log(`🌍 [MemoryGameScreen] NUEVO PROCESAMIENTO - Contenido para idioma: ${language}`);
+    console.log(`🔧 [MemoryGameScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
+    
+    // Process step text
+    const originalText = rawStep.text || '';
+    const originalHelpMessage = rawStep.helpMessage || '';
+    
+    console.log(`🧪 [MemoryGameScreen] ANTES del procesamiento:`);
+    console.log(`   Original text: "${originalText}"`);
+    console.log(`   Original helpMessage: "${originalHelpMessage}"`);
+    console.log(`   Tiene colon en text: ${originalText.includes(':')}`);
+    console.log(`   Tiene colon en helpMessage: ${originalHelpMessage.includes(':')}`);
+    
+    const processedText = BilingualTextProcessor.extractText(originalText, language);
+    const processedHelpMessage = BilingualTextProcessor.extractText(originalHelpMessage, language);
+    
+    // Process options (memory cards)
+    const newProcessedOptions = rawStep.options?.map((option, index) => {
+      const originalLabel = option.label || '';
+      
+      console.log(`🧪 [MemoryGameScreen] ANTES del procesamiento carta ${index + 1}:`);
+      console.log(`   Original label: "${originalLabel}"`);
+      console.log(`   Icon: "${option.icon}"`);
+      console.log(`   Tiene colon: ${originalLabel.includes(':')}`);
+      
+      const processedLabel = BilingualTextProcessor.extractText(originalLabel, language);
+      
+      console.log(`🎯 [MemoryGameScreen] DESPUÉS del procesamiento carta ${index + 1}:`);
+      console.log(`   Processed label: "${processedLabel}"`);
+      console.log(`   Cambió: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
+      
+      return {
+        ...option,
+        label: processedLabel,
+      };
+    }) || [];
+    
+    console.log(`🎯 [MemoryGameScreen] DESPUÉS del procesamiento principal:`);
+    console.log(`   Processed text: "${processedText}"`);
+    console.log(`   Processed helpMessage: "${processedHelpMessage}"`);
+    console.log(`   Language usado: ${language}`);
+    console.log(`   Text cambió: ${originalText !== processedText ? 'SÍ' : 'NO'}`);
+    console.log(`   HelpMessage cambió: ${originalHelpMessage !== processedHelpMessage ? 'SÍ' : 'NO'}`);
+    
+    // Update processed step and options
+    const newProcessedStep = {
+      ...rawStep,
+      text: processedText,
+      helpMessage: processedHelpMessage,
+      options: newProcessedOptions,
+    };
+    
+    setProcessedStep(newProcessedStep);
+    setProcessedOptions(newProcessedOptions);
+    
+    console.log(`✅ [MemoryGameScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
+    console.log('🃏 [MemoryGameScreen] Cartas procesadas:');
+    newProcessedOptions.forEach((option, index) => {
+      console.log(`  ${index + 1}. "${option.icon}" - "${option.label}"`);
+    });
+  }, [rawStep, language]);
 
   // Initialize achievements service
   useEffect(() => {
     const initAchievements = async () => {
       try {
         console.log('🏆 [MemoryGameScreen] Inicializando servicio de logros mejorado...');
-        await RealAchievementServiceEnhanced.initializeAchievements();
+        await AchievementService.initializeAchievements();
         console.log('✅ [MemoryGameScreen] Servicio de logros inicializado');
       } catch (error) {
         console.error('❌ [MemoryGameScreen] Error inicializando logros:', error);
@@ -424,7 +502,8 @@ const MemoryGameScreen = () => {
 
       console.log('🏆 [MemoryGameScreen] Verificando logros con datos:', gameData);
 
-      const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
+      // const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
+      const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
       if (newlyUnlocked.length > 0) {
         console.log(`🎉 [MemoryGameScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
@@ -464,10 +543,28 @@ const MemoryGameScreen = () => {
     }
   }, [saveProgressToBackend, step]);
 
+  // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
+    console.log(`🎬 [MemoryGameScreen] Animación terminada: ${animationType}, matchedCount: ${matchedCount}, totalPairs: ${totalPairs}, gameCompleted: ${gameCompleted}`);
     setShowAnimation(false);
     
-    if (animationType === 'winner' && !gameCompleted) {
+    // CONDICIÓN CORREGIDA: Solo completar el juego si se encontraron TODAS las parejas
+    if (animationType === 'winner' && matchedCount === totalPairs && totalPairs > 0 && !gameCompleted) {
+      console.log('🎯 [MemoryGameScreen] ¡TODAS LAS PAREJAS ENCONTRADAS! Iniciando secuencia de finalización...');
+      console.log(`📊 [MemoryGameScreen] Verificación: matchedCount=${matchedCount}, totalPairs=${totalPairs}, todas encontradas=${matchedCount === totalPairs}`);
+      
+      // IMPORTANTE: Limpiar toda la ayuda activa inmediatamente
+      if (isHelpActive) {
+        console.log('🛑 [MemoryGameScreen] Limpiando ayuda activa...');
+        setIsHelpActive(false);
+        setBlinkingCardIds([]);
+        helpBlinkAnimation.setValue(1);
+      }
+      
+      // Detener servicios de ayuda
+      adaptiveService.current.cleanup();
+      audioService.current.cleanup();
+      
       setGameCompleted(true);
       
       // Calculate final stats
@@ -497,12 +594,17 @@ const MemoryGameScreen = () => {
       // Record game completion (includes backend save and achievement check)
       recordGameCompletion(finalStats);
       
-      // Show stars after a delay
+      // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
       setTimeout(() => {
+        console.log('🏆 [MemoryGameScreen] Mostrando modal de finalización directamente...');
         setShowStars(true);
-      }, 500);
+        console.log('⭐ [MemoryGameScreen] Modal debería aparecer ahora');
+        console.log(`🎯 [MemoryGameScreen] Estados para modal: matchedCount=${matchedCount}, gameCompleted=true, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
+      }, 800);
+    } else if (animationType === 'winner' && matchedCount !== totalPairs) {
+      console.log(`⚠️ [MemoryGameScreen] Animación winner pero no todas las parejas encontradas: matchedCount=${matchedCount}, totalPairs=${totalPairs}`);
     }
-  }, [animationType, gameCompleted, gameStats, startTime, calculateStars, totalPairs, recordGameCompletion]);
+  }, [animationType, matchedCount, totalPairs, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation, showCelebration]);
 
   useEffect(() => {
     // Update score for ProgressSection
@@ -510,6 +612,9 @@ const MemoryGameScreen = () => {
 
     // Check if game is complete
     if (matchedCount === totalPairs && totalPairs > 0 && !gameCompleted) {
+      console.log('🎉 [MemoryGameScreen] ¡TODAS LAS PAREJAS ENCONTRADAS! Preparando animación winner...');
+      console.log(`📊 [MemoryGameScreen] Parejas encontradas: ${matchedCount}/${totalPairs}`);
+      
       const timer = setTimeout(() => {
         showFeedbackAnimation('winner');
       }, 1000);
@@ -519,6 +624,8 @@ const MemoryGameScreen = () => {
 
   const flipCard = useCallback((card: Card) => {
     if (card.flipped || card.matched || selected.length === 2 || !gameStarted) return;
+
+    console.log(`🃏 [MemoryGameScreen] Usuario volteó carta: ID=${card.id}, icon="${card.icon}"`);
 
     // Record user interaction for inactivity tracking
     adaptiveService.current.recordInactivity();
@@ -556,6 +663,8 @@ const MemoryGameScreen = () => {
     if (newSelected.length === 2) {
       const [first, second] = newSelected;
       
+      console.log(`🔍 [MemoryGameScreen] Comparando cartas: "${first.icon}" vs "${second.icon}"`);
+      
       // Update total attempts
       setGameStats(prev => ({
         ...prev,
@@ -564,18 +673,25 @@ const MemoryGameScreen = () => {
 
       const isMatch = first.icon === second.icon;
 
+      console.log(`🎯 [MemoryGameScreen] ¿Es pareja?: ${isMatch ? 'SÍ' : 'NO'}`);
+
       // Record action in adaptive reinforcement service
       adaptiveService.current.recordAction(isMatch, -1, step.activityType);
 
       if (isMatch) {
         // Match found
+        console.log('✅ [MemoryGameScreen] ¡PAREJA ENCONTRADA!');
         setTimeout(() => {
           setCards((prev) =>
             prev.map((c) =>
               c.id === first.id || c.id === second.id ? { ...c, matched: true } : c
             )
           );
-          setMatchedCount((prev) => prev + 1);
+          setMatchedCount((prev) => {
+            const newCount = prev + 1;
+            console.log(`🎊 [MemoryGameScreen] Parejas encontradas: ${newCount}/${totalPairs}`);
+            return newCount;
+          });
           setGameStats(prev => ({
             ...prev,
             matchesFound: prev.matchesFound + 1,
@@ -586,6 +702,7 @@ const MemoryGameScreen = () => {
         }, 500);
       } else {
         // No match
+        console.log('❌ [MemoryGameScreen] No es pareja, volteando cartas de vuelta');
         setGameStats(prev => ({
           ...prev,
           errors: prev.errors + 1,
@@ -620,7 +737,7 @@ const MemoryGameScreen = () => {
 
       setTimeout(() => setSelected([]), 1200);
     }
-  }, [cards, selected, gameStarted, showFeedbackAnimation, step.activityType, isHelpActive, helpBlinkAnimation, gameStats.flipCount]);
+  }, [cards, selected, gameStarted, showFeedbackAnimation, step.activityType, isHelpActive, helpBlinkAnimation, gameStats.flipCount, totalPairs]);
 
   const resetGame = useCallback(() => {
     setMatchedCount(0);
@@ -754,6 +871,24 @@ const MemoryGameScreen = () => {
     });
   }, [step]);
 
+  // Log state changes for debugging
+  useEffect(() => {
+    console.log(`🎯 [MemoryGameScreen] Estado del modal: matchedCount=${matchedCount}, totalPairs=${totalPairs}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}, showCelebration=${showCelebration}`);
+    
+    // Log modal visibility condition
+    const modalShouldBeVisible = gameCompleted && !showAnimation && showStars && !showCelebration;
+    console.log(`🎯 [MemoryGameScreen] ¿Modal debería ser visible? ${modalShouldBeVisible ? 'SÍ' : 'NO'}`);
+    
+    if (gameCompleted && showStars && !showCelebration) {
+      console.log(`🎯 [MemoryGameScreen] ✅ Condiciones principales cumplidas para mostrar modal`);
+      if (showAnimation) {
+        console.log(`🎯 [MemoryGameScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
+      } else {
+        console.log(`🎯 [MemoryGameScreen] ✅ Modal debería estar visible ahora!`);
+      }
+    }
+  }, [matchedCount, totalPairs, gameCompleted, showAnimation, showStars, showCelebration]);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header simplificado */}
@@ -762,13 +897,17 @@ const MemoryGameScreen = () => {
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <Text style={styles.backButtonText}>← Volver</Text>
+          <Text style={styles.backButtonText}>
+            ← {language === 'es' ? 'Volver' : 'Back'}
+          </Text>
         </TouchableOpacity>
         
         {/* Progress indicator */}
         {progressLoading && (
           <View style={styles.progressIndicator}>
-            <Text style={styles.progressText}>Guardando...</Text>
+            <Text style={styles.progressText}>
+              {language === 'es' ? 'Guardando...' : 'Saving...'}
+            </Text>
           </View>
         )}
       </View>
@@ -796,15 +935,34 @@ const MemoryGameScreen = () => {
           gameStats={gameStats}
         />
 
+        {/* Status bilingüe */}
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>
+            🌍 {language === 'es' 
+              ? `Actividad bilingüe • Idioma: Español • Memoria visual`
+              : `Bilingual activity • Language: English • Visual memory`
+            }
+          </Text>
+        </View>
+
         {/* Estado del juego */}
         <View style={styles.gameStateContainer}>
           <Text style={styles.sectionTitle}>
-            {showingCards ? '👀 ¡Memoriza las cartas!' : '🧠 Encuentra las parejas:'}
+            {showingCards 
+              ? (language === 'es' ? '👀 ¡Memoriza las cartas!' : '👀 Memorize the cards!')
+              : (language === 'es' ? '🧠 Encuentra las parejas:' : '🧠 Find the pairs:')
+            }
           </Text>
           <Text style={styles.gameStateText}>
             {showingCards 
-              ? 'Observa bien las cartas y recuerda dónde están'
-              : 'Toca las cartas para voltearlas y encuentra las parejas iguales'
+              ? (language === 'es' 
+                  ? 'Observa bien las cartas y recuerda dónde están'
+                  : 'Look carefully at the cards and remember where they are'
+                )
+              : (language === 'es' 
+                  ? 'Toca las cartas para voltearlas y encuentra las parejas iguales'
+                  : 'Tap the cards to flip them and find the matching pairs'
+                )
             }
           </Text>
         </View>
@@ -821,10 +979,14 @@ const MemoryGameScreen = () => {
           <View style={styles.motivationContainer}>
             <Text style={styles.motivationIcon}>⭐</Text>
             <Text style={styles.footerText}>
-              {showingCards ? '¡Observa con atención!' :
-               score === 0 ? '¡Usa tu memoria!' :
-               score === totalItems ? '¡Increíble! Lo lograste' :
-               '¡Excelente! Sigue así, casi terminas'}
+              {showingCards 
+                ? (language === 'es' ? '¡Observa con atención!' : 'Watch carefully!')
+                : score === 0 
+                  ? (language === 'es' ? '¡Usa tu memoria!' : 'Use your memory!')
+                  : score === totalItems 
+                    ? (language === 'es' ? '¡Increíble! Lo lograste' : 'Amazing! You did it')
+                    : (language === 'es' ? '¡Excelente! Sigue así, casi terminas' : 'Excellent! Keep going, almost done')
+              }
             </Text>
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
@@ -832,7 +994,10 @@ const MemoryGameScreen = () => {
           {/* Mensaje adicional de ánimo */}
           <View style={styles.encouragementFooter}>
             <Text style={styles.encouragementFooterText}>
-              🧠 Cada juego fortalece tu memoria ✨
+              {language === 'es' 
+                ? '🧠 Cada juego fortalece tu memoria ✨'
+                : '🧠 Every game strengthens your memory ✨'
+              }
             </Text>
           </View>
         </View>
@@ -936,6 +1101,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
+  },
+  statusContainer: {
+    backgroundColor: '#e8f5e8',
+    marginHorizontal: 0,
+    marginBottom: 16,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+  },
+  statusText: {
+    fontSize: 11,
+    color: '#2e7d32',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   gameStateContainer: {
     backgroundColor: '#ffffff',

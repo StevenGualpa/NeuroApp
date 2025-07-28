@@ -206,12 +206,6 @@ const SelectOptionScreen = () => {
     
     adaptiveService.current.initialize(
       (helpOptionIndex) => {
-        // NO ACTIVAR SI EL JUEGO YA TERMINÓ
-        if (gameCompleted || score === 1) {
-          console.log('🛑 [SelectOptionScreen] Juego completado, ignorando ayuda');
-          return;
-        }
-        
         // Handle help trigger
         if (helpOptionIndex === -1) {
           // Inactivity help - find correct option
@@ -225,12 +219,6 @@ const SelectOptionScreen = () => {
         }
       },
       (message, activityType) => {
-        // NO REPRODUCIR SI EL JUEGO YA TERMINÓ
-        if (gameCompleted || score === 1) {
-          console.log('🛑 [SelectOptionScreen] Juego completado, ignorando audio de ayuda');
-          return;
-        }
-        
         // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
@@ -253,7 +241,7 @@ const SelectOptionScreen = () => {
       adaptiveService.current.cleanup();
       audioService.current.cleanup();
     };
-  }, [step, gameCompleted, score]);
+  }, [step]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, completionTime: number, firstTry: boolean): number => {
@@ -273,12 +261,6 @@ const SelectOptionScreen = () => {
 
   // Helper function to trigger help for a specific option
   const triggerHelpForOption = useCallback((optionIndex: number) => {
-    // NO ACTIVAR AYUDA SI EL JUEGO YA TERMINÓ
-    if (gameCompleted || score === 1) {
-      console.log('🛑 [SelectOptionScreen] Juego completado, no activando ayuda');
-      return;
-    }
-    
     setIsHelpActive(true);
     setBlinkingOptionIndex(optionIndex);
     
@@ -303,7 +285,7 @@ const SelectOptionScreen = () => {
           useNativeDriver: true,
         }),
       ]).start(() => {
-        if (isHelpActive && !gameCompleted && score !== 1) {
+        if (isHelpActive) {
           blinkAnimation();
         }
       });
@@ -317,7 +299,7 @@ const SelectOptionScreen = () => {
       setBlinkingOptionIndex(null);
       helpBlinkAnimation.setValue(1);
     }, 5000);
-  }, [helpBlinkAnimation, isHelpActive, gameCompleted, score]);
+  }, [helpBlinkAnimation, isHelpActive]);
 
   const showFeedbackAnimation = useCallback((type: 'success' | 'error' | 'winner' | 'loser') => {
     setAnimationType(type);
@@ -391,10 +373,8 @@ const SelectOptionScreen = () => {
         if (progressError) {
           console.error('❌ [SelectOptionScreen] Error específico:', progressError);
           Alert.alert(
-            language === 'es' ? 'Error de Conexión' : 'Connection Error',
-            language === 'es' 
-              ? `No se pudo guardar tu progreso: ${progressError}. Tu progreso local se ha guardado.`
-              : `Could not save your progress: ${progressError}. Your local progress has been saved.`,
+            'Error de Conexión',
+            `No se pudo guardar tu progreso: ${progressError}. Tu progreso local se ha guardado.`,
             [{ text: 'OK' }]
           );
         }
@@ -402,14 +382,12 @@ const SelectOptionScreen = () => {
     } catch (error) {
       console.error('❌ [SelectOptionScreen] Error guardando progreso:', error);
       Alert.alert(
-        language === 'es' ? 'Error' : 'Error',
-        language === 'es' 
-          ? 'Hubo un problema guardando tu progreso. Tu progreso local se ha guardado.'
-          : 'There was a problem saving your progress. Your local progress has been saved.',
+        'Error',
+        'Hubo un problema guardando tu progreso. Tu progreso local se ha guardado.',
         [{ text: 'OK' }]
       );
     }
-  }, [completeStep, step, progressError, language]);
+  }, [completeStep, step, progressError]);
 
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
@@ -469,36 +447,17 @@ const SelectOptionScreen = () => {
     } catch (error) {
       console.error('❌ [SelectOptionScreen] Error registrando finalización:', error);
       Alert.alert(
-        language === 'es' ? 'Error' : 'Error',
-        language === 'es' 
-          ? 'No se pudieron verificar los logros. Tu progreso se ha guardado.'
-          : 'Could not verify achievements. Your progress has been saved.',
+        'Error',
+        'No se pudieron verificar los logros. Tu progreso se ha guardado.',
         [{ text: 'OK' }]
       );
     }
-  }, [saveProgressToBackend, step, language]);
+  }, [saveProgressToBackend, step]);
 
-  // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
-    console.log(`🎬 [SelectOptionScreen] Animación terminada: ${animationType}, score: ${score}, gameCompleted: ${gameCompleted}`);
     setShowAnimation(false);
     
-    // CONDICIÓN CORREGIDA: Verificar que el score sea 1 (ganó)
-    if (animationType === 'success' && score === 1 && !gameCompleted) {
-      console.log('🎯 [SelectOptionScreen] ¡JUEGO COMPLETADO! Iniciando secuencia de finalización...');
-      
-      // IMPORTANTE: Limpiar toda la ayuda activa inmediatamente
-      if (isHelpActive) {
-        console.log('🛑 [SelectOptionScreen] Limpiando ayuda activa...');
-        setIsHelpActive(false);
-        setBlinkingOptionIndex(null);
-        helpBlinkAnimation.setValue(1);
-      }
-      
-      // Detener servicios de ayuda
-      adaptiveService.current.cleanup();
-      audioService.current.cleanup();
-      
+    if (animationType === 'success' && !gameCompleted) {
       setGameCompleted(true);
       
       // Calculate final stats
@@ -524,23 +483,17 @@ const SelectOptionScreen = () => {
       // Record game completion (includes backend save and achievement check)
       recordGameCompletion(finalStats);
       
-      // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
+      // Small delay before showing winner animation
       setTimeout(() => {
-        console.log('🏆 [SelectOptionScreen] Mostrando modal de finalización directamente...');
-        setShowStars(true);
-        console.log('⭐ [SelectOptionScreen] Modal debería aparecer ahora');
-        console.log(`🎯 [SelectOptionScreen] Estados para modal: score=${score}, gameCompleted=true, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
-      }, 800);
-    } else if (animationType === 'winner') {
-      console.log('🏆 [SelectOptionScreen] Animación de ganador terminada, mostrando modal...');
-      // Show modal after winner animation
-      setTimeout(() => {
-        setShowStars(true);
-        console.log('⭐ [SelectOptionScreen] Modal mostrado después de animación winner');
-        console.log(`🎯 [SelectOptionScreen] Estados para modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${false}, showStars=true, showCelebration=${showCelebration}`);
+        showFeedbackAnimation('winner');
       }, 300);
+    } else if (animationType === 'winner') {
+      // Show stars after winner animation
+      setTimeout(() => {
+        setShowStars(true);
+      }, 500);
     }
-  }, [animationType, score, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation, isHelpActive, helpBlinkAnimation]);
+  }, [animationType, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation]);
 
   const handlePress = useCallback((correct: boolean, index: number) => {
     if (isAnswered || gameCompleted) return;
@@ -551,9 +504,8 @@ const SelectOptionScreen = () => {
     const correctOptionIndex = step.options?.findIndex(option => option.correct) ?? -1;
     adaptiveService.current.recordAction(correct, correctOptionIndex, step.activityType);
 
-    // Clear any active help INMEDIATAMENTE
+    // Clear any active help
     if (isHelpActive) {
-      console.log('🛑 [SelectOptionScreen] Limpiando ayuda activa por respuesta...');
       setIsHelpActive(false);
       setBlinkingOptionIndex(null);
       helpBlinkAnimation.setValue(1);
@@ -597,7 +549,7 @@ const SelectOptionScreen = () => {
 
     setTimeout(() => {
       if (correct) {
-        console.log('✅ [SelectOptionScreen] ¡Respuesta correcta! Estableciendo score = 1');
+        console.log('✅ [SelectOptionScreen] ¡Respuesta correcta! Completando juego...');
         setScore(1);
         showFeedbackAnimation('success');
         // Play encouragement audio
@@ -624,17 +576,15 @@ const SelectOptionScreen = () => {
   const handleOptionPressIn = useCallback((index: number) => {
     if (isAnswered) return;
     
-    // Record user interaction for inactivity tracking - SOLO SI NO HA GANADO
-    if (!gameCompleted && score !== 1) {
-      adaptiveService.current.recordInactivity();
-    }
+    // Record user interaction for inactivity tracking
+    adaptiveService.current.recordInactivity();
     
     Animated.timing(optionScales[index], {
       toValue: 0.95,
       duration: 100,
       useNativeDriver: true,
     }).start();
-  }, [isAnswered, optionScales, gameCompleted, score]);
+  }, [isAnswered, optionScales]);
 
   const handleOptionPressOut = useCallback((index: number) => {
     if (isAnswered) return;
@@ -645,7 +595,6 @@ const SelectOptionScreen = () => {
   }, [isAnswered, optionScales]);
 
   const resetGame = useCallback(() => {
-    console.log('🔄 [SelectOptionScreen] Reiniciando juego...');
     setSelectedOption(null);
     setIsAnswered(false);
     setGameCompleted(false);
@@ -676,8 +625,8 @@ const SelectOptionScreen = () => {
 
   const getOptionStyle = useCallback((index: number, correct: boolean) => {
     if (!isAnswered) {
-      // Add help highlighting if this option is blinking - SOLO SI NO HA GANADO
-      if (isHelpActive && blinkingOptionIndex === index && !gameCompleted && score !== 1) {
+      // Add help highlighting if this option is blinking
+      if (isHelpActive && blinkingOptionIndex === index) {
         return [styles.optionButton, styles.optionButtonHelp];
       }
       return styles.optionButton;
@@ -688,7 +637,7 @@ const SelectOptionScreen = () => {
     }
     
     return styles.optionButtonDisabled;
-  }, [isAnswered, selectedOption, isHelpActive, blinkingOptionIndex, gameCompleted, score]);
+  }, [isAnswered, selectedOption, isHelpActive, blinkingOptionIndex]);
 
   const getOptionTextStyle = useCallback((index: number, correct: boolean) => {
     if (!isAnswered) return styles.optionLabel;
@@ -701,49 +650,33 @@ const SelectOptionScreen = () => {
   }, [isAnswered, selectedOption]);
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, firstTry: boolean) => {
-    if (language === 'es') {
-      if (perfectRun && stars === 3 && firstTry) {
-        return "¡Perfecto! Primera vez sin errores 🏆";
-      } else if (perfectRun && stars === 3) {
-        return "¡Excelente! Sin errores 🌟";
-      } else if (stars === 3) {
-        return "¡Muy bien hecho! 👏";
-      } else if (stars === 2) {
-        return "¡Buen trabajo! Sigue así 💪";
-      } else {
-        return "¡Completado! Puedes mejorar 📈";
-      }
+    if (perfectRun && stars === 3 && firstTry) {
+      return "¡Perfecto! Primera vez sin errores 🏆";
+    } else if (perfectRun && stars === 3) {
+      return "¡Excelente! Sin errores 🌟";
+    } else if (stars === 3) {
+      return "¡Muy bien hecho! 👏";
+    } else if (stars === 2) {
+      return "¡Buen trabajo! Sigue así 💪";
     } else {
-      if (perfectRun && stars === 3 && firstTry) {
-        return "Perfect! First time without errors 🏆";
-      } else if (perfectRun && stars === 3) {
-        return "Excellent! No errors 🌟";
-      } else if (stars === 3) {
-        return "Very well done! 👏";
-      } else if (stars === 2) {
-        return "Good job! Keep it up 💪";
-      } else {
-        return "Completed! You can improve 📈";
-      }
+      return "¡Completado! Puedes mejorar 📈";
     }
-  }, [language]);
+  }, []);
 
   const handleBackPress = useCallback(() => {
     if (gameStats.totalAttempts > 0 && !gameCompleted) {
       Alert.alert(
-        language === 'es' ? 'Salir del juego' : 'Exit game',
-        language === 'es' 
-          ? '¿Estás seguro de que quieres salir? Perderás tu progreso actual.'
-          : 'Are you sure you want to exit? You will lose your current progress.',
+        'Salir del juego',
+        '¿Estás seguro de que quieres salir? Perderás tu progreso actual.',
         [
-          { text: language === 'es' ? 'Cancelar' : 'Cancel', style: 'cancel' },
-          { text: language === 'es' ? 'Salir' : 'Exit', style: 'destructive', onPress: () => navigation.goBack() }
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Salir', style: 'destructive', onPress: () => navigation.goBack() }
         ]
       );
     } else {
       navigation.goBack();
     }
-  }, [gameStats.totalAttempts, gameCompleted, navigation, language]);
+  }, [gameStats.totalAttempts, gameCompleted, navigation]);
 
   const handleCelebrationClose = useCallback(() => {
     setShowCelebration(false);
@@ -765,24 +698,6 @@ const SelectOptionScreen = () => {
       optionsCount: step.options?.length || 0,
     });
   }, [step]);
-
-  // Log state changes for debugging
-  useEffect(() => {
-    console.log(`🎯 [SelectOptionScreen] Estado del modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}, showCelebration=${showCelebration}`);
-    
-    // Log modal visibility condition
-    const modalShouldBeVisible = score === 1 && gameCompleted && !showAnimation && showStars && !showCelebration;
-    console.log(`🎯 [SelectOptionScreen] ¿Modal debería ser visible? ${modalShouldBeVisible ? 'SÍ' : 'NO'}`);
-    
-    if (score === 1 && gameCompleted && showStars && !showCelebration) {
-      console.log(`🎯 [SelectOptionScreen] ✅ Condiciones principales cumplidas para mostrar modal`);
-      if (showAnimation) {
-        console.log(`�� [SelectOptionScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
-      } else {
-        console.log(`🎯 [SelectOptionScreen] ✅ Modal debería estar visible ahora!`);
-      }
-    }
-  }, [score, gameCompleted, showAnimation, showStars, showCelebration]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -814,16 +729,12 @@ const SelectOptionScreen = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
         onTouchStart={() => {
-          // Record user interaction for inactivity tracking - SOLO SI NO HA GANADO
-          if (!gameCompleted && score !== 1) {
-            adaptiveService.current.recordInactivity();
-          }
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
         }}
         onScrollBeginDrag={() => {
-          // Record user interaction for inactivity tracking - SOLO SI NO HA GANADO
-          if (!gameCompleted && score !== 1) {
-            adaptiveService.current.recordInactivity();
-          }
+          // Record user interaction for inactivity tracking
+          adaptiveService.current.recordInactivity();
         }}
       >
 
@@ -858,63 +769,54 @@ const SelectOptionScreen = () => {
             {language === 'es' ? 'Opciones disponibles:' : 'Available options:'}
           </Text>
           <View style={styles.optionsGrid}>
-            {processedStep.options?.map((option, idx) => {
-              const isBlinking = isHelpActive && blinkingOptionIndex === idx && !gameCompleted && score !== 1;
-              return (
-                <Animated.View
-                  key={idx}
-                  style={[
-                    styles.optionWrapper,
-                    { 
-                      transform: [{ scale: optionScales[idx] || 1 }],
-                      opacity: isBlinking ? helpBlinkAnimation : 1
-                    }
-                  ]}
+            {processedStep.options?.map((option, idx) => (
+              <Animated.View
+                key={idx}
+                style={[
+                  styles.optionWrapper,
+                  { 
+                    transform: [{ scale: optionScales[idx] || 1 }],
+                    opacity: isHelpActive && blinkingOptionIndex === idx ? helpBlinkAnimation : 1
+                  }
+                ]}
+              >
+                <TouchableOpacity
+                  style={getOptionStyle(idx, option.correct || false)}
+                  onPress={() => handlePress(option.correct || false, idx)}
+                  onPressIn={() => handleOptionPressIn(idx)}
+                  onPressOut={() => handleOptionPressOut(idx)}
+                  activeOpacity={0.8}
+                  disabled={isAnswered}
                 >
-                  <TouchableOpacity
-                    style={getOptionStyle(idx, option.correct || false)}
-                    onPress={() => {
-                      // Record user interaction for inactivity tracking - SOLO SI NO HA GANADO
-                      if (!gameCompleted && score !== 1) {
-                        adaptiveService.current.recordInactivity();
-                      }
-                      handlePress(option.correct || false, idx);
-                    }}
-                    onPressIn={() => handleOptionPressIn(idx)}
-                    onPressOut={() => handleOptionPressOut(idx)}
-                    activeOpacity={0.8}
-                    disabled={isAnswered}
-                  >
-                    <View style={styles.optionContent}>
-                      <View style={[
-                        styles.iconContainer,
-                        isAnswered && selectedOption === idx && option.correct && styles.iconContainerCorrect,
-                        isAnswered && selectedOption === idx && !option.correct && styles.iconContainerIncorrect,
+                  <View style={styles.optionContent}>
+                    <View style={[
+                      styles.iconContainer,
+                      isAnswered && selectedOption === idx && option.correct && styles.iconContainerCorrect,
+                      isAnswered && selectedOption === idx && !option.correct && styles.iconContainerIncorrect,
+                    ]}>
+                      <Text style={styles.optionIcon}>{option.icon}</Text>
+                    </View>
+                    <Text style={getOptionTextStyle(idx, option.correct || false)}>
+                      {option.label}
+                    </Text>
+                  </View>
+                  
+                  {isAnswered && selectedOption === idx && (
+                    <View style={[
+                      styles.resultIndicator,
+                      option.correct ? styles.resultIndicatorCorrect : styles.resultIndicatorIncorrect
+                    ]}>
+                      <Text style={[
+                        styles.resultIcon,
+                        option.correct ? styles.resultIconCorrect : styles.resultIconIncorrect
                       ]}>
-                        <Text style={styles.optionIcon}>{option.icon}</Text>
-                      </View>
-                      <Text style={getOptionTextStyle(idx, option.correct || false)}>
-                        {option.label}
+                        {option.correct ? '✓' : '✗'}
                       </Text>
                     </View>
-                    
-                    {isAnswered && selectedOption === idx && (
-                      <View style={[
-                        styles.resultIndicator,
-                        option.correct ? styles.resultIndicatorCorrect : styles.resultIndicatorIncorrect
-                      ]}>
-                        <Text style={[
-                          styles.resultIcon,
-                          option.correct ? styles.resultIconCorrect : styles.resultIconIncorrect
-                        ]}>
-                          {option.correct ? '✓' : '✗'}
-                        </Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </Animated.View>
-              );
-            })}
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
           </View>
         </View>
 
@@ -945,35 +847,21 @@ const SelectOptionScreen = () => {
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
-      {/* Game Complete Modal - CONDICIÓN ARREGLADA */}
+      {/* Game Complete Modal usando componente reutilizable */}
       <GameCompletionModal
-        visible={score === 1 && gameCompleted && !showAnimation && showStars && !showCelebration}
+        visible={gameCompleted && !showAnimation && showStars && !showCelebration}
         stats={gameStats}
         onReset={resetGame}
         onContinue={() => navigation.goBack()}
         performanceMessage={getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.firstTrySuccess)}
         gameType="selection"
         customStats={[
-          { 
-            label: language === 'es' ? 'Intentos totales' : 'Total attempts', 
-            value: gameStats.totalAttempts 
-          },
-          { 
-            label: language === 'es' ? 'Respuesta correcta' : 'Correct answer', 
-            value: score === 1 ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No')
-          },
-          { 
-            label: language === 'es' ? 'Ayuda usada' : 'Help used', 
-            value: gameStats.usedHelp ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No')
-          },
-          { 
-            label: language === 'es' ? 'Progreso guardado' : 'Progress saved', 
-            value: progressLoading 
-              ? (language === 'es' ? 'Guardando...' : 'Saving...') 
-              : (language === 'es' ? 'Guardado ✅' : 'Saved ✅')
-          },
+          { label: 'Intentos totales', value: gameStats.totalAttempts },
+          { label: 'Respuesta correcta', value: score === 1 ? 'Sí' : 'No' },
+          { label: 'Ayuda usada', value: gameStats.usedHelp ? 'Sí' : 'No' },
+          { label: 'Progreso guardado', value: progressLoading ? 'Guardando...' : 'Guardado ✅' },
         ]}
-        bonusMessage={gameStats.firstTrySuccess ? (language === 'es' ? "🎯 ¡Primera vez perfecto!" : "🎯 Perfect first time!") : undefined}
+        bonusMessage={gameStats.firstTrySuccess ? "🎯 ¡Primera vez perfecto!" : undefined}
       />
 
       {/* Feedback Animation */}

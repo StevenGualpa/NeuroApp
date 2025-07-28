@@ -20,10 +20,12 @@ import AchievementCelebration from '../components/AchievementCelebration';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
-import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
+// import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
+import { useLanguage } from '../contexts/LanguageContext';
+import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 
 type PatternRecognitionRouteProp = RouteProp<RootStackParamList, 'patternRecognition'>;
 
@@ -57,9 +59,15 @@ const PatternRecognitionScreen = () => {
   const route = useRoute<PatternRecognitionRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
+  const { t, language } = useLanguage();
 
   // Real progress hook
   const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
+
+  // Bilingual states
+  const [processedStep, setProcessedStep] = useState(step);
+  const [rawStep] = useState(step); // Keep original data
+  const [processedOptions, setProcessedOptions] = useState(step.options || []);
 
   // Game state
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -116,12 +124,83 @@ const PatternRecognitionScreen = () => {
   // Memoized values
   const totalItems = 1; // Solo una respuesta correcta en reconocimiento de patrones
 
+  // Process step content when language changes
+  useEffect(() => {
+    console.log(`🌍 [PatternRecognitionScreen] Procesando contenido para idioma: ${language}`);
+    processStepForLanguage();
+  }, [language]);
+
+  // Process step content for current language
+  const processStepForLanguage = useCallback(() => {
+    console.log(`🌍 [PatternRecognitionScreen] NUEVO PROCESAMIENTO - Contenido para idioma: ${language}`);
+    console.log(`🔧 [PatternRecognitionScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
+    
+    // Process step text and description
+    const originalText = rawStep.text || '';
+    const originalDescription = rawStep.description || '';
+    
+    console.log(`🧪 [PatternRecognitionScreen] ANTES del procesamiento:`);
+    console.log(`   Original text: "${originalText}"`);
+    console.log(`   Original description: "${originalDescription}"`);
+    console.log(`   Tiene colon en text: ${originalText.includes(':')}`);
+    console.log(`   Tiene colon en description: ${originalDescription.includes(':')}`);
+    
+    const processedText = BilingualTextProcessor.extractText(originalText, language);
+    const processedDescription = BilingualTextProcessor.extractText(originalDescription, language);
+    
+    // Process options
+    const newProcessedOptions = rawStep.options?.map((option, index) => {
+      const originalLabel = option.label || '';
+      
+      console.log(`🧪 [PatternRecognitionScreen] ANTES del procesamiento opción ${index + 1}:`);
+      console.log(`   Original label: "${originalLabel}"`);
+      console.log(`   Icon: "${option.icon}"`);
+      console.log(`   Correct: ${option.correct}`);
+      console.log(`   Tiene colon en label: ${originalLabel.includes(':')}`);
+      
+      const processedLabel = BilingualTextProcessor.extractText(originalLabel, language);
+      
+      console.log(`🎯 [PatternRecognitionScreen] DESPUÉS del procesamiento opción ${index + 1}:`);
+      console.log(`   Processed label: "${processedLabel}"`);
+      console.log(`   Label cambió: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
+      
+      return {
+        ...option,
+        label: processedLabel,
+      };
+    }) || [];
+    
+    console.log(`🎯 [PatternRecognitionScreen] DESPUÉS del procesamiento principal:`);
+    console.log(`   Processed text: "${processedText}"`);
+    console.log(`   Processed description: "${processedDescription}"`);
+    console.log(`   Language usado: ${language}`);
+    console.log(`   Text cambió: ${originalText !== processedText ? 'SÍ' : 'NO'}`);
+    console.log(`   Description cambió: ${originalDescription !== processedDescription ? 'SÍ' : 'NO'}`);
+    
+    // Update processed step and options
+    const newProcessedStep = {
+      ...rawStep,
+      text: processedText,
+      description: processedDescription,
+      options: newProcessedOptions,
+    };
+    
+    setProcessedStep(newProcessedStep);
+    setProcessedOptions(newProcessedOptions);
+    
+    console.log(`✅ [PatternRecognitionScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
+    console.log('🎯 [PatternRecognitionScreen] Opciones procesadas:');
+    newProcessedOptions.forEach((option, index) => {
+      console.log(`  ${index + 1}. "${option.icon}" - "${option.label}" (correct: ${option.correct})`);
+    });
+  }, [rawStep, language]);
+
   // Initialize achievements service
   useEffect(() => {
     const initAchievements = async () => {
       try {
         console.log('🏆 [PatternRecognitionScreen] Inicializando servicio de logros mejorado...');
-        await RealAchievementServiceEnhanced.initializeAchievements();
+        await AchievementService.initializeAchievements();
         console.log('✅ [PatternRecognitionScreen] Servicio de logros inicializado');
       } catch (error) {
         console.error('❌ [PatternRecognitionScreen] Error inicializando logros:', error);
@@ -134,10 +213,15 @@ const PatternRecognitionScreen = () => {
   useEffect(() => {
     adaptiveService.current.initialize(
       (helpOptionIndex: number) => {
-        // Handle help trigger
+        // Handle help trigger - NO ACTIVAR SI EL JUEGO YA TERMINÓ
+        if (gameCompleted || score === 1) {
+          console.log('🛑 [PatternRecognitionScreen] Juego completado, ignorando ayuda');
+          return;
+        }
+        
         if (helpOptionIndex === -1) {
           // Inactivity help - find correct option
-          const correctIndex = step.options?.findIndex(option => option.correct) ?? -1;
+          const correctIndex = processedOptions.findIndex(option => option.correct) ?? -1;
           if (correctIndex !== -1) {
             triggerHelpForOption(correctIndex);
           }
@@ -147,11 +231,16 @@ const PatternRecognitionScreen = () => {
         }
       },
       (message: string, activityType: string) => {
-        // Handle audio help - use step's helpMessage if available, otherwise use service message
+        // Handle audio help - NO REPRODUCIR SI EL JUEGO YA TERMINÓ
+        if (gameCompleted || score === 1) {
+          console.log('🛑 [PatternRecognitionScreen] Juego completado, ignorando audio de ayuda');
+          return;
+        }
+        
         let helpMessage: string;
         
-        if (step.helpMessage) {
-          helpMessage = step.helpMessage;
+        if (processedStep.helpMessage) {
+          helpMessage = processedStep.helpMessage;
           console.log(`🔊 Using custom lesson help: ${helpMessage}`);
         } else {
           helpMessage = message;
@@ -169,7 +258,7 @@ const PatternRecognitionScreen = () => {
       adaptiveService.current.cleanup();
       audioService.current.cleanup();
     };
-  }, [step]);
+  }, [processedStep, processedOptions, step.activityType, gameCompleted, score]);
 
   useEffect(() => {
     // Animación de entrada para la secuencia
@@ -209,6 +298,12 @@ const PatternRecognitionScreen = () => {
 
   // Helper function to trigger help for a specific option
   const triggerHelpForOption = useCallback((optionIndex: number) => {
+    // NO ACTIVAR AYUDA SI EL JUEGO YA TERMINÓ
+    if (gameCompleted || score === 1) {
+      console.log('🛑 [PatternRecognitionScreen] Juego completado, no activando ayuda');
+      return;
+    }
+    
     setIsHelpActive(true);
     setBlinkingOptionIndex(optionIndex);
     
@@ -233,7 +328,7 @@ const PatternRecognitionScreen = () => {
           useNativeDriver: true,
         }),
       ]).start(() => {
-        if (isHelpActive) {
+        if (isHelpActive && !gameCompleted && score !== 1) {
           blinkAnimation();
         }
       });
@@ -247,7 +342,7 @@ const PatternRecognitionScreen = () => {
       setBlinkingOptionIndex(null);
       helpBlinkAnimation.setValue(1);
     }, 5000);
-  }, [helpBlinkAnimation, isHelpActive]);
+  }, [helpBlinkAnimation, isHelpActive, gameCompleted, score]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, completionTime: number, firstTry: boolean): number => {
@@ -337,8 +432,10 @@ const PatternRecognitionScreen = () => {
         if (progressError) {
           console.error('❌ [PatternRecognitionScreen] Error específico:', progressError);
           Alert.alert(
-            'Error de Conexión',
-            `No se pudo guardar tu progreso: ${progressError}. Tu progreso local se ha guardado.`,
+            language === 'es' ? 'Error de Conexión' : 'Connection Error',
+            language === 'es' 
+              ? `No se pudo guardar tu progreso: ${progressError}. Tu progreso local se ha guardado.`
+              : `Could not save your progress: ${progressError}. Your local progress has been saved.`,
             [{ text: 'OK' }]
           );
         }
@@ -346,12 +443,14 @@ const PatternRecognitionScreen = () => {
     } catch (error) {
       console.error('❌ [PatternRecognitionScreen] Error guardando progreso:', error);
       Alert.alert(
-        'Error',
-        'Hubo un problema guardando tu progreso. Tu progreso local se ha guardado.',
+        language === 'es' ? 'Error' : 'Error',
+        language === 'es' 
+          ? 'Hubo un problema guardando tu progreso. Tu progreso local se ha guardado.'
+          : 'There was a problem saving your progress. Your local progress has been saved.',
         [{ text: 'OK' }]
       );
     }
-  }, [completeStep, step, progressError]);
+  }, [completeStep, step, progressError, language]);
 
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
@@ -377,7 +476,8 @@ const PatternRecognitionScreen = () => {
 
       console.log('🏆 [PatternRecognitionScreen] Verificando logros con datos:', gameData);
 
-      const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
+      // const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
+      const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
       if (newlyUnlocked.length > 0) {
         console.log(`🎉 [PatternRecognitionScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
@@ -410,17 +510,37 @@ const PatternRecognitionScreen = () => {
     } catch (error) {
       console.error('❌ [PatternRecognitionScreen] Error registrando finalización:', error);
       Alert.alert(
-        'Error',
-        'No se pudieron verificar los logros. Tu progreso se ha guardado.',
+        language === 'es' ? 'Error' : 'Error',
+        language === 'es' 
+          ? 'No se pudieron verificar los logros. Tu progreso se ha guardado.'
+          : 'Could not verify achievements. Your progress has been saved.',
         [{ text: 'OK' }]
       );
     }
-  }, [saveProgressToBackend, step]);
+  }, [saveProgressToBackend, step, language]);
 
+  // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
+    console.log(`🎬 [PatternRecognitionScreen] Animación terminada: ${animationType}, score: ${score}, gameCompleted: ${gameCompleted}`);
     setShowAnimation(false);
     
-    if (animationType === 'success' && !gameCompleted) {
+    // CONDICIÓN CORREGIDA: Verificar que el score sea 1 (ganó)
+    if (animationType === 'success' && score === 1 && !gameCompleted) {
+      console.log('🎯 [PatternRecognitionScreen] ¡PATRÓN IDENTIFICADO! Iniciando secuencia de finalización...');
+      console.log(`📊 [PatternRecognitionScreen] Verificación: score=${score}, patrón identificado=${score === 1}`);
+      
+      // IMPORTANTE: Limpiar toda la ayuda activa inmediatamente
+      if (isHelpActive) {
+        console.log('🛑 [PatternRecognitionScreen] Limpiando ayuda activa...');
+        setIsHelpActive(false);
+        setBlinkingOptionIndex(null);
+        helpBlinkAnimation.setValue(1);
+      }
+      
+      // Detener servicios de ayuda
+      adaptiveService.current.cleanup();
+      audioService.current.cleanup();
+      
       setGameCompleted(true);
       
       // Calculate final stats
@@ -449,28 +569,37 @@ const PatternRecognitionScreen = () => {
       
       // Small delay before showing winner animation
       setTimeout(() => {
+        console.log('🏆 [PatternRecognitionScreen] Mostrando animación de ganador...');
         showFeedbackAnimation('winner');
       }, 300);
     } else if (animationType === 'winner') {
+      console.log('🎊 [PatternRecognitionScreen] Animación winner terminada, mostrando modal...');
       // Show stars after winner animation
       setTimeout(() => {
+        console.log('⭐ [PatternRecognitionScreen] Modal debería aparecer ahora');
         setShowStars(true);
+        console.log(`🎯 [PatternRecognitionScreen] Estados para modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
       }, 500);
     }
-  }, [animationType, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation]);
+  }, [animationType, score, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation, isHelpActive, helpBlinkAnimation, showCelebration]);
 
   const handleAnswerSelect = useCallback((selectedIcon: string, index: number) => {
     if (isAnswered || gameCompleted) return;
 
+    console.log(`🎯 [PatternRecognitionScreen] Respuesta seleccionada: ${selectedIcon} (índice: ${index})`);
+
     // Record action in adaptive reinforcement service
-    const correctOptionIndex = step.options?.findIndex(option => option.correct) ?? -1;
-    const correctOption = step.options?.find(option => option.correct);
+    const correctOptionIndex = processedOptions.findIndex(option => option.correct) ?? -1;
+    const correctOption = processedOptions.find(option => option.correct);
     const correct = selectedIcon === correctOption?.icon;
+    
+    console.log(`✅ [PatternRecognitionScreen] Respuesta ${correct ? 'CORRECTA' : 'INCORRECTA'}`);
     
     adaptiveService.current.recordAction(correct, correctOptionIndex, step.activityType);
 
-    // Clear any active help
+    // Clear any active help INMEDIATAMENTE
     if (isHelpActive) {
+      console.log('🛑 [PatternRecognitionScreen] Limpiando ayuda activa por respuesta...');
       setIsHelpActive(false);
       setBlinkingOptionIndex(null);
       helpBlinkAnimation.setValue(1);
@@ -505,11 +634,13 @@ const PatternRecognitionScreen = () => {
 
     setTimeout(() => {
       if (correct) {
+        console.log('🎉 [PatternRecognitionScreen] ¡Respuesta correcta! Estableciendo score = 1');
         setScore(1);
         showFeedbackAnimation('success');
         // Play encouragement audio
         audioService.current.playEncouragementMessage();
       } else {
+        console.log('❌ [PatternRecognitionScreen] Respuesta incorrecta, mostrando error');
         showFeedbackAnimation('error');
         // Play error guidance audio
         audioService.current.playErrorGuidanceMessage();
@@ -525,7 +656,7 @@ const PatternRecognitionScreen = () => {
         }, 1500);
       }
     }, 600);
-  }, [isAnswered, gameCompleted, gameStats, optionScales, showFeedbackAnimation, step.options, step.activityType, isHelpActive, helpBlinkAnimation]);
+  }, [isAnswered, gameCompleted, gameStats, optionScales, showFeedbackAnimation, processedOptions, step.activityType, isHelpActive, helpBlinkAnimation]);
 
   const handleOptionPressIn = useCallback((index: number) => {
     if (isAnswered) return;
@@ -545,6 +676,7 @@ const PatternRecognitionScreen = () => {
   }, [isAnswered, optionScales]);
 
   const resetGame = useCallback(() => {
+    console.log('🔄 [PatternRecognitionScreen] Reiniciando juego...');
     setSelectedAnswer(null);
     setIsAnswered(false);
     setGameCompleted(false);
@@ -590,51 +722,65 @@ const PatternRecognitionScreen = () => {
   const getPatternTypeLabel = () => {
     switch (step.patternType) {
       case 'visual':
-        return 'Patrón Visual';
+        return language === 'es' ? 'Patrón Visual' : 'Visual Pattern';
       case 'auditory':
-        return 'Patrón Auditivo';
+        return language === 'es' ? 'Patrón Auditivo' : 'Auditory Pattern';
       case 'conceptual':
-        return 'Patrón Conceptual';
+        return language === 'es' ? 'Patrón Conceptual' : 'Conceptual Pattern';
       case 'behavioral':
-        return 'Patrón de Comportamiento';
+        return language === 'es' ? 'Patrón de Comportamiento' : 'Behavioral Pattern';
       default:
-        return 'Patrón';
+        return language === 'es' ? 'Patrón' : 'Pattern';
     }
   };
 
   const getOptionStyle = useCallback((index: number, correct: boolean) => {
     if (!isAnswered) return styles.optionButton;
     
-    if (selectedAnswer === step.options?.[index]?.icon) {
+    if (selectedAnswer === processedOptions[index]?.icon) {
       return correct ? styles.optionButtonCorrect : styles.optionButtonIncorrect;
     }
     
     return styles.optionButtonDisabled;
-  }, [isAnswered, selectedAnswer, step.options]);
+  }, [isAnswered, selectedAnswer, processedOptions]);
 
   const getOptionTextStyle = useCallback((index: number, correct: boolean) => {
     if (!isAnswered) return styles.optionLabel;
     
-    if (selectedAnswer === step.options?.[index]?.icon) {
+    if (selectedAnswer === processedOptions[index]?.icon) {
       return correct ? styles.optionLabelCorrect : styles.optionLabelIncorrect;
     }
     
     return styles.optionLabelDisabled;
-  }, [isAnswered, selectedAnswer, step.options]);
+  }, [isAnswered, selectedAnswer, processedOptions]);
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, firstTry: boolean) => {
-    if (perfectRun && stars === 3 && firstTry) {
-      return "¡Perfecto! Patrón identificado a la primera 🧠🏆";
-    } else if (perfectRun && stars === 3) {
-      return "¡Excelente! Patrón identificado sin errores 🌟";
-    } else if (stars === 3) {
-      return "¡Muy bien hecho! 👏";
-    } else if (stars === 2) {
-      return "¡Buen trabajo! Sigue practicando 💪";
+    if (language === 'es') {
+      if (perfectRun && stars === 3 && firstTry) {
+        return "¡Perfecto! Patrón identificado a la primera 🧠🏆";
+      } else if (perfectRun && stars === 3) {
+        return "¡Excelente! Patrón identificado sin errores 🌟";
+      } else if (stars === 3) {
+        return "¡Muy bien hecho! 👏";
+      } else if (stars === 2) {
+        return "¡Buen trabajo! Sigue practicando 💪";
+      } else {
+        return "¡Completado! Tu reconocimiento mejorará 📈";
+      }
     } else {
-      return "¡Completado! Tu reconocimiento mejorará 📈";
+      if (perfectRun && stars === 3 && firstTry) {
+        return "Perfect! Pattern identified on first try 🧠🏆";
+      } else if (perfectRun && stars === 3) {
+        return "Excellent! Pattern identified without errors 🌟";
+      } else if (stars === 3) {
+        return "Very well done! 👏";
+      } else if (stars === 2) {
+        return "Good job! Keep practicing 💪";
+      } else {
+        return "Completed! Your recognition will improve 📈";
+      }
     }
-  }, []);
+  }, [language]);
 
   const handleCelebrationClose = useCallback(() => {
     setShowCelebration(false);
@@ -687,17 +833,19 @@ const PatternRecognitionScreen = () => {
   const handleBackPress = useCallback(() => {
     if (gameStats.totalAttempts > 0 && !gameCompleted) {
       Alert.alert(
-        'Salir del juego',
-        '¿Estás seguro de que quieres salir? Perderás tu progreso actual.',
+        language === 'es' ? 'Salir del juego' : 'Exit game',
+        language === 'es' 
+          ? '¿Estás seguro de que quieres salir? Perderás tu progreso actual.'
+          : 'Are you sure you want to exit? You will lose your current progress.',
         [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Salir', style: 'destructive', onPress: () => navigation.goBack() }
+          { text: language === 'es' ? 'Cancelar' : 'Cancel', style: 'cancel' },
+          { text: language === 'es' ? 'Salir' : 'Exit', style: 'destructive', onPress: () => navigation.goBack() }
         ]
       );
     } else {
       navigation.goBack();
     }
-  }, [gameStats.totalAttempts, gameCompleted, navigation]);
+  }, [gameStats.totalAttempts, gameCompleted, navigation, language]);
 
   // Process achievement queue when it changes
   useEffect(() => {
@@ -717,6 +865,24 @@ const PatternRecognitionScreen = () => {
     });
   }, [step]);
 
+  // Log state changes for debugging
+  useEffect(() => {
+    console.log(`🎯 [PatternRecognitionScreen] Estado del modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}, showCelebration=${showCelebration}`);
+    
+    // Log modal visibility condition
+    const modalShouldBeVisible = score === 1 && gameCompleted && !showAnimation && showStars && !showCelebration;
+    console.log(`🎯 [PatternRecognitionScreen] ¿Modal debería ser visible? ${modalShouldBeVisible ? 'SÍ' : 'NO'}`);
+    
+    if (score === 1 && gameCompleted && showStars && !showCelebration) {
+      console.log(`🎯 [PatternRecognitionScreen] ✅ Condiciones principales cumplidas para mostrar modal`);
+      if (showAnimation) {
+        console.log(`🎯 [PatternRecognitionScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
+      } else {
+        console.log(`🎯 [PatternRecognitionScreen] ✅ Modal debería estar visible ahora!`);
+      }
+    }
+  }, [score, gameCompleted, showAnimation, showStars, showCelebration]);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header simplificado */}
@@ -725,13 +891,17 @@ const PatternRecognitionScreen = () => {
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <Text style={styles.backButtonText}>← Volver</Text>
+          <Text style={styles.backButtonText}>
+            ← {language === 'es' ? 'Volver' : 'Back'}
+          </Text>
         </TouchableOpacity>
         
         {/* Progress indicator */}
         {progressLoading && (
           <View style={styles.progressIndicator}>
-            <Text style={styles.progressText}>Guardando...</Text>
+            <Text style={styles.progressText}>
+              {language === 'es' ? 'Guardando...' : 'Saving...'}
+            </Text>
           </View>
         )}
       </View>
@@ -743,12 +913,16 @@ const PatternRecognitionScreen = () => {
         showsVerticalScrollIndicator={false}
         bounces={true}
         onTouchStart={() => {
-          // Record user interaction for inactivity tracking
-          adaptiveService.current.recordInactivity();
+          // Record user interaction for inactivity tracking - SOLO SI NO HA GANADO
+          if (!gameCompleted && score !== 1) {
+            adaptiveService.current.recordInactivity();
+          }
         }}
         onScrollBeginDrag={() => {
-          // Record user interaction for inactivity tracking
-          adaptiveService.current.recordInactivity();
+          // Record user interaction for inactivity tracking - SOLO SI NO HA GANADO
+          if (!gameCompleted && score !== 1) {
+            adaptiveService.current.recordInactivity();
+          }
         }}
       >
 
@@ -759,22 +933,36 @@ const PatternRecognitionScreen = () => {
           gameStats={gameStats}
         />
 
+        {/* Status bilingüe */}
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>
+            🌍 {language === 'es' 
+              ? `Actividad bilingüe • Idioma: Español • Reconoce patrones`
+              : `Bilingual activity • Language: English • Recognize patterns`
+            }
+          </Text>
+        </View>
+
         {/* Pregunta */}
         <View style={styles.questionContainer}>
-          <Text style={styles.sectionTitle}>Pregunta:</Text>
-          <Text style={styles.questionText}>{step.text}</Text>
+          <Text style={styles.sectionTitle}>
+            {language === 'es' ? 'Pregunta:' : 'Question:'}
+          </Text>
+          <Text style={styles.questionText}>{processedStep.text}</Text>
         </View>
 
         {/* Descripción adicional si existe */}
-        {step.description && (
+        {processedStep.description && (
           <View style={styles.descriptionContainer}>
-            <Text style={styles.descriptionText}>{step.description}</Text>
+            <Text style={styles.descriptionText}>{processedStep.description}</Text>
           </View>
         )}
 
         {/* Secuencia del patrón */}
         <View style={styles.sequenceContainer}>
-          <Text style={styles.sectionTitle}>Secuencia del patrón:</Text>
+          <Text style={styles.sectionTitle}>
+            {language === 'es' ? 'Secuencia del patrón:' : 'Pattern sequence:'}
+          </Text>
           <View style={styles.sequenceRow}>
             {step.sequence?.map((item, index) => renderSequenceItem(item, index))}
           </View>
@@ -782,10 +970,12 @@ const PatternRecognitionScreen = () => {
 
         {/* Opciones de respuesta */}
         <View style={styles.optionsContainer}>
-          <Text style={styles.sectionTitle}>Opciones disponibles:</Text>
+          <Text style={styles.sectionTitle}>
+            {language === 'es' ? 'Opciones disponibles:' : 'Available options:'}
+          </Text>
           <View style={styles.optionsGrid}>
-            {step.options?.map((option, index) => {
-              const isBlinking = isHelpActive && blinkingOptionIndex === index;
+            {processedOptions.map((option, index) => {
+              const isBlinking = isHelpActive && blinkingOptionIndex === index && !gameCompleted && score !== 1;
               return (
                 <Animated.View
                   key={index}
@@ -803,8 +993,10 @@ const PatternRecognitionScreen = () => {
                       isBlinking && styles.optionButtonHelp
                     ]}
                     onPress={() => {
-                      // Record user interaction for inactivity tracking
-                      adaptiveService.current.recordInactivity();
+                      // Record user interaction for inactivity tracking - SOLO SI NO HA GANADO
+                      if (!gameCompleted && score !== 1) {
+                        adaptiveService.current.recordInactivity();
+                      }
                       handleAnswerSelect(option.icon, index);
                     }}
                     onPressIn={() => handleOptionPressIn(index)}
@@ -850,8 +1042,10 @@ const PatternRecognitionScreen = () => {
           <View style={styles.motivationContainer}>
             <Text style={styles.motivationIcon}>⭐</Text>
             <Text style={styles.footerText}>
-              {score === 0 ? '¡Busca el patrón y complétalo!' :
-               '¡Increíble! Has identificado el patrón'}
+              {score === 0 
+                ? (language === 'es' ? '¡Busca el patrón y complétalo!' : 'Find the pattern and complete it!')
+                : (language === 'es' ? '¡Increíble! Has identificado el patrón' : 'Amazing! You identified the pattern')
+              }
             </Text>
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
@@ -859,7 +1053,10 @@ const PatternRecognitionScreen = () => {
           {/* Mensaje adicional de ánimo */}
           <View style={styles.encouragementFooter}>
             <Text style={styles.encouragementFooterText}>
-              🧠 Cada patrón te hace más inteligente ✨
+              {language === 'es' 
+                ? '🧠 Cada patrón te hace más inteligente ✨'
+                : '🧠 Every pattern makes you smarter ✨'
+              }
             </Text>
           </View>
         </View>
@@ -867,22 +1064,39 @@ const PatternRecognitionScreen = () => {
         <View style={styles.bottomSpacing} />
       </ScrollView>
 
-      {/* Game Complete Modal usando componente reutilizable */}
+      {/* Game Complete Modal - CONDICIÓN CORREGIDA */}
       <GameCompletionModal
-        visible={gameCompleted && !showAnimation && showStars && !showCelebration}
+        visible={score === 1 && gameCompleted && !showAnimation && showStars && !showCelebration}
         stats={gameStats}
         onReset={resetGame}
         onContinue={() => navigation.goBack()}
         performanceMessage={getPerformanceMessage(gameStats.stars, gameStats.perfectRun, gameStats.firstTrySuccess)}
         gameType="pattern"
         customStats={[
-          { label: 'Intentos totales', value: gameStats.totalAttempts },
-          { label: 'Patrón identificado', value: score === 1 ? 'Sí' : 'No' },
-          { label: 'Tipo de patrón', value: getPatternTypeLabel() },
-          { label: 'Ayuda usada', value: gameStats.usedHelp ? 'Sí' : 'No' },
-          { label: 'Progreso guardado', value: progressLoading ? 'Guardando...' : 'Guardado ✅' },
+          { 
+            label: language === 'es' ? 'Intentos totales' : 'Total attempts', 
+            value: gameStats.totalAttempts 
+          },
+          { 
+            label: language === 'es' ? 'Patrón identificado' : 'Pattern identified', 
+            value: score === 1 ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No')
+          },
+          { 
+            label: language === 'es' ? 'Tipo de patrón' : 'Pattern type', 
+            value: getPatternTypeLabel() 
+          },
+          { 
+            label: language === 'es' ? 'Ayuda usada' : 'Help used', 
+            value: gameStats.usedHelp ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No')
+          },
+          { 
+            label: language === 'es' ? 'Progreso guardado' : 'Progress saved', 
+            value: progressLoading 
+              ? (language === 'es' ? 'Guardando...' : 'Saving...') 
+              : (language === 'es' ? 'Guardado ✅' : 'Saved ✅')
+          },
         ]}
-        bonusMessage={gameStats.firstTrySuccess ? "🔍 ¡Patrón perfecto!" : undefined}
+        bonusMessage={gameStats.firstTrySuccess ? (language === 'es' ? "🔍 ¡Patrón perfecto!" : "🔍 Perfect pattern!") : undefined}
       />
 
       {/* Feedback Animation */}
@@ -961,6 +1175,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
+  },
+  statusContainer: {
+    backgroundColor: '#e8f5e8',
+    marginHorizontal: 0,
+    marginBottom: 16,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+  },
+  statusText: {
+    fontSize: 11,
+    color: '#2e7d32',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   questionContainer: {
     backgroundColor: '#ffffff',

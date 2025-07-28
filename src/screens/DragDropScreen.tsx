@@ -22,10 +22,12 @@ import { GameStatsDisplay } from '../components/GameStatsDisplay';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
-import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
+// import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
+import { useLanguage } from '../contexts/LanguageContext';
+import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 
 const { width } = Dimensions.get('window');
 
@@ -76,9 +78,16 @@ const DragDropScreen = () => {
   const route = useRoute<DragDropRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
+  const { t, language } = useLanguage();
 
   // Real progress hook
   const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
+
+  // Bilingual states
+  const [processedStep, setProcessedStep] = useState(step);
+  const [rawStep] = useState(step); // Keep original data
+  const [processedOptions, setProcessedOptions] = useState(step.options || []);
+  const [processedZones, setProcessedZones] = useState<string[]>([]);
 
   // Game state
   const [correctlyPlaced, setCorrectlyPlaced] = useState<Set<number>>(new Set());
@@ -117,8 +126,90 @@ const DragDropScreen = () => {
   const [showStars, setShowStars] = useState(false);
 
   // Memoized values
-  const zones = useMemo(() => Array.from(new Set(step.options?.map(o => o.correctZone) || [])), [step.options]);
-  const totalItems = useMemo(() => step.options?.length || 0, [step.options]);
+  const zones = useMemo(() => Array.from(new Set(processedOptions.map(o => o.correctZone) || [])), [processedOptions]);
+  const totalItems = useMemo(() => processedOptions.length || 0, [processedOptions]);
+
+  // Process step content when language changes
+  useEffect(() => {
+    console.log(`🌍 [DragDropScreen] Procesando contenido para idioma: ${language}`);
+    processStepForLanguage();
+  }, [language]);
+
+  // Process step content for current language
+  const processStepForLanguage = useCallback(() => {
+    console.log(`🌍 [DragDropScreen] NUEVO PROCESAMIENTO - Contenido para idioma: ${language}`);
+    console.log(`🔧 [DragDropScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
+    
+    // Process step text
+    const originalText = rawStep.text || '';
+    const originalHelpMessage = rawStep.helpMessage || '';
+    
+    console.log(`🧪 [DragDropScreen] ANTES del procesamiento:`);
+    console.log(`   Original text: "${originalText}"`);
+    console.log(`   Original helpMessage: "${originalHelpMessage}"`);
+    console.log(`   Tiene colon en text: ${originalText.includes(':')}`);
+    console.log(`   Tiene colon en helpMessage: ${originalHelpMessage.includes(':')}`);
+    
+    const processedText = BilingualTextProcessor.extractText(originalText, language);
+    const processedHelpMessage = BilingualTextProcessor.extractText(originalHelpMessage, language);
+    
+    // Process options (draggable items)
+    const newProcessedOptions = rawStep.options?.map((option, index) => {
+      const originalLabel = option.label || '';
+      const originalCorrectZone = option.correctZone || '';
+      
+      console.log(`🧪 [DragDropScreen] ANTES del procesamiento elemento ${index + 1}:`);
+      console.log(`   Original label: "${originalLabel}"`);
+      console.log(`   Original correctZone: "${originalCorrectZone}"`);
+      console.log(`   Icon: "${option.icon}"`);
+      console.log(`   Tiene colon en label: ${originalLabel.includes(':')}`);
+      console.log(`   Tiene colon en correctZone: ${originalCorrectZone.includes(':')}`);
+      
+      const processedLabel = BilingualTextProcessor.extractText(originalLabel, language);
+      const processedCorrectZone = BilingualTextProcessor.extractText(originalCorrectZone, language);
+      
+      console.log(`🎯 [DragDropScreen] DESPUÉS del procesamiento elemento ${index + 1}:`);
+      console.log(`   Processed label: "${processedLabel}"`);
+      console.log(`   Processed correctZone: "${processedCorrectZone}"`);
+      console.log(`   Label cambió: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
+      console.log(`   CorrectZone cambió: ${originalCorrectZone !== processedCorrectZone ? 'SÍ' : 'NO'}`);
+      
+      return {
+        ...option,
+        label: processedLabel,
+        correctZone: processedCorrectZone,
+      };
+    }) || [];
+    
+    // Process zones
+    const newProcessedZones = Array.from(new Set(newProcessedOptions.map(o => o.correctZone).filter(Boolean)));
+    
+    console.log(`🎯 [DragDropScreen] DESPUÉS del procesamiento principal:`);
+    console.log(`   Processed text: "${processedText}"`);
+    console.log(`   Processed helpMessage: "${processedHelpMessage}"`);
+    console.log(`   Language usado: ${language}`);
+    console.log(`   Text cambió: ${originalText !== processedText ? 'SÍ' : 'NO'}`);
+    console.log(`   HelpMessage cambió: ${originalHelpMessage !== processedHelpMessage ? 'SÍ' : 'NO'}`);
+    
+    // Update processed step and options
+    const newProcessedStep = {
+      ...rawStep,
+      text: processedText,
+      helpMessage: processedHelpMessage,
+      options: newProcessedOptions,
+    };
+    
+    setProcessedStep(newProcessedStep);
+    setProcessedOptions(newProcessedOptions);
+    setProcessedZones(newProcessedZones);
+    
+    console.log(`✅ [DragDropScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
+    console.log('🎯 [DragDropScreen] Elementos procesados:');
+    newProcessedOptions.forEach((option, index) => {
+      console.log(`  ${index + 1}. "${option.icon}" - "${option.label}" → "${option.correctZone}"`);
+    });
+    console.log('📦 [DragDropScreen] Zonas procesadas:', newProcessedZones);
+  }, [rawStep, language]);
 
   // Adaptive reinforcement states
   const [isHelpActive, setIsHelpActive] = useState(false);
@@ -712,13 +803,17 @@ const DragDropScreen = () => {
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <Text style={styles.backButtonText}>← Volver</Text>
+          <Text style={styles.backButtonText}>
+            ← {language === 'es' ? 'Volver' : 'Back'}
+          </Text>
         </TouchableOpacity>
         
         {/* Progress indicator */}
         {progressLoading && (
           <View style={styles.progressIndicator}>
-            <Text style={styles.progressText}>Guardando...</Text>
+            <Text style={styles.progressText}>
+              {language === 'es' ? 'Guardando...' : 'Saving...'}
+            </Text>
           </View>
         )}
       </View>
@@ -747,9 +842,21 @@ const DragDropScreen = () => {
           gameStats={gameStats}
         />
 
+        {/* Status bilingüe */}
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>
+            🌍 {language === 'es' 
+              ? `Actividad bilingüe • Idioma: Español • Asocia elementos`
+              : `Bilingual activity • Language: English • Associate elements`
+            }
+          </Text>
+        </View>
+
         {/* Zonas de Destino - Altura Fija */}
         <View style={styles.zonesContainer}>
-          <Text style={styles.sectionTitle}>Zonas de destino:</Text>
+          <Text style={styles.sectionTitle}>
+            {language === 'es' ? 'Zonas de destino:' : 'Target zones:'}
+          </Text>
           <View style={styles.zonesGrid}>
             {zones.map((zone, zoneIndex) => {
               if (!zone) return null;
@@ -773,7 +880,9 @@ const DragDropScreen = () => {
                 <Text style={styles.zoneTitle}>{zone}</Text>
                 <View style={styles.zoneContent}>
                   {(zoneItems[zone] || []).length === 0 ? (
-                    <Text style={styles.emptyZoneText}>Suelta aquí</Text>
+                    <Text style={styles.emptyZoneText}>
+                      {language === 'es' ? 'Suelta aquí' : 'Drop here'}
+                    </Text>
                   ) : (
                     <View style={styles.placedItemsContainer}>
                       {(zoneItems[zone] || []).map((placedItem: PlacedItem, i: number) => (
@@ -792,9 +901,11 @@ const DragDropScreen = () => {
 
         {/* Elementos Arrastrables */}
         <View style={styles.optionsContainer}>
-          <Text style={styles.sectionTitle}>Elementos para arrastrar:</Text>
+          <Text style={styles.sectionTitle}>
+            {language === 'es' ? 'Elementos para arrastrar:' : 'Elements to drag:'}
+          </Text>
           <View style={styles.optionsGrid}>
-            {step.options?.map((option, idx) => {
+            {processedOptions.map((option, idx) => {
               if (!option.correctZone) return null;
               const { pan, panResponder } = createPanHandlers(option as Option, idx);
               const isPlaced = correctlyPlaced.has(idx);
@@ -836,9 +947,12 @@ const DragDropScreen = () => {
           <View style={styles.motivationContainer}>
             <Text style={styles.motivationIcon}>⭐</Text>
             <Text style={styles.footerText}>
-              {score === 0 ? '¡Tú puedes hacerlo! Empieza arrastrando' :
-               score === totalItems ? '¡Increíble! Lo lograste' :
-               '¡Excelente! Sigue así, casi terminas'}
+              {score === 0 
+                ? (language === 'es' ? '¡Tú puedes hacerlo! Empieza arrastrando' : 'You can do it! Start dragging')
+                : score === totalItems 
+                  ? (language === 'es' ? '¡Increíble! Lo lograste' : 'Amazing! You did it')
+                  : (language === 'es' ? '¡Excelente! Sigue así, casi terminas' : 'Excellent! Keep going, almost done')
+              }
             </Text>
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
@@ -846,7 +960,10 @@ const DragDropScreen = () => {
           {/* Mensaje adicional de ánimo */}
           <View style={styles.encouragementFooter}>
             <Text style={styles.encouragementFooterText}>
-              🌟 Cada intento te hace más inteligente 🧠
+              {language === 'es' 
+                ? '🌟 Cada intento te hace más inteligente 🧠'
+                : '🌟 Every attempt makes you smarter 🧠'
+              }
             </Text>
           </View>
         </View>
@@ -948,6 +1065,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
+  },
+  statusContainer: {
+    backgroundColor: '#e8f5e8',
+    marginHorizontal: 0,
+    marginBottom: 16,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+  },
+  statusText: {
+    fontSize: 11,
+    color: '#2e7d32',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 16,

@@ -18,6 +18,7 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import ApiService, { Category, Lesson, Step } from '../services/ApiService';
 import { AchievementService } from '../services/AchievementService';
 import { useLanguage } from '../contexts/LanguageContext';
+import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 
 const { width } = Dimensions.get('window');
 
@@ -31,11 +32,12 @@ type CategoryMenuScreenRouteProp = {
 const CategoryMenuScreen = () => {
   const navigation = useNavigation<CategoryMenuScreenNavigationProp>();
   const route = useRoute<CategoryMenuScreenRouteProp>();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { activityType } = route.params || {};
   
   // Estados
   const [categories, setCategories] = useState<Category[]>([]);
+  const [rawCategories, setRawCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [totalPoints, setTotalPoints] = useState(0);
@@ -48,6 +50,14 @@ const CategoryMenuScreen = () => {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Procesar categorías cuando cambie el idioma
+  useEffect(() => {
+    if (rawCategories.length > 0) {
+      console.log(`🌍 [CategoryMenuScreen] Procesando ${rawCategories.length} categorías para idioma: ${language}`);
+      processCategoriesForLanguage();
+    }
+  }, [language, rawCategories]);
 
   // Reload stats when screen comes into focus
   useEffect(() => {
@@ -77,6 +87,16 @@ const CategoryMenuScreen = () => {
       setLoading(true);
       console.log('📂 [CategoryMenuScreen] Cargando categorías desde API...');
       const categoriesData = await ApiService.getCategories();
+      
+      console.log('📋 [CategoryMenuScreen] Datos originales del servidor:');
+      categoriesData.forEach((category, index) => {
+        console.log(`  ${index + 1}. ID: ${category.ID}`);
+        console.log(`     Name: "${category.name}"`);
+        console.log(`     Description: "${category.description}"`);
+        console.log(`     Has colon in name: ${category.name?.includes(':') || false}`);
+        console.log(`     Has colon in description: ${category.description?.includes(':') || false}`);
+        console.log(`     Is active: ${category.is_active}`);
+      });
       
       let filteredCategories = categoriesData;
       
@@ -140,8 +160,13 @@ const CategoryMenuScreen = () => {
         return a.name.localeCompare(b.name);
       });
       
-      setCategories(sortedCategories);
-      console.log(`✅ [CategoryMenuScreen] ${sortedCategories.length} categorías cargadas`);
+      // Guardar datos originales
+      setRawCategories(sortedCategories);
+      
+      // Procesar inmediatamente para el idioma actual
+      processCategoriesForLanguage(sortedCategories);
+      
+      console.log(`✅ [CategoryMenuScreen] ${sortedCategories.length} categorías cargadas desde servidor`);
       
       // Initialize scale animations for each category
       scaleValues.length = 0;
@@ -162,6 +187,50 @@ const CategoryMenuScreen = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const processCategoriesForLanguage = (categoriesToProcess?: Category[]) => {
+    const sourceCategories = categoriesToProcess || rawCategories;
+    
+    console.log(`🌍 [CategoryMenuScreen] NUEVO PROCESAMIENTO - ${sourceCategories.length} categorías para idioma: ${language}`);
+    console.log(`🔧 [CategoryMenuScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
+    
+    if (sourceCategories.length === 0) {
+      console.log('⚠️ [CategoryMenuScreen] No hay categorías para procesar');
+      return;
+    }
+    
+    // Procesar textos bilingües
+    const processedCategories = sourceCategories.map((category, index) => {
+      const originalName = category.name || '';
+      const originalDescription = category.description || '';
+      
+      console.log(`🧪 [CategoryMenuScreen] ANTES del procesamiento ${index + 1}:`);
+      console.log(`   Original name: "${originalName}"`);
+      console.log(`   Tiene colon: ${originalName.includes(':')}`);
+      
+      const processedName = BilingualTextProcessor.extractText(originalName, language);
+      const processedDescription = BilingualTextProcessor.extractText(originalDescription, language);
+      
+      console.log(`🎯 [CategoryMenuScreen] DESPUÉS del procesamiento ${index + 1}:`);
+      console.log(`   Processed name: "${processedName}"`);
+      console.log(`   Language usado: ${language}`);
+      console.log(`   Cambió: ${originalName !== processedName ? 'SÍ' : 'NO'}`);
+      
+      return {
+        ...category,
+        name: processedName,
+        description: processedDescription,
+      };
+    });
+    
+    console.log(`✅ [CategoryMenuScreen] RESULTADO FINAL - Categorías procesadas para idioma: ${language}`);
+    console.log('📋 [CategoryMenuScreen] Lista completa procesada:');
+    processedCategories.forEach((category, index) => {
+      console.log(`  ${index + 1}. "${category.name}"`);
+    });
+    
+    setCategories(processedCategories);
   };
 
   const loadAchievementStats = async () => {
@@ -186,9 +255,11 @@ const CategoryMenuScreen = () => {
 
   const goToSubLessons = (category: Category) => {
     console.log(`📚 [CategoryMenuScreen] Navegando a lecciones para categoría: ${category.name}`);
-    // Navegar a la pantalla de lecciones con la categoría seleccionada
+    // Usar el nombre original para la navegación (el servidor espera el nombre original)
+    const originalCategory = rawCategories.find(orig => orig.ID === category.ID);
+    const categoryName = originalCategory ? originalCategory.name : category.name;
     navigation.navigate('lessonList', { 
-      category: category.name, 
+      category: categoryName, 
       activityType 
     });
   };
@@ -411,6 +482,16 @@ const CategoryMenuScreen = () => {
         </View>
       </View>
       
+      {/* Status */}
+      <View style={styles.statusContainer}>
+        <Text style={styles.statusText}>
+          🌍 {language === 'es' 
+            ? `Categorías bilingües • Idioma: Español • ${categories.length} categorías`
+            : `Bilingual categories • Language: English • ${categories.length} categories`
+          }
+        </Text>
+      </View>
+      
       {/* Categories Grid */}
       {categories.length === 0 ? (
         renderEmptyState()
@@ -545,6 +626,22 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: '#ffffff',
+  },
+  statusContainer: {
+    backgroundColor: '#e8f5e8',
+    marginHorizontal: 15,
+    marginTop: 10,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+  },
+  statusText: {
+    fontSize: 11,
+    color: '#2e7d32',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,

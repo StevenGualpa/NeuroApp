@@ -21,10 +21,12 @@ import AchievementCelebration from '../components/AchievementCelebration';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
-import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
+// import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
+import { useLanguage } from '../contexts/LanguageContext';
+import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 
 const { width } = Dimensions.get('window');
 
@@ -56,14 +58,20 @@ const OrderStepsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'orderSteps'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
+  const { t, language } = useLanguage();
 
   // Real progress hook
   const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
 
-  // Crear una copia de las opciones y mezclarlas
+  // Bilingual states
+  const [processedStep, setProcessedStep] = useState(step);
+  const [rawStep] = useState(step); // Keep original data
+  const [processedOptions, setProcessedOptions] = useState(step.options || []);
+
+  // Crear una copia de las opciones procesadas y mezclarlas
   const shuffledOptions = useMemo(() => 
-    [...(step.options || [])].sort(() => Math.random() - 0.5), 
-    [step.options]
+    [...processedOptions].sort(() => Math.random() - 0.5), 
+    [processedOptions]
   );
 
   // Game state
@@ -114,12 +122,81 @@ const OrderStepsScreen = () => {
   const totalSteps = useMemo(() => shuffledOptions.length, [shuffledOptions]);
   const totalItems = totalSteps; // Para compatibilidad con ProgressSection
 
+  // Process step content when language changes
+  useEffect(() => {
+    console.log(`🌍 [OrderStepsScreen] Procesando contenido para idioma: ${language}`);
+    processStepForLanguage();
+  }, [language]);
+
+  // Process step content for current language
+  const processStepForLanguage = useCallback(() => {
+    console.log(`🌍 [OrderStepsScreen] NUEVO PROCESAMIENTO - Contenido para idioma: ${language}`);
+    console.log(`🔧 [OrderStepsScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
+    
+    // Process step text
+    const originalText = rawStep.text || '';
+    const originalHelpMessage = rawStep.helpMessage || '';
+    
+    console.log(`🧪 [OrderStepsScreen] ANTES del procesamiento:`);
+    console.log(`   Original text: "${originalText}"`);
+    console.log(`   Original helpMessage: "${originalHelpMessage}"`);
+    console.log(`   Tiene colon en text: ${originalText.includes(':')}`);
+    console.log(`   Tiene colon en helpMessage: ${originalHelpMessage.includes(':')}`);
+    
+    const processedText = BilingualTextProcessor.extractText(originalText, language);
+    const processedHelpMessage = BilingualTextProcessor.extractText(originalHelpMessage, language);
+    
+    // Process options
+    const newProcessedOptions = rawStep.options?.map((option, index) => {
+      const originalLabel = option.label || '';
+      
+      console.log(`🧪 [OrderStepsScreen] ANTES del procesamiento paso ${index + 1}:`);
+      console.log(`   Original label: "${originalLabel}"`);
+      console.log(`   Tiene colon: ${originalLabel.includes(':')}`);
+      
+      const processedLabel = BilingualTextProcessor.extractText(originalLabel, language);
+      
+      console.log(`🎯 [OrderStepsScreen] DESPUÉS del procesamiento paso ${index + 1}:`);
+      console.log(`   Processed label: "${processedLabel}"`);
+      console.log(`   Cambió: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
+      
+      return {
+        ...option,
+        label: processedLabel,
+      };
+    }) || [];
+    
+    console.log(`🎯 [OrderStepsScreen] DESPUÉS del procesamiento principal:`);
+    console.log(`   Processed text: "${processedText}"`);
+    console.log(`   Processed helpMessage: "${processedHelpMessage}"`);
+    console.log(`   Language usado: ${language}`);
+    console.log(`   Text cambió: ${originalText !== processedText ? 'SÍ' : 'NO'}`);
+    console.log(`   HelpMessage cambió: ${originalHelpMessage !== processedHelpMessage ? 'SÍ' : 'NO'}`);
+    
+    // Update processed step and options
+    const newProcessedStep = {
+      ...rawStep,
+      text: processedText,
+      helpMessage: processedHelpMessage,
+      options: newProcessedOptions,
+    };
+    
+    setProcessedStep(newProcessedStep);
+    setProcessedOptions(newProcessedOptions);
+    
+    console.log(`✅ [OrderStepsScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
+    console.log('📋 [OrderStepsScreen] Pasos procesados:');
+    newProcessedOptions.forEach((option, index) => {
+      console.log(`  ${index + 1}. "${option.label}" (Orden: ${option.order})`);
+    });
+  }, [rawStep, language]);
+
   // Initialize achievements service
   useEffect(() => {
     const initAchievements = async () => {
       try {
         console.log('🏆 [OrderStepsScreen] Inicializando servicio de logros mejorado...');
-        await RealAchievementServiceEnhanced.initializeAchievements();
+        await AchievementService.initializeAchievements();
         console.log('✅ [OrderStepsScreen] Servicio de logros inicializado');
       } catch (error) {
         console.error('❌ [OrderStepsScreen] Error inicializando logros:', error);
@@ -347,7 +424,8 @@ const OrderStepsScreen = () => {
 
       console.log('🏆 [OrderStepsScreen] Verificando logros con datos:', gameData);
 
-      const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
+      // const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
+      const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
       if (newlyUnlocked.length > 0) {
         console.log(`🎉 [OrderStepsScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
@@ -387,10 +465,28 @@ const OrderStepsScreen = () => {
     }
   }, [saveProgressToBackend, step]);
 
+  // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
+    console.log(`🎬 [OrderStepsScreen] Animación terminada: ${animationType}, score: ${score}, totalSteps: ${totalSteps}, gameCompleted: ${gameCompleted}`);
     setShowAnimation(false);
     
-    if (animationType === 'winner' && !gameCompleted) {
+    // CONDICIÓN CORREGIDA: Solo completar el juego si se ordenaron TODOS los pasos
+    if (animationType === 'winner' && score === totalSteps && !gameCompleted) {
+      console.log('🎯 [OrderStepsScreen] ¡TODOS LOS PASOS COMPLETADOS! Iniciando secuencia de finalización...');
+      console.log(`📊 [OrderStepsScreen] Verificación: score=${score}, totalSteps=${totalSteps}, todos completados=${score === totalSteps}`);
+      
+      // IMPORTANTE: Limpiar toda la ayuda activa inmediatamente
+      if (isHelpActive) {
+        console.log('🛑 [OrderStepsScreen] Limpiando ayuda activa...');
+        setIsHelpActive(false);
+        setBlinkingStepIndex(null);
+        helpBlinkAnimation.setValue(1);
+      }
+      
+      // Detener servicios de ayuda
+      adaptiveService.current.cleanup();
+      audioService.current.cleanup();
+      
       setGameCompleted(true);
       
       // Calculate final stats
@@ -418,15 +514,23 @@ const OrderStepsScreen = () => {
       // Record game completion (includes backend save and achievement check)
       recordGameCompletion(finalStats);
       
-      // Show stars after a delay
+      // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
       setTimeout(() => {
+        console.log('🏆 [OrderStepsScreen] Mostrando modal de finalización directamente...');
         setShowStars(true);
-      }, 500);
+        console.log('⭐ [OrderStepsScreen] Modal debería aparecer ahora');
+        console.log(`🎯 [OrderStepsScreen] Estados para modal: score=${score}, gameCompleted=true, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
+      }, 800);
+    } else if (animationType === 'winner' && score !== totalSteps) {
+      console.log(`⚠️ [OrderStepsScreen] Animación winner pero no todos los pasos completados: score=${score}, totalSteps=${totalSteps}`);
     }
-  }, [animationType, gameCompleted, gameStats, startTime, totalSteps, calculateStars, recordGameCompletion]);
+  }, [animationType, score, totalSteps, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation, showCelebration]);
 
   const handleSelect = useCallback((option: any) => {
     if (disabled || selectedOrder.some(item => item.label === option.label)) return;
+
+    console.log(`🎯 [OrderStepsScreen] Usuario seleccionó: "${option.label}" con orden ${option.order}`);
+    console.log(`📊 [OrderStepsScreen] Estado actual: ${selectedOrder.length} pasos seleccionados`);
 
     const newOrder = [...selectedOrder, option];
     setSelectedOrder(newOrder);
@@ -435,6 +539,13 @@ const OrderStepsScreen = () => {
     // Find what step should be next based on order
     const expectedStep = newOrder.length;
     const isCorrect = option.order === expectedStep;
+
+    console.log(`🔍 [OrderStepsScreen] Verificación de orden:`);
+    console.log(`   Paso esperado: ${expectedStep}`);
+    console.log(`   Orden del paso seleccionado: ${option.order}`);
+    console.log(`   ¿Es correcto?: ${isCorrect ? 'SÍ' : 'NO'}`);
+    console.log(`   Total de pasos: ${shuffledOptions.length}`);
+    console.log(`   Pasos completados: ${newOrder.length}`);
 
     // Record action in adaptive reinforcement service
     const nextStepOrder = newOrder.length + 1;
@@ -460,6 +571,9 @@ const OrderStepsScreen = () => {
     setStatus(prev => ({ ...prev, [option.label]: isCorrect ? 'correct' : 'wrong' }));
 
     if (!isCorrect) {
+      // PASO INCORRECTO - Error y reiniciar
+      console.log('❌ [OrderStepsScreen] PASO INCORRECTO - Mostrando error y reiniciando');
+      
       // Update error stats
       setGameStats(prev => ({
         ...prev,
@@ -486,12 +600,19 @@ const OrderStepsScreen = () => {
         }, 1000);
       }, 800);
     } else if (newOrder.length === shuffledOptions.length) {
-      // Game completed successfully
+      // TODOS LOS PASOS COMPLETADOS CORRECTAMENTE
+      console.log('🎉 [OrderStepsScreen] ¡TODOS LOS PASOS ORDENADOS CORRECTAMENTE!');
+      console.log(`📊 [OrderStepsScreen] Secuencia completa: ${newOrder.length}/${shuffledOptions.length} pasos`);
+      console.log('🏆 [OrderStepsScreen] Mostrando animación WINNER');
+      
       setTimeout(() => {
         showFeedbackAnimation('winner');
       }, 500);
     } else {
-      // Correct step, continue
+      // PASO CORRECTO PERO AÚN FALTAN MÁS
+      console.log(`✅ [OrderStepsScreen] Paso correcto, pero faltan más. Progreso: ${newOrder.length}/${shuffledOptions.length}`);
+      console.log('👍 [OrderStepsScreen] Mostrando animación SUCCESS');
+      
       showFeedbackAnimation('success');
       // Play encouragement audio
       audioService.current.playEncouragementMessage();
@@ -650,6 +771,24 @@ const OrderStepsScreen = () => {
     });
   }, [step]);
 
+  // Log state changes for debugging
+  useEffect(() => {
+    console.log(`🎯 [OrderStepsScreen] Estado del modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}, showCelebration=${showCelebration}`);
+    
+    // Log modal visibility condition
+    const modalShouldBeVisible = gameCompleted && !showAnimation && showStars && !showCelebration;
+    console.log(`🎯 [OrderStepsScreen] ¿Modal debería ser visible? ${modalShouldBeVisible ? 'SÍ' : 'NO'}`);
+    
+    if (gameCompleted && showStars && !showCelebration) {
+      console.log(`🎯 [OrderStepsScreen] ✅ Condiciones principales cumplidas para mostrar modal`);
+      if (showAnimation) {
+        console.log(`🎯 [OrderStepsScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
+      } else {
+        console.log(`🎯 [OrderStepsScreen] ✅ Modal debería estar visible ahora!`);
+      }
+    }
+  }, [score, gameCompleted, showAnimation, showStars, showCelebration]);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header simplificado */}
@@ -658,13 +797,17 @@ const OrderStepsScreen = () => {
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <Text style={styles.backButtonText}>← Volver</Text>
+          <Text style={styles.backButtonText}>
+            ← {language === 'es' ? 'Volver' : 'Back'}
+          </Text>
         </TouchableOpacity>
         
         {/* Progress indicator */}
         {progressLoading && (
           <View style={styles.progressIndicator}>
-            <Text style={styles.progressText}>Guardando...</Text>
+            <Text style={styles.progressText}>
+              {language === 'es' ? 'Guardando...' : 'Saving...'}
+            </Text>
           </View>
         )}
       </View>
@@ -692,15 +835,29 @@ const OrderStepsScreen = () => {
           gameStats={gameStats}
         />
 
+        {/* Status bilingüe */}
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>
+            🌍 {language === 'es' 
+              ? `Actividad bilingüe • Idioma: Español • Ordena los pasos`
+              : `Bilingual activity • Language: English • Order the steps`
+            }
+          </Text>
+        </View>
+
         {/* Pregunta */}
         <View style={styles.questionContainer}>
-          <Text style={styles.sectionTitle}>Pregunta:</Text>
-          <Text style={styles.questionText}>{step.text}</Text>
+          <Text style={styles.sectionTitle}>
+            {language === 'es' ? 'Pregunta:' : 'Question:'}
+          </Text>
+          <Text style={styles.questionText}>{processedStep.text}</Text>
         </View>
 
         {/* Opciones para ordenar */}
         <View style={styles.optionsContainer}>
-          <Text style={styles.sectionTitle}>Pasos para ordenar:</Text>
+          <Text style={styles.sectionTitle}>
+            {language === 'es' ? 'Pasos para ordenar:' : 'Steps to order:'}
+          </Text>
           <FlatList
             data={shuffledOptions}
             keyExtractor={(item, idx) => item.label + idx}
@@ -716,7 +873,9 @@ const OrderStepsScreen = () => {
         {selectedOrder.length > 0 && !gameCompleted && (
           <View style={styles.resetContainer}>
             <TouchableOpacity onPress={reset} style={styles.resetButton}>
-              <Text style={styles.resetText}>🔄 Reiniciar</Text>
+              <Text style={styles.resetText}>
+                🔄 {language === 'es' ? 'Reiniciar' : 'Reset'}
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -726,9 +885,12 @@ const OrderStepsScreen = () => {
           <View style={styles.motivationContainer}>
             <Text style={styles.motivationIcon}>⭐</Text>
             <Text style={styles.footerText}>
-              {score === 0 ? '¡Piensa en el orden correcto!' :
-               score === totalItems ? '¡Increíble! Lo lograste' :
-               '¡Excelente! Sigue así, casi terminas'}
+              {score === 0 
+                ? (language === 'es' ? '¡Piensa en el orden correcto!' : 'Think about the correct order!')
+                : score === totalItems 
+                  ? (language === 'es' ? '¡Increíble! Lo lograste' : 'Amazing! You did it!')
+                  : (language === 'es' ? '¡Excelente! Sigue así, casi terminas' : 'Excellent! Keep going, almost done!')
+              }
             </Text>
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
@@ -736,7 +898,10 @@ const OrderStepsScreen = () => {
           {/* Mensaje adicional de ánimo */}
           <View style={styles.encouragementFooter}>
             <Text style={styles.encouragementFooterText}>
-              🧠 Cada paso te hace más organizado ✨
+              {language === 'es' 
+                ? '🧠 Cada paso te hace más organizado ✨'
+                : '🧠 Every step makes you more organized ✨'
+              }
             </Text>
           </View>
         </View>
@@ -838,6 +1003,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
+  },
+  statusContainer: {
+    backgroundColor: '#e8f5e8',
+    marginHorizontal: 0,
+    marginBottom: 16,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+  },
+  statusText: {
+    fontSize: 11,
+    color: '#2e7d32',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   questionContainer: {
     backgroundColor: '#ffffff',

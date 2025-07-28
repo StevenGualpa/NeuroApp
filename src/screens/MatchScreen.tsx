@@ -20,10 +20,12 @@ import AchievementCelebration from '../components/AchievementCelebration';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
-import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
+// import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
+import { useLanguage } from '../contexts/LanguageContext';
+import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 
 const { width } = Dimensions.get('window');
 
@@ -54,9 +56,15 @@ const MatchScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'match'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { step, lessonTitle } = route.params;
+  const { t, language } = useLanguage();
 
   // Real progress hook
   const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
+
+  // Bilingual states
+  const [processedStep, setProcessedStep] = useState(step);
+  const [rawStep] = useState(step); // Keep original data
+  const [processedOptions, setProcessedOptions] = useState(step.options || []);
   
   // Game state
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -106,15 +114,86 @@ const MatchScreen = () => {
   const audioService = useRef(AudioService.getInstance());
 
   // Memoized values
-  const totalOptions = useMemo(() => step.options?.length || 0, [step.options]);
+  const totalOptions = useMemo(() => processedOptions.length || 0, [processedOptions]);
   const totalItems = 1; // Solo una respuesta correcta en asociar
+
+  // Process step content when language changes
+  useEffect(() => {
+    console.log(`🌍 [MatchScreen] Procesando contenido para idioma: ${language}`);
+    processStepForLanguage();
+  }, [language]);
+
+  // Process step content for current language
+  const processStepForLanguage = useCallback(() => {
+    console.log(`🌍 [MatchScreen] NUEVO PROCESAMIENTO - Contenido para idioma: ${language}`);
+    console.log(`🔧 [MatchScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
+    
+    // Process step text
+    const originalText = rawStep.text || '';
+    const originalHelpMessage = rawStep.helpMessage || '';
+    
+    console.log(`🧪 [MatchScreen] ANTES del procesamiento:`);
+    console.log(`   Original text: "${originalText}"`);
+    console.log(`   Original helpMessage: "${originalHelpMessage}"`);
+    console.log(`   Tiene colon en text: ${originalText.includes(':')}`);
+    console.log(`   Tiene colon en helpMessage: ${originalHelpMessage.includes(':')}`);
+    
+    const processedText = BilingualTextProcessor.extractText(originalText, language);
+    const processedHelpMessage = BilingualTextProcessor.extractText(originalHelpMessage, language);
+    
+    // Process options
+    const newProcessedOptions = rawStep.options?.map((option, index) => {
+      const originalLabel = option.label || '';
+      
+      console.log(`🧪 [MatchScreen] ANTES del procesamiento opción ${index + 1}:`);
+      console.log(`   Original label: "${originalLabel}"`);
+      console.log(`   Icon: "${option.icon}"`);
+      console.log(`   Correct: ${option.correct}`);
+      console.log(`   Tiene colon: ${originalLabel.includes(':')}`);
+      
+      const processedLabel = BilingualTextProcessor.extractText(originalLabel, language);
+      
+      console.log(`🎯 [MatchScreen] DESPUÉS del procesamiento opción ${index + 1}:`);
+      console.log(`   Processed label: "${processedLabel}"`);
+      console.log(`   Cambió: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
+      
+      return {
+        ...option,
+        label: processedLabel,
+      };
+    }) || [];
+    
+    console.log(`🎯 [MatchScreen] DESPUÉS del procesamiento principal:`);
+    console.log(`   Processed text: "${processedText}"`);
+    console.log(`   Processed helpMessage: "${processedHelpMessage}"`);
+    console.log(`   Language usado: ${language}`);
+    console.log(`   Text cambió: ${originalText !== processedText ? 'SÍ' : 'NO'}`);
+    console.log(`   HelpMessage cambió: ${originalHelpMessage !== processedHelpMessage ? 'SÍ' : 'NO'}`);
+    
+    // Update processed step and options
+    const newProcessedStep = {
+      ...rawStep,
+      text: processedText,
+      helpMessage: processedHelpMessage,
+      options: newProcessedOptions,
+    };
+    
+    setProcessedStep(newProcessedStep);
+    setProcessedOptions(newProcessedOptions);
+    
+    console.log(`✅ [MatchScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
+    console.log('🔗 [MatchScreen] Opciones procesadas:');
+    newProcessedOptions.forEach((option, index) => {
+      console.log(`  ${index + 1}. "${option.icon}" - "${option.label}" (Correcto: ${option.correct})`);
+    });
+  }, [rawStep, language]);
 
   // Initialize achievements service
   useEffect(() => {
     const initAchievements = async () => {
       try {
         console.log('🏆 [MatchScreen] Inicializando servicio de logros mejorado...');
-        await RealAchievementServiceEnhanced.initializeAchievements();
+        await AchievementService.initializeAchievements();
         console.log('✅ [MatchScreen] Servicio de logros inicializado');
       } catch (error) {
         console.error('❌ [MatchScreen] Error inicializando logros:', error);
@@ -130,7 +209,7 @@ const MatchScreen = () => {
         // Handle help trigger
         if (helpOptionIndex === -1) {
           // Inactivity help - find correct option
-          const correctIndex = step.options?.findIndex(option => option.correct) ?? -1;
+          const correctIndex = processedOptions.findIndex(option => option.correct) ?? -1;
           if (correctIndex !== -1) {
             triggerHelpForOption(correctIndex);
           }
@@ -162,7 +241,7 @@ const MatchScreen = () => {
       adaptiveService.current.cleanup();
       audioService.current.cleanup();
     };
-  }, [step]);
+  }, [step, processedOptions]);
 
   useEffect(() => {
     // Entrance animations
@@ -347,7 +426,8 @@ const MatchScreen = () => {
 
       console.log('🏆 [MatchScreen] Verificando logros con datos:', gameData);
 
-      const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
+      // const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
+      const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
       if (newlyUnlocked.length > 0) {
         console.log(`🎉 [MatchScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
@@ -387,10 +467,27 @@ const MatchScreen = () => {
     }
   }, [saveProgressToBackend, step]);
 
+  // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
+    console.log(`🎬 [MatchScreen] Animación terminada: ${animationType}, score: ${score}, gameCompleted: ${gameCompleted}`);
     setShowAnimation(false);
     
-    if (animationType === 'success' && !gameCompleted) {
+    if (animationType === 'success' && score === 1 && !gameCompleted) {
+      console.log('🎯 [MatchScreen] ¡RESPUESTA CORRECTA! Iniciando secuencia de finalización...');
+      console.log(`📊 [MatchScreen] Verificación: score=${score}, respuesta correcta=${score === 1}`);
+      
+      // IMPORTANTE: Limpiar toda la ayuda activa inmediatamente
+      if (isHelpActive) {
+        console.log('🛑 [MatchScreen] Limpiando ayuda activa...');
+        setIsHelpActive(false);
+        setBlinkingOptionIndex(null);
+        helpBlinkAnimation.setValue(1);
+      }
+      
+      // Detener servicios de ayuda
+      adaptiveService.current.cleanup();
+      audioService.current.cleanup();
+      
       setGameCompleted(true);
       
       // Calculate final stats
@@ -418,21 +515,27 @@ const MatchScreen = () => {
       
       // Small delay before showing winner animation
       setTimeout(() => {
+        console.log('🏆 [MatchScreen] Mostrando animación winner...');
         showFeedbackAnimation('winner');
       }, 300);
     } else if (animationType === 'winner') {
+      console.log('🎊 [MatchScreen] Animación winner terminada, mostrando modal...');
       // Show stars after winner animation
       setTimeout(() => {
+        console.log('⭐ [MatchScreen] Modal debería aparecer ahora');
         setShowStars(true);
+        console.log(`🎯 [MatchScreen] Estados para modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
       }, 500);
     }
-  }, [animationType, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation]);
+  }, [animationType, score, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation, isHelpActive, helpBlinkAnimation, showCelebration]);
 
   const handleOptionPress = useCallback((correct: boolean, index: number) => {
     if (isAnswered || gameCompleted) return;
     
+    console.log(`🔗 [MatchScreen] Usuario seleccionó opción ${index + 1}: "${processedOptions[index]?.label}" (Correcto: ${correct})`);
+    
     // Record action in adaptive reinforcement service
-    const correctOptionIndex = step.options?.findIndex(option => option.correct) ?? -1;
+    const correctOptionIndex = processedOptions.findIndex(option => option.correct) ?? -1;
     adaptiveService.current.recordAction(correct, correctOptionIndex, step.activityType);
 
     // Clear any active help
@@ -473,11 +576,13 @@ const MatchScreen = () => {
 
     setTimeout(() => {
       if (correct) {
+        console.log('✅ [MatchScreen] ¡RESPUESTA CORRECTA!');
         setScore(1);
         showFeedbackAnimation('success');
         // Play encouragement audio
         audioService.current.playEncouragementMessage();
       } else {
+        console.log('❌ [MatchScreen] Respuesta incorrecta, permitiendo reintentar');
         showFeedbackAnimation('error');
         // Play error guidance audio
         audioService.current.playErrorGuidanceMessage();
@@ -487,7 +592,7 @@ const MatchScreen = () => {
         }, 1500);
       }
     }, 500);
-  }, [isAnswered, gameCompleted, gameStats, optionAnimations, showFeedbackAnimation, step.options, step.activityType, isHelpActive, helpBlinkAnimation]);
+  }, [isAnswered, gameCompleted, gameStats, optionAnimations, showFeedbackAnimation, processedOptions, step.activityType, isHelpActive, helpBlinkAnimation]);
 
   const resetGame = useCallback(() => {
     setSelectedOption(null);
@@ -569,6 +674,24 @@ const MatchScreen = () => {
     });
   }, [step]);
 
+  // Log state changes for debugging
+  useEffect(() => {
+    console.log(`🎯 [MatchScreen] Estado del modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}, showCelebration=${showCelebration}`);
+    
+    // Log modal visibility condition
+    const modalShouldBeVisible = gameCompleted && !showAnimation && showStars && !showCelebration;
+    console.log(`🎯 [MatchScreen] ¿Modal debería ser visible? ${modalShouldBeVisible ? 'SÍ' : 'NO'}`);
+    
+    if (gameCompleted && showStars && !showCelebration) {
+      console.log(`🎯 [MatchScreen] ✅ Condiciones principales cumplidas para mostrar modal`);
+      if (showAnimation) {
+        console.log(`🎯 [MatchScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
+      } else {
+        console.log(`🎯 [MatchScreen] ✅ Modal debería estar visible ahora!`);
+      }
+    }
+  }, [score, gameCompleted, showAnimation, showStars, showCelebration]);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header simplificado */}
@@ -577,13 +700,17 @@ const MatchScreen = () => {
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <Text style={styles.backButtonText}>← Volver</Text>
+          <Text style={styles.backButtonText}>
+            ← {language === 'es' ? 'Volver' : 'Back'}
+          </Text>
         </TouchableOpacity>
         
         {/* Progress indicator */}
         {progressLoading && (
           <View style={styles.progressIndicator}>
-            <Text style={styles.progressText}>Guardando...</Text>
+            <Text style={styles.progressText}>
+              {language === 'es' ? 'Guardando...' : 'Saving...'}
+            </Text>
           </View>
         )}
       </View>
@@ -611,17 +738,31 @@ const MatchScreen = () => {
           gameStats={gameStats}
         />
 
+        {/* Status bilingüe */}
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>
+            🌍 {language === 'es' 
+              ? `Actividad bilingüe • Idioma: Español • Asocia elementos`
+              : `Bilingual activity • Language: English • Associate elements`
+            }
+          </Text>
+        </View>
+
         {/* Pregunta */}
         <View style={styles.questionContainer}>
-          <Text style={styles.sectionTitle}>Pregunta:</Text>
-          <Text style={styles.questionText}>{step.text}</Text>
+          <Text style={styles.sectionTitle}>
+            {language === 'es' ? 'Pregunta:' : 'Question:'}
+          </Text>
+          <Text style={styles.questionText}>{processedStep.text}</Text>
         </View>
 
         {/* Opciones de respuesta */}
         <View style={styles.optionsContainer}>
-          <Text style={styles.sectionTitle}>Opciones disponibles:</Text>
+          <Text style={styles.sectionTitle}>
+            {language === 'es' ? 'Opciones disponibles:' : 'Available options:'}
+          </Text>
           <View style={styles.optionsGrid}>
-            {step.options?.map((option, idx) => {
+            {processedOptions.map((option, idx) => {
               const isBlinking = isHelpActive && blinkingOptionIndex === idx;
               return (
                 <Animated.View
@@ -694,8 +835,10 @@ const MatchScreen = () => {
           <View style={styles.motivationContainer}>
             <Text style={styles.motivationIcon}>⭐</Text>
             <Text style={styles.footerText}>
-              {score === 0 ? '¡Piensa bien antes de elegir!' :
-               '¡Increíble! Lo lograste'}
+              {score === 0 
+                ? (language === 'es' ? '¡Piensa bien antes de elegir!' : 'Think carefully before choosing!')
+                : (language === 'es' ? '¡Increíble! Lo lograste' : 'Amazing! You did it!')
+              }
             </Text>
             <Text style={styles.motivationIcon}>⭐</Text>
           </View>
@@ -703,7 +846,10 @@ const MatchScreen = () => {
           {/* Mensaje adicional de ánimo */}
           <View style={styles.encouragementFooter}>
             <Text style={styles.encouragementFooterText}>
-              🧠 Cada respuesta te hace más inteligente ✨
+              {language === 'es' 
+                ? '🧠 Cada respuesta te hace más inteligente ✨'
+                : '🧠 Every answer makes you smarter ✨'
+              }
             </Text>
           </View>
         </View>
@@ -804,6 +950,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
+  },
+  statusContainer: {
+    backgroundColor: '#e8f5e8',
+    marginHorizontal: 0,
+    marginBottom: 16,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#c8e6c9',
+  },
+  statusText: {
+    fontSize: 11,
+    color: '#2e7d32',
+    fontWeight: '600',
+    textAlign: 'center',
   },
   questionContainer: {
     backgroundColor: '#ffffff',

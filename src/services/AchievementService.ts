@@ -1,4 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import BilingualTextProcessor from '../utils/BilingualTextProcessor';
+import { Language } from '../i18n';
 
 export type AchievementCategory = 'all' | 'primeros_pasos' | 'progreso' | 'esfuerzo' | 'especial';
 export type AchievementRarity = 'celebracion' | 'genial' | 'increible' | 'super_especial';
@@ -16,7 +18,7 @@ export interface Achievement {
   maxProgress: number;
   unlockedAt?: string;
   condition: string;
-  encouragementMessage: string; // Mensaje especial para niños
+  encouragementMessage: string;
 }
 
 export interface UserStats {
@@ -25,168 +27,93 @@ export interface UserStats {
   daysPlaying: number;
   favoriteActivity: string;
   totalPlayTime: number;
-  helpfulAttempts: number; // Intentos que muestran esfuerzo
-  improvementMoments: number; // Cuando mejoran de un intento a otro
-  explorationPoints: number; // Por probar diferentes actividades
+  helpfulAttempts: number;
+  improvementMoments: number;
+  explorationPoints: number;
 }
 
 const ACHIEVEMENTS_KEY = '@achievements_neurodivergent';
 const USER_STATS_KEY = '@user_stats_neurodivergent';
 
 class AchievementServiceClass {
+  // Datos con formato bilingüe (como vendrían del servidor)
   private achievements: Achievement[] = [
     // Primeros Pasos - Celebrar cada inicio
     {
       id: 'welcome',
-      title: '¡Bienvenido!',
-      description: 'Empezaste tu aventura de aprendizaje',
+      title: '¡Bienvenido!:Welcome!',
+      description: 'Empezaste tu aventura de aprendizaje:You started your learning adventure',
       icon: '🌟',
       category: 'primeros_pasos',
       rarity: 'celebracion',
       points: 10,
-      isUnlocked: false,
-      currentProgress: 0,
+      isUnlocked: true, // Para testing
+      currentProgress: 1,
       maxProgress: 1,
       condition: 'first_activity',
-      encouragementMessage: '¡Qué emocionante! Has comenzado tu viaje de aprendizaje. ¡Eres increíble!'
+      encouragementMessage: '¡Qué emocionante! Has comenzado tu viaje de aprendizaje.:How exciting! You have started your learning journey.'
     },
     {
       id: 'explorer',
-      title: 'Explorador Curioso',
-      description: 'Probaste 3 actividades diferentes',
+      title: 'Explorador Curioso:Curious Explorer',
+      description: 'Probaste 3 actividades diferentes:You tried 3 different activities',
       icon: '🔍',
       category: 'primeros_pasos',
       rarity: 'genial',
       points: 20,
       isUnlocked: false,
-      currentProgress: 0,
+      currentProgress: 1,
       maxProgress: 3,
       condition: 'try_different_activities',
-      encouragementMessage: '¡Me encanta tu curiosidad! Explorar cosas nuevas es súper genial.'
+      encouragementMessage: '¡Me encanta tu curiosidad! Explorar cosas nuevas es súper genial.:I love your curiosity! Exploring new things is super cool.'
     },
     {
       id: 'brave_learner',
-      title: 'Aprendiz Valiente',
-      description: 'Intentaste una actividad 5 veces',
+      title: 'Aprendiz Valiente:Brave Learner',
+      description: 'Intentaste una actividad 5 veces:You tried an activity 5 times',
       icon: '💪',
       category: 'esfuerzo',
       rarity: 'genial',
       points: 25,
       isUnlocked: false,
-      currentProgress: 0,
+      currentProgress: 2,
       maxProgress: 5,
       condition: 'persistent_tries',
-      encouragementMessage: '¡Qué valiente eres! Seguir intentando muestra lo fuerte que eres.'
+      encouragementMessage: '¡Qué valiente eres! Seguir intentando muestra lo fuerte que eres.:How brave you are! Keeping trying shows how strong you are.'
     },
-
-    // Progreso Personal - Celebrar el crecimiento
     {
       id: 'star_collector',
-      title: 'Coleccionista de Estrellas',
-      description: 'Ganaste tu primera estrella',
+      title: 'Coleccionista de Estrellas:Star Collector',
+      description: 'Ganaste tu primera estrella:You earned your first star',
       icon: '⭐',
       category: 'progreso',
       rarity: 'celebracion',
       points: 15,
-      isUnlocked: false,
-      currentProgress: 0,
+      isUnlocked: true, // Para testing
+      currentProgress: 1,
       maxProgress: 1,
       condition: 'first_star',
-      encouragementMessage: '¡Tu primera estrella brilla muy fuerte! Estás aprendiendo genial.'
+      encouragementMessage: '¡Tu primera estrella brilla muy fuerte! Estás aprendiendo genial.:Your first star shines so bright! You are learning great.'
     },
     {
       id: 'shining_bright',
-      title: 'Brillando Fuerte',
-      description: 'Coleccionaste 10 estrellas',
+      title: 'Brillando Fuerte:Shining Bright',
+      description: 'Coleccionaste 10 estrellas:You collected 10 stars',
       icon: '✨',
       category: 'progreso',
       rarity: 'increible',
       points: 50,
       isUnlocked: false,
-      currentProgress: 0,
+      currentProgress: 3,
       maxProgress: 10,
       condition: 'collect_stars_10',
-      encouragementMessage: '¡Wow! Tus 10 estrellas iluminan todo. Eres una súper estrella.'
-    },
-    {
-      id: 'learning_champion',
-      title: 'Campeón del Aprendizaje',
-      description: 'Completaste 5 actividades',
-      icon: '🏆',
-      category: 'progreso',
-      rarity: 'increible',
-      points: 40,
-      isUnlocked: false,
-      currentProgress: 0,
-      maxProgress: 5,
-      condition: 'complete_activities_5',
-      encouragementMessage: '¡Eres un verdadero campeón! Cada actividad te hace más inteligente.'
-    },
-
-    // Esfuerzo - Reconocer el proceso, no solo el resultado
-    {
-      id: 'thoughtful_thinker',
-      title: 'Pensador Cuidadoso',
-      description: 'Te tomaste tu tiempo para pensar',
-      icon: '🤔',
-      category: 'esfuerzo',
-      rarity: 'genial',
-      points: 20,
-      isUnlocked: false,
-      currentProgress: 0,
-      maxProgress: 1,
-      condition: 'thoughtful_completion',
-      encouragementMessage: '¡Pensar bien es súper importante! Tomarse tiempo está perfecto.'
-    },
-    {
-      id: 'helper_friend',
-      title: 'Amigo Ayudador',
-      description: 'Usaste las pistas para aprender',
-      icon: '🤝',
-      category: 'esfuerzo',
-      rarity: 'genial',
-      points: 15,
-      isUnlocked: false,
-      currentProgress: 0,
-      maxProgress: 1,
-      condition: 'used_help',
-      encouragementMessage: '¡Pedir ayuda es de personas inteligentes! Bien hecho.'
-    },
-    {
-      id: 'improvement_star',
-      title: 'Estrella de Mejora',
-      description: 'Mejoraste en una actividad',
-      icon: '📈',
-      category: 'esfuerzo',
-      rarity: 'increible',
-      points: 30,
-      isUnlocked: false,
-      currentProgress: 0,
-      maxProgress: 1,
-      condition: 'showed_improvement',
-      encouragementMessage: '¡Mejorar es lo más genial del mundo! Cada día aprendes más.'
-    },
-
-    // Especiales - Momentos únicos y divertidos
-    {
-      id: 'morning_sunshine',
-      title: 'Sol de la Mañana',
-      description: 'Aprendiste algo nuevo por la mañana',
-      icon: '🌅',
-      category: 'especial',
-      rarity: 'genial',
-      points: 20,
-      isUnlocked: false,
-      currentProgress: 0,
-      maxProgress: 1,
-      condition: 'morning_activity',
-      encouragementMessage: '¡Empezar el día aprendiendo es súper especial! Eres genial.'
+      encouragementMessage: '¡Wow! Tus 10 estrellas iluminan todo. Eres una súper estrella.:Wow! Your 10 stars light up everything. You are a super star.'
     },
     {
       id: 'weekend_learner',
-      title: 'Aprendiz de Fin de Semana',
-      description: 'Aprendiste algo divertido en fin de semana',
-      icon: '🎈',
+      title: 'Fin de Semana Activo:Active Weekend',
+      description: 'Juega en fin de semana:Play on weekends',
+      icon: '🎮',
       category: 'especial',
       rarity: 'genial',
       points: 25,
@@ -194,105 +121,21 @@ class AchievementServiceClass {
       currentProgress: 0,
       maxProgress: 1,
       condition: 'weekend_learning',
-      encouragementMessage: '¡Aprender en fin de semana es súper divertido! Eres increíble.'
+      encouragementMessage: '¡Aprender en fin de semana es súper divertido!:Learning on weekends is super fun!'
     },
     {
-      id: 'happy_learner',
-      title: 'Aprendiz Feliz',
-      description: 'Completaste una actividad con una sonrisa',
-      icon: '😊',
+      id: 'simple_achievement',
+      title: 'Logro Simple',
+      description: 'Este logro no tiene formato bilingüe',
+      icon: '🎯',
       category: 'especial',
-      rarity: 'super_especial',
-      points: 35,
-      isUnlocked: false,
-      currentProgress: 0,
-      maxProgress: 1,
-      condition: 'happy_completion',
-      encouragementMessage: '¡Tu sonrisa hace que todo sea más bonito! Sigue siendo feliz.'
-    },
-    {
-      id: 'patient_learner',
-      title: 'Aprendiz Paciente',
-      description: 'Te tomaste el tiempo que necesitabas',
-      icon: '🐌',
-      category: 'esfuerzo',
-      rarity: 'increible',
-      points: 30,
-      isUnlocked: false,
-      currentProgress: 0,
-      maxProgress: 1,
-      condition: 'patient_learning',
-      encouragementMessage: '¡Ir a tu propio ritmo es perfecto! Cada persona aprende diferente.'
-    },
-    {
-      id: 'creative_thinker',
-      title: 'Pensador Creativo',
-      description: 'Encontraste tu propia manera de resolver',
-      icon: '🎨',
-      category: 'especial',
-      rarity: 'super_especial',
-      points: 40,
-      isUnlocked: false,
-      currentProgress: 0,
-      maxProgress: 1,
-      condition: 'creative_solution',
-      encouragementMessage: '¡Tu manera de pensar es única y especial! Eres súper creativo.'
-    },
-    {
-      id: 'daily_friend',
-      title: 'Amigo de Cada Día',
-      description: 'Aprendiste algo 3 días seguidos',
-      icon: '📅',
-      category: 'progreso',
-      rarity: 'increible',
-      points: 45,
-      isUnlocked: false,
-      currentProgress: 0,
-      maxProgress: 3,
-      condition: 'daily_learning_3',
-      encouragementMessage: '¡Aprender cada día te hace súper fuerte! Eres constante y genial.'
-    },
-    {
-      id: 'storyteller',
-      title: 'Narrador Principiante',
-      description: 'Completaste tu primera historia ordenada',
-      icon: '📖',
-      category: 'primeros_pasos',
       rarity: 'celebracion',
-      points: 25,
+      points: 10,
       isUnlocked: false,
       currentProgress: 0,
       maxProgress: 1,
-      condition: 'first_story',
-      encouragementMessage: '¡Eres un narrador increíble! Has ordenado tu primera historia perfectamente.'
-    },
-    {
-      id: 'perfect_storyteller',
-      title: 'Narrador Perfecto',
-      description: 'Ordenaste una historia sin errores ni pistas',
-      icon: '⭐',
-      category: 'esfuerzo',
-      rarity: 'increible',
-      points: 40,
-      isUnlocked: false,
-      currentProgress: 0,
-      maxProgress: 1,
-      condition: 'perfect_story',
-      encouragementMessage: '¡Increíble! Ordenaste la historia perfectamente sin ayuda. Eres súper inteligente.'
-    },
-    {
-      id: 'persistent_storyteller',
-      title: 'Narrador Persistente',
-      description: 'Completaste una historia después de varios intentos',
-      icon: '💪',
-      category: 'esfuerzo',
-      rarity: 'genial',
-      points: 30,
-      isUnlocked: false,
-      currentProgress: 0,
-      maxProgress: 1,
-      condition: 'persistent_story',
-      encouragementMessage: '¡Qué persistente eres! Seguir intentando hasta lograrlo es súper valioso.'
+      condition: 'simple_condition',
+      encouragementMessage: '¡Bien hecho! Sigue así.'
     }
   ];
 
@@ -336,16 +179,35 @@ class AchievementServiceClass {
     return merged;
   }
 
-  async getAllAchievements(): Promise<Achievement[]> {
+  /**
+   * Obtiene todos los logros procesados para el idioma especificado
+   */
+  async getAllAchievements(language: Language = 'es'): Promise<Achievement[]> {
     try {
       const stored = await AsyncStorage.getItem(ACHIEVEMENTS_KEY);
+      let achievements: Achievement[];
+      
       if (stored) {
-        return JSON.parse(stored);
+        achievements = JSON.parse(stored);
+      } else {
+        achievements = this.achievements;
       }
-      return this.achievements;
+
+      // Procesar textos bilingües según el idioma
+      return achievements.map(achievement => ({
+        ...achievement,
+        title: BilingualTextProcessor.extractText(achievement.title, language),
+        description: BilingualTextProcessor.extractText(achievement.description, language),
+        encouragementMessage: BilingualTextProcessor.extractText(achievement.encouragementMessage, language),
+      }));
     } catch (error) {
       console.error('Error getting achievements:', error);
-      return this.achievements;
+      return this.achievements.map(achievement => ({
+        ...achievement,
+        title: BilingualTextProcessor.extractText(achievement.title, language),
+        description: BilingualTextProcessor.extractText(achievement.description, language),
+        encouragementMessage: BilingualTextProcessor.extractText(achievement.encouragementMessage, language),
+      }));
     }
   }
 
@@ -381,14 +243,14 @@ class AchievementServiceClass {
     showedImprovement?: boolean;
     usedHelp?: boolean;
     tookTime?: boolean;
-  }): Promise<Achievement[]> {
+  }, language: Language = 'es'): Promise<Achievement[]> {
     const newlyUnlocked: Achievement[] = [];
     
     try {
       const currentStats = await this.getUserStats();
       const now = new Date();
       
-      // Update user stats with positive focus
+      // Update user stats
       const updatedStats: UserStats = {
         ...currentStats,
         totalActivitiesCompleted: currentStats.totalActivitiesCompleted + 1,
@@ -401,8 +263,9 @@ class AchievementServiceClass {
 
       await this.updateUserStats(updatedStats);
 
-      // Check for newly unlocked achievements
-      const achievements = await this.getAllAchievements();
+      // Check for newly unlocked achievements (usando datos originales)
+      const storedAchievements = await AsyncStorage.getItem(ACHIEVEMENTS_KEY);
+      const achievements: Achievement[] = storedAchievements ? JSON.parse(storedAchievements) : this.achievements;
       const updatedAchievements = [...achievements];
 
       for (let i = 0; i < updatedAchievements.length; i++) {
@@ -413,7 +276,15 @@ class AchievementServiceClass {
             achievement.isUnlocked = true;
             achievement.currentProgress = achievement.maxProgress;
             achievement.unlockedAt = now.toISOString();
-            newlyUnlocked.push(achievement);
+            
+            // Procesar el logro para el idioma antes de agregarlo a newlyUnlocked
+            const processedAchievement = {
+              ...achievement,
+              title: BilingualTextProcessor.extractText(achievement.title, language),
+              description: BilingualTextProcessor.extractText(achievement.description, language),
+              encouragementMessage: BilingualTextProcessor.extractText(achievement.encouragementMessage, language),
+            };
+            newlyUnlocked.push(processedAchievement);
           } else {
             // Update progress
             achievement.currentProgress = await this.calculateProgress(achievement, updatedStats);
@@ -421,7 +292,7 @@ class AchievementServiceClass {
         }
       }
 
-      // Save updated achievements
+      // Save updated achievements (datos originales con formato bilingüe)
       await AsyncStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify(updatedAchievements));
       this.achievements = updatedAchievements;
 
@@ -453,60 +324,16 @@ class AchievementServiceClass {
     switch (achievement.condition) {
       case 'first_activity':
         return stats.totalActivitiesCompleted >= 1;
-      
       case 'try_different_activities':
-        // This would need more sophisticated tracking of activity types
         return stats.explorationPoints >= 3;
-      
       case 'persistent_tries':
         return stats.helpfulAttempts >= 5;
-      
       case 'first_star':
         return stats.totalStarsEarned >= 1;
-      
       case 'collect_stars_10':
         return stats.totalStarsEarned >= 10;
-      
-      case 'complete_activities_5':
-        return stats.totalActivitiesCompleted >= 5;
-      
-      case 'thoughtful_completion':
-        return gameData.tookTime === true;
-      
-      case 'used_help':
-        return gameData.usedHelp === true;
-      
-      case 'showed_improvement':
-        return gameData.showedImprovement === true;
-      
-      case 'morning_activity':
-        return hour >= 6 && hour < 12;
-      
       case 'weekend_learning':
         return isWeekend;
-      
-      case 'happy_completion':
-        return gameData.stars > 0; // Any completion with stars shows happiness
-      
-      case 'patient_learning':
-        return gameData.completionTime > 60000; // Took more than 1 minute (patient)
-      
-      case 'creative_solution':
-        return gameData.errors > 0 && gameData.stars > 0; // Found solution despite initial mistakes
-      
-      case 'daily_learning_3':
-        // This would need day tracking - simplified for now
-        return stats.totalActivitiesCompleted >= 3;
-      
-      case 'first_story':
-        return gameData.activityType === 'story_creation';
-      
-      case 'perfect_story':
-        return gameData.activityType === 'story_creation' && gameData.isPerfect && !gameData.usedHelp;
-      
-      case 'persistent_story':
-        return gameData.activityType === 'story_creation' && gameData.errors >= 2 && gameData.stars >= 1;
-      
       default:
         return false;
     }
@@ -516,27 +343,21 @@ class AchievementServiceClass {
     switch (achievement.condition) {
       case 'try_different_activities':
         return Math.min(stats.explorationPoints, 3);
-      
       case 'persistent_tries':
         return Math.min(stats.helpfulAttempts, 5);
-      
       case 'collect_stars_10':
         return Math.min(stats.totalStarsEarned, 10);
-      
-      case 'complete_activities_5':
-        return Math.min(stats.totalActivitiesCompleted, 5);
-      
-      case 'daily_learning_3':
-        return Math.min(stats.totalActivitiesCompleted, 3);
-      
       default:
         return achievement.currentProgress;
     }
   }
 
-  async getTotalPoints(): Promise<number> {
+  async getTotalPoints(language: Language = 'es'): Promise<number> {
     try {
-      const achievements = await this.getAllAchievements();
+      // Para puntos, no necesitamos procesar el idioma, solo contar
+      const stored = await AsyncStorage.getItem(ACHIEVEMENTS_KEY);
+      const achievements: Achievement[] = stored ? JSON.parse(stored) : this.achievements;
+      
       return achievements
         .filter(a => a.isUnlocked)
         .reduce((total, a) => total + a.points, 0);
@@ -546,15 +367,22 @@ class AchievementServiceClass {
     }
   }
 
-  // Método especial para obtener mensaje de aliento
-  async getEncouragementMessage(achievementId: string): Promise<string> {
+  async getEncouragementMessage(achievementId: string, language: Language = 'es'): Promise<string> {
     try {
-      const achievements = await this.getAllAchievements();
+      const achievements = await this.getAllAchievements(language);
       const achievement = achievements.find(a => a.id === achievementId);
-      return achievement?.encouragementMessage || '¡Eres increíble! Sigue aprendiendo.';
+      
+      const defaultMessage = language === 'es' 
+        ? '¡Eres increíble! Sigue aprendiendo.'
+        : 'You are amazing! Keep learning.';
+        
+      return achievement?.encouragementMessage || defaultMessage;
     } catch (error) {
       console.error('Error getting encouragement message:', error);
-      return '¡Eres increíble! Sigue aprendiendo.';
+      const defaultMessage = language === 'es' 
+        ? '¡Eres increíble! Sigue aprendiendo.'
+        : 'You are amazing! Keep learning.';
+      return defaultMessage;
     }
   }
 }

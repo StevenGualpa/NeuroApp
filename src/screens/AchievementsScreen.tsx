@@ -15,24 +15,18 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import RealAchievementService from '../services/RealAchievementService';
-import AuthService from '../services/AuthService';
-import { Achievement, UserAchievement } from '../services/ApiService';
+import { AchievementService, Achievement, AchievementCategory } from '../services/AchievementService';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
 type AchievementsNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 
-interface AchievementWithProgress extends Achievement {
-  isUnlocked: boolean;
-  currentProgress: number;
-  unlockedAt?: string;
-}
-
-const RealAchievementsScreen = () => {
+const AchievementsScreen = () => {
   const navigation = useNavigation<AchievementsNavigationProp>();
-  const [achievements, setAchievements] = useState<AchievementWithProgress[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const { t, language } = useLanguage();
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<AchievementCategory>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [stats, setStats] = useState({
@@ -47,12 +41,36 @@ const RealAchievementsScreen = () => {
   const slideAnim = useRef(new Animated.Value(50)).current;
 
   const categories = [
-    { key: 'all', label: 'Todos', icon: '🏆', color: '#4285f4' },
-    { key: 'gameplay', label: 'Juego', icon: '🎮', color: '#FF6B6B' },
-    { key: 'learning', label: 'Aprendizaje', icon: '📚', color: '#4CAF50' },
-    { key: 'progress', label: 'Progreso', icon: '⭐', color: '#FFA726' },
-    { key: 'social', label: 'Social', icon: '👥', color: '#9C27B0' },
-    { key: 'special', label: 'Especiales', icon: '💎', color: '#FF5722' },
+    { 
+      key: 'all' as AchievementCategory, 
+      label: language === 'es' ? 'Todos' : 'All', 
+      icon: '🏆', 
+      color: '#4285f4' 
+    },
+    { 
+      key: 'primeros_pasos' as AchievementCategory, 
+      label: language === 'es' ? 'Primeros Pasos' : 'First Steps', 
+      icon: '🌟', 
+      color: '#FF6B6B' 
+    },
+    { 
+      key: 'progreso' as AchievementCategory, 
+      label: language === 'es' ? 'Progreso' : 'Progress', 
+      icon: '📈', 
+      color: '#4CAF50' 
+    },
+    { 
+      key: 'esfuerzo' as AchievementCategory, 
+      label: language === 'es' ? 'Esfuerzo' : 'Effort', 
+      icon: '💪', 
+      color: '#FFA726' 
+    },
+    { 
+      key: 'especial' as AchievementCategory, 
+      label: language === 'es' ? 'Especiales' : 'Special', 
+      icon: '💎', 
+      color: '#9C27B0' 
+    },
   ];
 
   useEffect(() => {
@@ -74,33 +92,32 @@ const RealAchievementsScreen = () => {
     ]).start();
   }, []);
 
+  // Recargar logros cuando cambie el idioma
   useEffect(() => {
-    filterAchievements();
-  }, [selectedCategory]);
+    if (!isLoading) {
+      console.log(`🌍 [AchievementsScreen] Idioma cambiado a: ${language}, recargando logros...`);
+      loadAchievements();
+    }
+  }, [language]);
 
   const initializeAchievements = async () => {
     setIsLoading(true);
     try {
-      const user = AuthService.getCurrentUser();
-      if (!user) {
-        Alert.alert('Error', 'No hay usuario logueado');
-        navigation.goBack();
-        return;
-      }
-
-      console.log('🏆 Loading achievements for user:', user.id);
+      console.log('🏆 [AchievementsScreen] Initializing achievements...');
       
       // Initialize achievement service
-      await RealAchievementService.initializeAchievements();
+      await AchievementService.initializeAchievements();
       
       // Load achievements
       await loadAchievements();
       
     } catch (error) {
-      console.error('❌ Error initializing achievements:', error);
+      console.error('❌ [AchievementsScreen] Error initializing achievements:', error);
       Alert.alert(
-        'Error de Conexión',
-        'No se pudieron cargar los logros. Verifica tu conexión a internet.',
+        'Error de conexión',
+        language === 'es' 
+          ? 'No se pudieron cargar los logros.'
+          : 'Could not load achievements.',
         [
           { text: 'Reintentar', onPress: initializeAchievements },
           { text: 'Volver', onPress: () => navigation.goBack() }
@@ -113,43 +130,72 @@ const RealAchievementsScreen = () => {
 
   const loadAchievements = async () => {
     try {
-      console.log('📥 Fetching achievements from API...');
+      console.log(`📥 [AchievementsScreen] Fetching achievements in ${language}...`);
       
-      // Get all achievements with user progress
-      const allAchievements = await RealAchievementService.getAllAchievements();
-      console.log('✅ Loaded achievements:', allAchievements.length);
+      // Get all achievements with bilingual processing
+      const allAchievements = await AchievementService.getAllAchievements(language);
+      console.log(`✅ [AchievementsScreen] Loaded ${allAchievements.length} achievements`);
       
-      // Get achievement stats
-      const achievementStats = await RealAchievementService.getAchievementStats();
-      console.log('📊 Achievement stats:', achievementStats);
+      // Log sample for debugging
+      if (allAchievements.length > 0) {
+        console.log('📋 [AchievementsScreen] Sample achievement:', {
+          id: allAchievements[0].id,
+          title: allAchievements[0].title,
+          description: allAchievements[0].description,
+          isUnlocked: allAchievements[0].isUnlocked,
+          currentProgress: allAchievements[0].currentProgress,
+          maxProgress: allAchievements[0].maxProgress,
+        });
+        
+        // Test bilingual processing
+        console.log('🌍 [AchievementsScreen] Bilingual test:');
+        console.log('  Original title might be: "¡Bienvenido!:Welcome!"');
+        console.log(`  Processed for ${language}:`, allAchievements[0].title);
+      }
+      
+      // Get total points
+      const totalPoints = await AchievementService.getTotalPoints(language);
+      
+      // Calculate stats
+      const unlockedAchievements = allAchievements.filter(a => a.isUnlocked);
+      const completionPercentage = allAchievements.length > 0 
+        ? Math.round((unlockedAchievements.length / allAchievements.length) * 100)
+        : 0;
       
       setAchievements(allAchievements);
       setStats({
-        totalUnlocked: achievementStats.unlocked,
-        totalAchievements: achievementStats.total,
-        completionPercentage: Math.round(achievementStats.completionRate),
-        totalPoints: achievementStats.unlockedPoints,
+        totalUnlocked: unlockedAchievements.length,
+        totalAchievements: allAchievements.length,
+        completionPercentage,
+        totalPoints,
+      });
+      
+      console.log('📊 [AchievementsScreen] Stats:', {
+        unlocked: unlockedAchievements.length,
+        total: allAchievements.length,
+        completion: completionPercentage,
+        points: totalPoints
       });
       
     } catch (error) {
-      console.error('❌ Error loading achievements:', error);
+      console.error('❌ [AchievementsScreen] Error loading achievements:', error);
       throw error;
     }
-  };
-
-  const filterAchievements = () => {
-    // This will be handled by the render method
-    // since we're filtering in real-time based on selectedCategory
   };
 
   const onRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await RealAchievementService.forceRefresh();
+      console.log('🔄 [AchievementsScreen] Refreshing achievements...');
       await loadAchievements();
     } catch (error) {
-      console.error('Error refreshing achievements:', error);
-      Alert.alert('Error', 'No se pudieron actualizar los logros');
+      console.error('❌ [AchievementsScreen] Error refreshing achievements:', error);
+      Alert.alert(
+        'Error de carga', 
+        language === 'es' 
+          ? 'No se pudieron actualizar los logros'
+          : 'Could not update achievements'
+      );
     } finally {
       setIsRefreshing(false);
     }
@@ -164,32 +210,32 @@ const RealAchievementsScreen = () => {
 
   const getRarityColor = (rarity: string) => {
     switch (rarity.toLowerCase()) {
-      case 'common': return '#9ca3af';
-      case 'rare': return '#3b82f6';
-      case 'epic': return '#8b5cf6';
-      case 'legendary': return '#f59e0b';
+      case 'celebracion': return '#4CAF50';
+      case 'genial': return '#2196F3';
+      case 'increible': return '#9C27B0';
+      case 'super_especial': return '#FF9800';
       default: return '#9ca3af';
     }
   };
 
   const getRarityLabel = (rarity: string) => {
     switch (rarity.toLowerCase()) {
-      case 'common': return 'C';
-      case 'rare': return 'R';
-      case 'epic': return 'E';
-      case 'legendary': return 'L';
+      case 'celebracion': return language === 'es' ? 'C' : 'C';
+      case 'genial': return language === 'es' ? 'G' : 'G';
+      case 'increible': return language === 'es' ? 'I' : 'A';
+      case 'super_especial': return language === 'es' ? 'S' : 'S';
       default: return '?';
     }
   };
 
-  const renderAchievementCard = (achievement: AchievementWithProgress, index: number) => {
-    const progressPercentage = achievement.condition_value > 0 
-      ? Math.min((achievement.currentProgress / achievement.condition_value) * 100, 100)
+  const renderAchievementCard = (achievement: Achievement, index: number) => {
+    const progressPercentage = achievement.maxProgress > 0 
+      ? Math.min((achievement.currentProgress / achievement.maxProgress) * 100, 100)
       : achievement.isUnlocked ? 100 : 0;
 
     return (
       <Animated.View
-        key={achievement.ID}
+        key={achievement.id}
         style={[
           styles.achievementCardContainer,
           {
@@ -233,7 +279,7 @@ const RealAchievementsScreen = () => {
                 styles.achievementTitle,
                 achievement.isUnlocked && styles.achievementTitleUnlocked
               ]}>
-                {achievement.name}
+                {achievement.title}
               </Text>
               <Text style={[
                 styles.achievementDescription,
@@ -254,7 +300,7 @@ const RealAchievementsScreen = () => {
           </View>
 
           {/* Progress Bar */}
-          {achievement.condition_value > 0 && (
+          {achievement.maxProgress > 0 && (
             <View style={styles.progressSection}>
               <View style={styles.progressBar}>
                 <View
@@ -268,7 +314,7 @@ const RealAchievementsScreen = () => {
                 />
               </View>
               <Text style={styles.progressText}>
-                {achievement.currentProgress}/{achievement.condition_value}
+                {achievement.currentProgress}/{achievement.maxProgress}
               </Text>
             </View>
           )}
@@ -277,7 +323,16 @@ const RealAchievementsScreen = () => {
           {achievement.isUnlocked && achievement.unlockedAt && (
             <View style={styles.unlockedSection}>
               <Text style={styles.unlockedText}>
-                🎉 Desbloqueado el {new Date(achievement.unlockedAt).toLocaleDateString('es-ES')}
+                🎉 {language === 'es' ? 'Desbloqueado el' : 'Unlocked on'} {new Date(achievement.unlockedAt).toLocaleDateString(language === 'es' ? 'es-ES' : 'en-US')}
+              </Text>
+            </View>
+          )}
+
+          {/* Encouragement Message for Unlocked Achievements */}
+          {achievement.isUnlocked && achievement.encouragementMessage && (
+            <View style={styles.encouragementSection}>
+              <Text style={styles.encouragementText}>
+                💝 {achievement.encouragementMessage}
               </Text>
             </View>
           )}
@@ -329,17 +384,23 @@ const RealAchievementsScreen = () => {
     <View style={styles.statsHeader}>
       <View style={[styles.statsCard, styles.statsCardBlue]}>
         <Text style={styles.statsNumber}>{stats.totalUnlocked}</Text>
-        <Text style={styles.statsLabel}>Logros</Text>
+        <Text style={styles.statsLabel}>
+          {language === 'es' ? 'Logros' : 'Achievements'}
+        </Text>
       </View>
       
       <View style={[styles.statsCard, styles.statsCardRed]}>
         <Text style={styles.statsNumber}>{stats.completionPercentage}%</Text>
-        <Text style={styles.statsLabel}>Progreso</Text>
+        <Text style={styles.statsLabel}>
+          {language === 'es' ? 'Progreso' : 'Progress'}
+        </Text>
       </View>
       
       <View style={[styles.statsCard, styles.statsCardOrange]}>
         <Text style={styles.statsNumber}>{stats.totalPoints}</Text>
-        <Text style={styles.statsLabel}>Puntos</Text>
+        <Text style={styles.statsLabel}>
+          {language === 'es' ? 'Puntos' : 'Points'}
+        </Text>
       </View>
     </View>
   );
@@ -347,8 +408,9 @@ const RealAchievementsScreen = () => {
   const renderLoadingState = () => (
     <View style={styles.loadingContainer}>
       <ActivityIndicator size="large" color="#4285f4" />
-      <Text style={styles.loadingText}>Cargando logros...</Text>
-      <Text style={styles.loadingSubtext}>Conectando con el servidor</Text>
+      <Text style={styles.loadingText}>
+        {language === 'es' ? 'Cargando logros...' : 'Loading achievements...'}
+      </Text>
     </View>
   );
 
@@ -360,9 +422,9 @@ const RealAchievementsScreen = () => {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backButtonText}>← Volver</Text>
+            <Text style={styles.backButtonText}>← {language === 'es' ? 'Volver' : 'Back'}</Text>
           </TouchableOpacity>
-          <Text style={styles.title}>🏆 Logros</Text>
+          <Text style={styles.title}>🏆 {language === 'es' ? 'Logros' : 'Achievements'}</Text>
           <View style={styles.headerSpacer} />
         </View>
         {renderLoadingState()}
@@ -380,9 +442,9 @@ const RealAchievementsScreen = () => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>← Volver</Text>
+          <Text style={styles.backButtonText}>← {language === 'es' ? 'Volver' : 'Back'}</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>🏆 Logros</Text>
+        <Text style={styles.title}>🏆 {language === 'es' ? 'Logros' : 'Achievements'}</Text>
         <TouchableOpacity 
           style={styles.refreshButton}
           onPress={onRefresh}
@@ -400,10 +462,13 @@ const RealAchievementsScreen = () => {
         {renderCategoryFilter()}
       </View>
 
-      {/* API Status */}
+      {/* Status */}
       <View style={styles.apiStatus}>
         <Text style={styles.apiStatusText}>
-          🌐 Conectado a API Real • {achievements.length} logros cargados
+          🌍 {language === 'es' 
+            ? `Logros bilingües • Idioma: Español • ${achievements.length} logros`
+            : `Bilingual achievements • Language: English • ${achievements.length} achievements`
+          }
         </Text>
       </View>
 
@@ -437,12 +502,17 @@ const RealAchievementsScreen = () => {
               <Text style={styles.emptyStateIcon}>🎯</Text>
               <Text style={styles.emptyStateText}>
                 {selectedCategory === 'all' 
-                  ? 'No hay logros disponibles' 
-                  : 'No hay logros en esta categoría'
+                  ? (language === 'es' ? 'No hay logros disponibles' : 'No achievements available')
+                  : (language === 'es' 
+                      ? 'No hay logros en esta categoría'
+                      : 'No achievements in this category')
                 }
               </Text>
               <Text style={styles.emptyStateSubtext}>
-                ¡Sigue jugando para desbloquear más logros!
+                {language === 'es' 
+                  ? '¡Sigue jugando para desbloquear más logros!'
+                  : 'Keep playing to unlock more achievements!'
+                }
               </Text>
             </View>
           </Animated.View>
@@ -631,12 +701,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     textAlign: 'center',
   },
-  loadingSubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 8,
-    textAlign: 'center',
-  },
   achievementsList: {
     flex: 1,
     marginTop: 10,
@@ -771,6 +835,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  encouragementSection: {
+    backgroundColor: '#fef3c7',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#fde68a',
+  },
+  encouragementText: {
+    fontSize: 12,
+    color: '#92400e',
+    fontWeight: '600',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    lineHeight: 16,
+  },
   rarityBadge: {
     position: 'absolute',
     top: 12,
@@ -828,4 +908,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default RealAchievementsScreen;
+export default AchievementsScreen;
