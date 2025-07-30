@@ -22,7 +22,6 @@ import { GameStatsDisplay } from '../components/GameStatsDisplay';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { AchievementService, Achievement } from '../services/AchievementService';
-// import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
@@ -228,8 +227,8 @@ const DragDropScreen = () => {
   useEffect(() => {
     const initAchievements = async () => {
       try {
-        console.log('🏆 [DragDropScreen] Inicializando servicio de logros mejorado...');
-        await RealAchievementServiceEnhanced.initializeAchievements();
+        console.log('🏆 [DragDropScreen] Inicializando servicio de logros...');
+        await AchievementService.initializeAchievements();
         console.log('✅ [DragDropScreen] Servicio de logros inicializado');
       } catch (error) {
         console.error('❌ [DragDropScreen] Error inicializando logros:', error);
@@ -481,7 +480,8 @@ const DragDropScreen = () => {
 
       console.log('🏆 [DragDropScreen] Verificando logros con datos:', gameData);
 
-      const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
+      // Use the local achievement service (temporarily disabled server sync)
+      const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
       if (newlyUnlocked.length > 0) {
         console.log(`🎉 [DragDropScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
@@ -521,12 +521,32 @@ const DragDropScreen = () => {
     }
   }, [saveProgressToBackend, step]);
 
+  // FUNCIÓN CORREGIDA: handleAnimationFinish - Alineada con otras actividades
   const handleAnimationFinish = useCallback(() => {
+    console.log(`🎬 [DragDropScreen] Animación terminada: ${animationType}, score: ${score}, totalItems: ${totalItems}, gameCompleted: ${gameCompleted}`);
     setShowAnimation(false);
     
+    // CONDICIÓN CORREGIDA: Verificar que se completaron TODOS los elementos
     if (animationType === 'success' && score === totalItems && !gameCompleted) {
+      console.log('🎯 [DragDropScreen] ¡TODOS LOS ELEMENTOS COLOCADOS! Iniciando secuencia de finalización...');
+      console.log(`📊 [DragDropScreen] Verificación: score=${score}, totalItems=${totalItems}, todos completados=${score === totalItems}`);
+      
+      // IMPORTANTE: Limpiar toda la ayuda activa inmediatamente
+      if (isHelpActive) {
+        console.log('🛑 [DragDropScreen] Limpiando ayuda activa...');
+        setIsHelpActive(false);
+        setBlinkingItemIndex(null);
+        setBlinkingZone(null);
+        helpBlinkAnimation.setValue(1);
+      }
+      
+      // Detener servicios de ayuda
+      adaptiveService.current.cleanup();
+      audioService.current.cleanup();
+      
       setGameCompleted(true);
       
+      // Calculate final stats
       const completionTime = Date.now() - startTime;
       const efficiency = Math.round((totalItems / (gameStats.dragCount || 1)) * 100);
       const finalStats = {
@@ -552,15 +572,17 @@ const DragDropScreen = () => {
       // Record game completion (includes backend save and achievement check)
       recordGameCompletion(finalStats);
       
+      // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
       setTimeout(() => {
-        showFeedbackAnimation('winner');
-      }, 300);
-    } else if (animationType === 'winner') {
-      setTimeout(() => {
+        console.log('🏆 [DragDropScreen] Mostrando modal de finalización directamente...');
         setShowStars(true);
-      }, 500);
+        console.log('⭐ [DragDropScreen] Modal debería aparecer ahora');
+        console.log(`🎯 [DragDropScreen] Estados para modal: score=${score}, gameCompleted=true, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
+      }, 800);
+    } else if (animationType === 'success' && score !== totalItems) {
+      console.log(`⚠️ [DragDropScreen] Animación success pero no todos los elementos completados: score=${score}, totalItems=${totalItems}`);
     }
-  }, [animationType, score, totalItems, gameCompleted, startTime, gameStats, calculateStars, recordGameCompletion, showFeedbackAnimation]);
+  }, [animationType, score, totalItems, gameCompleted, startTime, gameStats, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation, showCelebration]);
 
   const handleCorrectDrop = useCallback((zone: string, option: Option, index: number) => {
     // Record action in adaptive reinforcement service
@@ -657,7 +679,7 @@ const DragDropScreen = () => {
         },
 
         onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], {
-          useNativeDriver: false,
+          useNativeDriver: false, // Necesario para transformaciones de posición
         }),
 
         onPanResponderRelease: (_, gesture) => {
@@ -852,6 +874,14 @@ const DragDropScreen = () => {
           </Text>
         </View>
 
+        {/* Pregunta */}
+        <View style={styles.questionContainer}>
+          <Text style={styles.sectionTitle}>
+            {language === 'es' ? 'Pregunta:' : 'Question:'}
+          </Text>
+          <Text style={styles.questionText}>{processedStep.text}</Text>
+        </View>
+
         {/* Zonas de Destino - Altura Fija */}
         <View style={styles.zonesContainer}>
           <Text style={styles.sectionTitle}>
@@ -921,21 +951,30 @@ const DragDropScreen = () => {
                     isBlinkingItem && styles.draggableHelp,
                     {
                       transform: pan.getTranslateTransform(),
-                      opacity: isBlinkingItem ? helpBlinkAnimation : 1,
                     },
                   ]}
                 >
-                  <Text style={[styles.optionIcon, isPlaced && styles.placedIconStyle]}>
-                    {option.icon}
-                  </Text>
-                  <Text style={[styles.optionLabel, isPlaced && styles.placedLabelStyle]}>
-                    {option.label}
-                  </Text>
-                  {isPlaced && (
-                    <View style={styles.checkmark}>
-                      <Text style={styles.checkmarkText}>✓</Text>
-                    </View>
-                  )}
+                  <Animated.View
+                    style={{
+                      opacity: isBlinkingItem ? helpBlinkAnimation : 1,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: '100%',
+                      height: '100%',
+                    }}
+                  >
+                    <Text style={[styles.optionIcon, isPlaced && styles.placedIconStyle]}>
+                      {option.icon}
+                    </Text>
+                    <Text style={[styles.optionLabel, isPlaced && styles.placedLabelStyle]}>
+                      {option.label}
+                    </Text>
+                    {isPlaced && (
+                      <View style={styles.checkmark}>
+                        <Text style={styles.checkmarkText}>✓</Text>
+                      </View>
+                    )}
+                  </Animated.View>
                 </Animated.View>
               );
             })}
@@ -1088,6 +1127,26 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
     marginBottom: 12,
     textAlign: 'center',
+  },
+  questionContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ff9800',
+  },
+  questionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: '#1a1a1a',
+    lineHeight: 22,
   },
   zonesContainer: {
     marginBottom: 16,
