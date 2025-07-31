@@ -19,6 +19,7 @@ import ApiService, { Category, Lesson, Step } from '../services/ApiService';
 import { AchievementService } from '../services/AchievementService';
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
+import UniversalImage from '../components/UniversalImage';
 
 const { width } = Dimensions.get('window');
 
@@ -93,6 +94,7 @@ const CategoryMenuScreen = () => {
         console.log(`  ${index + 1}. ID: ${category.ID}`);
         console.log(`     Name: "${category.name}"`);
         console.log(`     Description: "${category.description}"`);
+        console.log(`     🖼�� Icon URL: "${category.icon}"`);
         console.log(`     Has colon in name: ${category.name?.includes(':') || false}`);
         console.log(`     Has colon in description: ${category.description?.includes(':') || false}`);
         console.log(`     Is active: ${category.is_active}`);
@@ -393,8 +395,14 @@ const CategoryMenuScreen = () => {
 
           {/* Icon Container */}
           <View style={styles.iconContainer}>
-            <View style={styles.iconBackground}>
-              <Text style={styles.icon}>{category.icon || '📚'}</Text>
+            <View style={styles.imageCircle}>
+              <UniversalImage
+                imageUrl={category.icon}
+                imageType="categorias"
+                fallbackEmoji="📚"
+                size="medium"
+                style={styles.categoryIcon}
+              />
             </View>
           </View>
 
@@ -753,8 +761,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  imageCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: 'rgba(0, 0, 0, 0.1)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    overflow: 'hidden',
+  },
   icon: {
     fontSize: 32,
+  },
+  categoryIcon: {
+    borderRadius: 25,
   },
   cardContent: {
     flex: 1,

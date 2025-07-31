@@ -27,7 +27,7 @@ import AchievementsScreen from '../screens/AchievementsScreen';
 import StatisticsScreen from '../screens/StatisticsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 
-import type { Lesson, Step } from '../data/lessons';
+import type { Lesson, Step } from '../services/ApiService';
 
 export type RootStackParamList = {
   // Pantalla principal

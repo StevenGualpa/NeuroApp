@@ -19,6 +19,7 @@ import ApiService, { Activity } from '../services/ApiService';
 import { AchievementService } from '../services/AchievementService';
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
+import ActivityImage from '../components/ActivityImage';
 
 const { width } = Dimensions.get('window');
 
@@ -98,6 +99,8 @@ const ActivityMenuScreen = () => {
         console.log(`  ${index + 1}. ID: ${activity.ID}`);
         console.log(`     Name: "${activity.name}"`);
         console.log(`     Description: "${activity.description}"`);
+        console.log(`     🖼️ Icon URL: "${activity.icon}"`);
+        console.log(`     📁 Imagen: "${activity.imagen}"`);
         console.log(`     Has colon in name: ${activity.name?.includes(':') || false}`);
         console.log(`     Has colon in description: ${activity.description?.includes(':') || false}`);
         console.log(`     Is active: ${activity.is_active}`);
@@ -316,18 +319,16 @@ const ActivityMenuScreen = () => {
           onPressOut={() => handlePressOut(index)}
           activeOpacity={0.9}
         >
-          {/* Status Badge */}
-          <View style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusColor(activity) }
-          ]}>
-            <Text style={styles.statusText}>{getActivityStatus(activity)}</Text>
-          </View>
-
+          
           {/* Icon Container */}
           <View style={styles.iconContainer}>
-            <View style={styles.iconBackground}>
-              <Text style={styles.icon}>{config.emoji}</Text>
+            <View style={styles.imageCircle}>
+              <ActivityImage
+                imageUrl={activity.icon}
+                fallbackEmoji={config.emoji}
+                size="small"
+                style={styles.activityImage}
+              />
             </View>
           </View>
 
@@ -350,7 +351,7 @@ const ActivityMenuScreen = () => {
               <Text style={styles.playButtonText}>▶</Text>
             </View>
           </View>
-
+          
           {/* Decorative Elements */}
           <View style={styles.decorativeCircle1} />
           <View style={styles.decorativeCircle2} />
@@ -423,16 +424,7 @@ const ActivityMenuScreen = () => {
         </View>
       </View>
 
-      {/* Status */}
-      <View style={styles.statusContainer}>
-        <Text style={styles.statusText}>
-          🌍 {language === 'es' 
-            ? `Actividades bilingües • Idioma: Español • ${activities.length} actividades`
-            : `Bilingual activities • Language: English • ${activities.length} activities`
-          }
-        </Text>
-      </View>
-      
+            
       {/* Activities Grid */}
       {activities.length === 0 ? (
         renderEmptyState()
@@ -453,7 +445,8 @@ const ActivityMenuScreen = () => {
           <View style={styles.grid}>
             {activities.map((activity, index) => renderActivityCard(activity, index))}
           </View>
-        </ScrollView>
+          
+                  </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -568,23 +561,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#ffffff',
   },
-  statusContainer: {
-    backgroundColor: '#e8f5e8',
-    marginHorizontal: 15,
-    marginTop: 10,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
-  },
-  statusText: {
-    fontSize: 11,
-    color: '#2e7d32',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  loadingContainer: {
+    loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -652,7 +629,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 20,
     padding: 16,
-    minHeight: 180,
+    minHeight: 200,
     shadowOffset: {
       width: 0,
       height: 6,
@@ -663,60 +640,28 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
-  statusBadge: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    zIndex: 2,
-  },
   iconContainer: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  iconBackground: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  imageCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: 'rgba(0, 0, 0, 0.1)',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    overflow: 'hidden',
   },
-  icon: {
-    fontSize: 32,
-  },
-  cardContent: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 6,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-    minHeight: 32,
-  },
-  cardDescription: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    marginBottom: 8,
-    lineHeight: 14,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
-    minHeight: 42,
+  activityImage: {
+    borderRadius: 8,
   },
   playButtonContainer: {
     alignItems: 'center',
@@ -740,7 +685,30 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     marginLeft: 2,
   },
-  decorativeCircle1: {
+  cardContent: {
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  cardDescription: {
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 14,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 1,
+  },
+    decorativeCircle1: {
     position: 'absolute',
     top: -20,
     right: -20,

@@ -8,6 +8,8 @@ export interface Activity {
   DeletedAt: string | null;
   name: string;
   description: string;
+  icon: string; // URL completa de la imagen del servidor
+  imagen: string; // Campo del servidor (no se usa en la app)
   is_active: boolean;
   Steps: any[] | null;
 }
