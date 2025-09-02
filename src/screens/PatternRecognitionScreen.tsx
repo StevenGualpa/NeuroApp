@@ -933,16 +933,6 @@ const PatternRecognitionScreen = () => {
           gameStats={gameStats}
         />
 
-        {/* Status bilingüe */}
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>
-            🌍 {language === 'es' 
-              ? `Actividad bilingüe • Idioma: Español • Reconoce patrones`
-              : `Bilingual activity • Language: English • Recognize patterns`
-            }
-          </Text>
-        </View>
-
         {/* Pregunta */}
         <View style={styles.questionContainer}>
           <Text style={styles.sectionTitle}>
@@ -1175,22 +1165,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
-  },
-  statusContainer: {
-    backgroundColor: '#e8f5e8',
-    marginHorizontal: 0,
-    marginBottom: 16,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
-  },
-  statusText: {
-    fontSize: 11,
-    color: '#2e7d32',
-    fontWeight: '600',
-    textAlign: 'center',
   },
   questionContainer: {
     backgroundColor: '#ffffff',

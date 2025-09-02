@@ -158,7 +158,7 @@ const OrderStepsScreen = () => {
       
       console.log(`🎯 [OrderStepsScreen] DESPUÉS del procesamiento paso ${index + 1}:`);
       console.log(`   Processed label: "${processedLabel}"`);
-      console.log(`   Cambió: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
+      console.log(`   Cambi��: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
       
       return {
         ...option,
@@ -368,7 +368,7 @@ const OrderStepsScreen = () => {
       console.log('⭐ Estrellas ganadas:', progressData.stars);
       console.log('🔄 Intentos totales:', progressData.attempts);
       console.log('❌ Errores cometidos:', progressData.errors);
-      console.log('��️ Tiempo gastado (segundos):', progressData.timeSpent);
+      console.log('⏱️ Tiempo gastado (segundos):', progressData.timeSpent);
       console.log('🤝 Usó ayuda:', progressData.usedHelp);
       console.log('💡 Activaciones de ayuda:', progressData.helpActivations);
       console.log('🏆 Ejecución perfecta:', progressData.perfectRun);
@@ -835,16 +835,6 @@ const OrderStepsScreen = () => {
           gameStats={gameStats}
         />
 
-        {/* Status bilingüe */}
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>
-            🌍 {language === 'es' 
-              ? `Actividad bilingüe • Idioma: Español • Ordena los pasos`
-              : `Bilingual activity • Language: English • Order the steps`
-            }
-          </Text>
-        </View>
-
         {/* Pregunta */}
         <View style={styles.questionContainer}>
           <Text style={styles.sectionTitle}>
@@ -1003,22 +993,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
-  },
-  statusContainer: {
-    backgroundColor: '#e8f5e8',
-    marginHorizontal: 0,
-    marginBottom: 16,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
-  },
-  statusText: {
-    fontSize: 11,
-    color: '#2e7d32',
-    fontWeight: '600',
-    textAlign: 'center',
   },
   questionContainer: {
     backgroundColor: '#ffffff',

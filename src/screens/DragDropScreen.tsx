@@ -440,8 +440,10 @@ const DragDropScreen = () => {
         if (progressError) {
           console.error('❌ [DragDropScreen] Error específico:', progressError);
           Alert.alert(
-            'Error de Conexión',
-            `No se pudo guardar tu progreso: ${progressError}. Tu progreso local se ha guardado.`,
+            language === 'es' ? 'Error de Conexión' : 'Connection Error',
+            language === 'es' 
+              ? `No se pudo guardar tu progreso: ${progressError}. Tu progreso local se ha guardado.`
+              : `Could not save your progress: ${progressError}. Your local progress has been saved.`,
             [{ text: 'OK' }]
           );
         }
@@ -449,12 +451,14 @@ const DragDropScreen = () => {
     } catch (error) {
       console.error('❌ [DragDropScreen] Error guardando progreso:', error);
       Alert.alert(
-        'Error',
-        'Hubo un problema guardando tu progreso. Tu progreso local se ha guardado.',
+        language === 'es' ? 'Error' : 'Error',
+        language === 'es' 
+          ? 'Hubo un problema guardando tu progreso. Tu progreso local se ha guardado.'
+          : 'There was a problem saving your progress. Your local progress has been saved.',
         [{ text: 'OK' }]
       );
     }
-  }, [completeStep, step, progressError]);
+  }, [completeStep, step, progressError, language]);
 
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
@@ -514,12 +518,14 @@ const DragDropScreen = () => {
     } catch (error) {
       console.error('❌ [DragDropScreen] Error registrando finalización:', error);
       Alert.alert(
-        'Error',
-        'No se pudieron verificar los logros. Tu progreso se ha guardado.',
+        language === 'es' ? 'Error' : 'Error',
+        language === 'es' 
+          ? 'No se pudieron verificar los logros. Tu progreso se ha guardado.'
+          : 'Could not verify achievements. Your progress has been saved.',
         [{ text: 'OK' }]
       );
     }
-  }, [saveProgressToBackend, step]);
+  }, [saveProgressToBackend, step, language]);
 
   // FUNCIÓN CORREGIDA: handleAnimationFinish - Alineada con otras actividades
   const handleAnimationFinish = useCallback(() => {
@@ -740,33 +746,49 @@ const DragDropScreen = () => {
   }, []);
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, efficiency: number) => {
-    if (perfectRun && stars === 3 && efficiency >= 100) {
-      return '¡Perfecto! Arrastre eficiente sin errores 🏆';
-    } else if (perfectRun && stars === 3) {
-      return '¡Excelente! Sin errores 🌟';
-    } else if (stars === 3) {
-      return '¡Muy bien hecho! 👏';
-    } else if (stars === 2) {
-      return '¡Buen trabajo! Sigue practicando 💪';
+    if (language === 'es') {
+      if (perfectRun && stars === 3 && efficiency >= 100) {
+        return '¡Perfecto! Arrastre eficiente sin errores 🏆';
+      } else if (perfectRun && stars === 3) {
+        return '¡Excelente! Sin errores 🌟';
+      } else if (stars === 3) {
+        return '¡Muy bien hecho! 👏';
+      } else if (stars === 2) {
+        return '¡Buen trabajo! Sigue practicando 💪';
+      } else {
+        return '¡Completado! Puedes mejorar la precisión 📈';
+      }
     } else {
-      return '¡Completado! Puedes mejorar la precisión 📈';
+      if (perfectRun && stars === 3 && efficiency >= 100) {
+        return 'Perfect! Efficient dragging without errors 🏆';
+      } else if (perfectRun && stars === 3) {
+        return 'Excellent! No errors 🌟';
+      } else if (stars === 3) {
+        return 'Very well done! 👏';
+      } else if (stars === 2) {
+        return 'Good job! Keep practicing 💪';
+      } else {
+        return 'Completed! You can improve precision 📈';
+      }
     }
-  }, []);
+  }, [language]);
 
   const handleBackPress = useCallback(() => {
     if (gameStats.totalAttempts > 0 && !gameCompleted) {
       Alert.alert(
-        'Salir del juego',
-        '¿Estás seguro de que quieres salir? Perderás tu progreso actual.',
+        language === 'es' ? 'Salir del juego' : 'Exit game',
+        language === 'es' 
+          ? '¿Estás seguro de que quieres salir? Perderás tu progreso actual.'
+          : 'Are you sure you want to exit? You will lose your current progress.',
         [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Salir', style: 'destructive', onPress: () => navigation.goBack() },
+          { text: language === 'es' ? 'Cancelar' : 'Cancel', style: 'cancel' },
+          { text: language === 'es' ? 'Salir' : 'Exit', style: 'destructive', onPress: () => navigation.goBack() },
         ]
       );
     } else {
       navigation.goBack();
     }
-  }, [gameStats.totalAttempts, gameCompleted, navigation]);
+  }, [gameStats.totalAttempts, gameCompleted, navigation, language]);
 
   const handleCelebrationClose = useCallback(() => {
     setShowCelebration(false);
@@ -863,16 +885,6 @@ const DragDropScreen = () => {
           totalItems={totalItems}
           gameStats={gameStats}
         />
-
-        {/* Status bilingüe */}
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>
-            🌍 {language === 'es' 
-              ? `Actividad bilingüe • Idioma: Español • Asocia elementos`
-              : `Bilingual activity • Language: English • Associate elements`
-            }
-          </Text>
-        </View>
 
         {/* Pregunta */}
         <View style={styles.questionContainer}>
@@ -1020,12 +1032,26 @@ const DragDropScreen = () => {
         gameType="dragdrop"
         showEfficiency={true}
         customStats={[
-          { label: 'Arrastres totales', value: gameStats.dragCount },
-          { label: 'Elementos colocados', value: `${score}/${totalItems}` },
-          { label: 'Ayuda usada', value: gameStats.usedHelp ? 'Sí' : 'No' },
-          { label: 'Progreso guardado', value: progressLoading ? 'Guardando...' : 'Guardado ✅' },
+          { 
+            label: language === 'es' ? 'Arrastres totales' : 'Total drags', 
+            value: gameStats.dragCount 
+          },
+          { 
+            label: language === 'es' ? 'Elementos colocados' : 'Elements placed', 
+            value: `${score}/${totalItems}` 
+          },
+          { 
+            label: language === 'es' ? 'Ayuda usada' : 'Help used', 
+            value: gameStats.usedHelp ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No')
+          },
+          { 
+            label: language === 'es' ? 'Progreso guardado' : 'Progress saved', 
+            value: progressLoading 
+              ? (language === 'es' ? 'Guardando...' : 'Saving...') 
+              : (language === 'es' ? 'Guardado ✅' : 'Saved ✅')
+          },
         ]}
-        bonusMessage={gameStats.perfectRun && gameStats.efficiency >= 100 ? '🎯 ¡Arrastre perfecto!' : undefined}
+        bonusMessage={gameStats.perfectRun && gameStats.efficiency >= 100 ? (language === 'es' ? '🎯 ¡Arrastre perfecto!' : '🎯 Perfect dragging!') : undefined}
       />
 
       {/* Feedback Animation */}
@@ -1104,22 +1130,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
-  },
-  statusContainer: {
-    backgroundColor: '#e8f5e8',
-    marginHorizontal: 0,
-    marginBottom: 16,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
-  },
-  statusText: {
-    fontSize: 11,
-    color: '#2e7d32',
-    fontWeight: '600',
-    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 16,
