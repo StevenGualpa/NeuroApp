@@ -47,8 +47,8 @@ const MainScreen = () => {
     {
       category: t.language === 'es' ? 'Agradecimientos' : 'Acknowledgments',
       items: [
-        { name: 'Beta Testers', value: t.language === 'es' ? 'Comunidad de Usuarios' : 'User Community' },
-        { name: 'Feedback', value: t.language === 'es' ? 'Padres y Educadores' : 'Parents and Educators' },
+        { name: t.language === 'es' ? 'Evaluadores Beta' : 'Beta Testers', value: t.language === 'es' ? 'Comunidad de Usuarios' : 'User Community' },
+        { name: t.language === 'es' ? 'Retroalimentación' : 'Feedback', value: t.language === 'es' ? 'Padres y Educadores' : 'Parents and Educators' },
         { name: t.language === 'es' ? 'Inspiraci��n' : 'Inspiration', value: t.language === 'es' ? 'Niños de Todo el Mundo' : 'Children Around the World' },
       ],
     },

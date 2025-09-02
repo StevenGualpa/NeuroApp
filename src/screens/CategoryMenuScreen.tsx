@@ -94,7 +94,7 @@ const CategoryMenuScreen = () => {
         console.log(`  ${index + 1}. ID: ${category.ID}`);
         console.log(`     Name: "${category.name}"`);
         console.log(`     Description: "${category.description}"`);
-        console.log(`     🖼�� Icon URL: "${category.icon}"`);
+        console.log(`     🖼️ Icon URL: "${category.icon}"`);
         console.log(`     Has colon in name: ${category.name?.includes(':') || false}`);
         console.log(`     Has colon in description: ${category.description?.includes(':') || false}`);
         console.log(`     Is active: ${category.is_active}`);
@@ -445,7 +445,7 @@ const CategoryMenuScreen = () => {
             <View style={styles.titleSection}>
               <Text style={styles.title}>📂 {t.categories.title}</Text>
             </View>
-            <View style={styles.achievementsButton} />
+            <View style={styles.headerSpacer} />
           </View>
         </View>
         {renderLoadingState()}
@@ -466,38 +466,8 @@ const CategoryMenuScreen = () => {
             <Text style={styles.title}>📂 {t.categories.title}</Text>
           </View>
           
-          {/* Achievements Button */}
-          <TouchableOpacity 
-            style={styles.achievementsButton}
-            onPress={goToAchievements}
-            activeOpacity={0.8}
-          >
-            <View style={styles.achievementsIconContainer}>
-              <Text style={styles.achievementsIcon}>🏆</Text>
-            </View>
-            <View style={styles.achievementsInfo}>
-              <Text style={styles.achievementsPoints}>{totalPoints}</Text>
-              <Text style={styles.achievementsLabel}>
-                {t.language === 'es' ? 'pts' : 'pts'}
-              </Text>
-            </View>
-            {unlockedAchievements > 0 && (
-              <View style={styles.achievementsBadge}>
-                <Text style={styles.achievementsBadgeText}>{unlockedAchievements}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          <View style={styles.headerSpacer} />
         </View>
-      </View>
-      
-      {/* Status */}
-      <View style={styles.statusContainer}>
-        <Text style={styles.statusText}>
-          🌍 {language === 'es' 
-            ? `Categorías bilingües • Idioma: Español • ${categories.length} categorías`
-            : `Bilingual categories • Language: English • ${categories.length} categories`
-          }
-        </Text>
       </View>
       
       {/* Categories Grid */}
@@ -575,81 +545,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   title: {
-    fontSize: 24,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
     textAlign: 'center',
     color: '#2D3436',
     textShadowColor: 'rgba(0, 0, 0, 0.1)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  achievementsButton: {
-    backgroundColor: '#4285f4',
-    borderRadius: 16,
-    padding: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-    position: 'relative',
-    minWidth: 70,
-  },
-  achievementsIconContainer: {
-    marginBottom: 2,
-  },
-  achievementsIcon: {
-    fontSize: 20,
-  },
-  achievementsInfo: {
-    alignItems: 'center',
-  },
-  achievementsPoints: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#ffffff',
-    lineHeight: 16,
-  },
-  achievementsLabel: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.8)',
-  },
-  achievementsBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#ff4757',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#ffffff',
-  },
-  achievementsBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#ffffff',
-  },
-  statusContainer: {
-    backgroundColor: '#e8f5e8',
-    marginHorizontal: 15,
-    marginTop: 10,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
-  },
-  statusText: {
-    fontSize: 11,
-    color: '#2e7d32',
-    fontWeight: '600',
-    textAlign: 'center',
+  headerSpacer: {
+    width: 70,
   },
   loadingContainer: {
     flex: 1,

@@ -777,7 +777,7 @@ const SelectOptionScreen = () => {
     if (score === 1 && gameCompleted && showStars && !showCelebration) {
       console.log(`🎯 [SelectOptionScreen] ✅ Condiciones principales cumplidas para mostrar modal`);
       if (showAnimation) {
-        console.log(`�� [SelectOptionScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
+        console.log(`🎯 [SelectOptionScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
       } else {
         console.log(`🎯 [SelectOptionScreen] ✅ Modal debería estar visible ahora!`);
       }
@@ -826,16 +826,6 @@ const SelectOptionScreen = () => {
           }
         }}
       >
-
-        {/* Status bilingüe */}
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>
-            🌍 {language === 'es' 
-              ? `Actividad bilingüe • Idioma: Español • Selecciona la opción correcta`
-              : `Bilingual activity • Language: English • Select the correct option`
-            }
-          </Text>
-        </View>
 
         {/* Progreso del juego */}
         <ProgressSection 
@@ -1052,22 +1042,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 8,
-  },
-  statusContainer: {
-    backgroundColor: '#e8f5e8',
-    marginHorizontal: 0,
-    marginBottom: 16,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
-  },
-  statusText: {
-    fontSize: 11,
-    color: '#2e7d32',
-    fontWeight: '600',
-    textAlign: 'center',
   },
   questionContainer: {
     backgroundColor: '#ffffff',

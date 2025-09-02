@@ -124,20 +124,6 @@ const MenuGrid = forwardRef<MenuGridRef, MenuGridProps>(({ menuOptions, onMenuPr
 
   return (
     <View style={styles.contentContainer}>
-      {/* Sección de bienvenida con animaciones */}
-      <Animated.View 
-        style={[
-          styles.welcomeSection,
-          {
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }]
-          }
-        ]}
-      >
-        <Text style={styles.welcomeTitle}>{getWelcomeTitle()}</Text>
-        <Text style={styles.welcomeSubtitle}>{getWelcomeSubtitle()}</Text>
-      </Animated.View>
-      
       {/* Grid de menú */}
       <Animated.View 
         style={[
@@ -205,28 +191,7 @@ const MenuGrid = forwardRef<MenuGridRef, MenuGridProps>(({ menuOptions, onMenuPr
 const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
-    paddingTop: 20,
-  },
-  welcomeSection: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 40,
-  },
-  welcomeTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    textAlign: 'center',
-    color: '#1a1a1a',
-    marginBottom: 8,
-    textShadowColor: 'rgba(0, 0, 0, 0.1)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    textAlign: 'center',
-    color: '#6b7280',
-    fontWeight: '500',
+    paddingTop: 10,
   },
   menuGrid: {
     flexDirection: 'row',
@@ -271,14 +236,15 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   menuTitle: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 12,
+    fontWeight: '700',
     color: '#ffffff',
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
     marginBottom: 8,
+    lineHeight: 14,
   },
   actionIndicator: {
     position: 'absolute',

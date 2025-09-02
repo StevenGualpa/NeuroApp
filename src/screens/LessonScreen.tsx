@@ -155,7 +155,7 @@ const RealLessonScreen = () => {
     
     switch (cleanActivityType) {
       case 'Memoria visual':
-        console.log('��� [LessonScreen] → Navegando a memoryGame');
+        console.log('🧠 [LessonScreen] → Navegando a memoryGame');
         navigation.replace('memoryGame', { step: convertedStep, lessonTitle: lesson.title });
         break;
       case 'Arrastra y suelta':
@@ -308,6 +308,7 @@ const RealLessonScreen = () => {
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Text style={styles.backButtonText}>← Volver</Text>
           </TouchableOpacity>
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.headerContent}>
           <View style={styles.titleRow}>
@@ -378,7 +379,7 @@ const RealLessonScreen = () => {
           }
         ]}
       >
-        {/* Top row con botón volver y progreso */}
+        {/* Top row con botón volver */}
         <View style={styles.headerTop}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -387,9 +388,7 @@ const RealLessonScreen = () => {
             <Text style={styles.backButtonText}>← Volver</Text>
           </TouchableOpacity>
           
-          <View style={styles.progressBadge}>
-            <Text style={styles.progressBadgeText}>{Math.round(progressPercentage)}%</Text>
-          </View>
+          <View style={styles.headerSpacer} />
         </View>
         
         {/* Título */}
@@ -401,7 +400,7 @@ const RealLessonScreen = () => {
             <View style={styles.titleInfo}>
               <Text style={styles.lessonTitle}>{displayLesson.title}</Text>
               <Text style={styles.lessonSubtitle}>
-                {completedSteps}/{steps.length} pasos completados • API
+                Pasos de la lección
               </Text>
             </View>
           </View>
@@ -495,29 +494,6 @@ const RealLessonScreen = () => {
                       <Text style={styles.stepDescription} numberOfLines={2}>
                         {step.description}
                       </Text>
-                      
-                      <View style={styles.stepMeta}>
-                        <View style={styles.stepMetaItem}>
-                          <Text style={styles.stepMetaIcon}>🆔</Text>
-                          <Text style={styles.stepMetaText}>ID: {step.ID}</Text>
-                        </View>
-                        <View style={styles.stepMetaItem}>
-                          <Text style={styles.stepMetaIcon}>📊</Text>
-                          <Text style={styles.stepMetaText}>Orden: {step.sort_order}</Text>
-                        </View>
-                        <View style={styles.stepMetaItem}>
-                          <Text style={styles.stepMetaIcon}>🎯</Text>
-                          <Text style={styles.stepMetaText}>
-                            {step.Options?.length || 0} opciones
-                          </Text>
-                        </View>
-                      </View>
-                      
-                      <View style={styles.activityTypeContainer}>
-                        <Text style={styles.activityTypeLabel}>
-                          {extractActivityType(activityType)}
-                        </Text>
-                      </View>
                     </View>
 
                     <View style={styles.stepActions}>
@@ -582,16 +558,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  progressBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  progressBadgeText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '700',
+  headerSpacer: {
+    width: 70,
   },
   headerContent: {
     marginBottom: 12,
@@ -617,7 +585,7 @@ const styles = StyleSheet.create({
   },
   lessonTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: 'white',
     marginBottom: 2,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -681,7 +649,7 @@ const styles = StyleSheet.create({
   },
   stepCardContent: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     padding: 16,
   },
   stepIconContainer: {
@@ -727,42 +695,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6b7280',
     lineHeight: 18,
-    marginBottom: 8,
-  },
-  stepMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  stepMetaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8faff',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  stepMetaIcon: {
-    fontSize: 10,
-    marginRight: 4,
-  },
-  stepMetaText: {
-    fontSize: 10,
-    color: '#6b7280',
-    fontWeight: '500',
-  },
-  activityTypeContainer: {
-    backgroundColor: '#e8f0fe',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  activityTypeLabel: {
-    fontSize: 11,
-    color: '#4285f4',
-    fontWeight: '600',
   },
   stepActions: {
     alignItems: 'center',

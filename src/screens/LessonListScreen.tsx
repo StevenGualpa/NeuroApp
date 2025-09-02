@@ -235,30 +235,13 @@ const LessonListScreen = () => {
     navigation.navigate('lesson', { lesson: convertedLesson });
   };
 
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return '#4CAF50';
-      case 'medium': return '#FF9800';
-      case 'hard': return '#F44336';
-      default: return '#9E9E9E';
-    }
-  };
-
-  const getDifficultyLabel = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return t.language === 'es' ? 'Fácil' : 'Easy';
-      case 'medium': return t.language === 'es' ? 'Medio' : 'Medium';
-      case 'hard': return t.language === 'es' ? 'Difícil' : 'Hard';
-      default: return t.language === 'es' ? 'Normal' : 'Normal';
-    }
-  };
-
   const categoryColor = selectedCategory?.color || '#4285f4';
   const categoryIcon = selectedCategory?.icon || '📚';
 
-  // Calcular progreso (simulado por ahora)
-  const completedLessons = 0; // Por ahora, ninguna lección está completada
-  const progressPercentage = lessons.length > 0 ? (completedLessons / lessons.length) * 100 : 0;
+  // Procesar el nombre de la categoría para mostrar solo en el idioma actual
+  const processedCategoryName = selectedCategory 
+    ? BilingualTextProcessor.extractText(selectedCategory.name, language)
+    : BilingualTextProcessor.extractText(category, language);
 
   const renderLoadingState = () => (
     <SafeAreaView style={styles.container}>
@@ -267,6 +250,7 @@ const LessonListScreen = () => {
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
             <Text style={styles.backButtonText}>← {t.common.back}</Text>
           </TouchableOpacity>
+          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.headerContent}>
           <View style={styles.titleRow}>
@@ -274,9 +258,9 @@ const LessonListScreen = () => {
               <Text style={styles.categoryIcon}>{categoryIcon}</Text>
             </View>
             <View style={styles.titleInfo}>
-              <Text style={styles.categoryTitle}>{category}</Text>
+              <Text style={styles.categoryTitle}>{processedCategoryName}</Text>
               <Text style={styles.categorySubtitle}>
-                {t.language === 'es' ? 'Cargando lecciones...' : 'Loading lessons...'}
+                {language === 'es' ? 'Cargando lecciones...' : 'Loading lessons...'}
               </Text>
             </View>
           </View>
@@ -285,7 +269,7 @@ const LessonListScreen = () => {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4285f4" />
         <Text style={styles.loadingText}>
-          {t.language === 'es' ? 'Cargando lecciones...' : 'Loading lessons...'}
+          {language === 'es' ? 'Cargando lecciones...' : 'Loading lessons...'}
         </Text>
       </View>
     </SafeAreaView>
@@ -296,7 +280,7 @@ const LessonListScreen = () => {
       <Text style={styles.emptyStateIcon}>📚</Text>
       <Text style={styles.emptyStateTitle}>
         {activityType 
-          ? (t.language === 'es' 
+          ? (language === 'es' 
               ? 'No hay lecciones para esta actividad'
               : 'No lessons for this activity')
           : t.lessons.noLessons
@@ -304,10 +288,10 @@ const LessonListScreen = () => {
       </Text>
       <Text style={styles.emptyStateText}>
         {activityType 
-          ? (t.language === 'es' 
-              ? `No se encontraron lecciones de "${activityType}" en la categoría "${category}". ¡Pronto agregaremos más contenido!`
-              : `No "${activityType}" lessons found in category "${category}". We'll add more content soon!`)
-          : (t.language === 'es'
+          ? (language === 'es' 
+              ? `No se encontraron lecciones de "${activityType}" en la categoría "${processedCategoryName}". ¡Pronto agregaremos más contenido!`
+              : `No "${activityType}" lessons found in category "${processedCategoryName}". We'll add more content soon!`)
+          : (language === 'es'
               ? 'Pronto agregaremos más contenido para esta categoría'
               : 'We will add more content for this category soon')
         }
@@ -349,7 +333,7 @@ const LessonListScreen = () => {
           }
         ]}
       >
-        {/* Top row con botón volver y progreso */}
+        {/* Top row con botón volver */}
         <View style={styles.headerTop}>
           <TouchableOpacity 
             style={styles.backButton}
@@ -358,9 +342,7 @@ const LessonListScreen = () => {
             <Text style={styles.backButtonText}>← {t.common.back}</Text>
           </TouchableOpacity>
           
-          <View style={styles.progressBadge}>
-            <Text style={styles.progressBadgeText}>{Math.round(progressPercentage)}%</Text>
-          </View>
+          <View style={styles.headerSpacer} />
         </View>
         
         {/* Título */}
@@ -370,9 +352,9 @@ const LessonListScreen = () => {
               <Text style={styles.categoryIcon}>{categoryIcon}</Text>
             </View>
             <View style={styles.titleInfo}>
-              <Text style={styles.categoryTitle}>{category}</Text>
+              <Text style={styles.categoryTitle}>{processedCategoryName}</Text>
               <Text style={styles.categorySubtitle}>
-                {completedLessons}/{lessons.length} {t.language === 'es' ? 'completadas' : 'completed'}
+                {language === 'es' ? 'Lecciones disponibles' : 'Available lessons'}
               </Text>
             </View>
           </View>
@@ -423,26 +405,6 @@ const LessonListScreen = () => {
             />
           }
         >
-          {/* Indicador de filtrado activo */}
-          {activityType && (
-            <View style={styles.filterIndicator}>
-              <Text style={styles.filterIcon}>🎯</Text>
-              <Text style={styles.filterText}>
-                {t.language === 'es' ? 'Filtrando por' : 'Filtering by'}: {activityType}
-              </Text>
-            </View>
-          )}
-
-          {/* Status */}
-          <View style={styles.statusContainer}>
-            <Text style={styles.statusText}>
-              🌍 {language === 'es' 
-                ? `Lecciones bilingües • Idioma: Español • ${lessons.length} lecciones`
-                : `Bilingual lessons • Language: English • ${lessons.length} lessons`
-              }
-            </Text>
-          </View>
-
           <Text style={styles.sectionTitle}>
             {t.lessons.available} ({lessons.length})
           </Text>
@@ -453,72 +415,32 @@ const LessonListScreen = () => {
             lessons.map((lesson, index) => (
               <TouchableOpacity
                 key={lesson.ID}
-                style={[
-                  styles.lessonCard,
-                  !lesson.is_active && styles.lessonCardInactive
-                ]}
-                onPress={() => lesson.is_active && goToLesson(lesson)}
-                activeOpacity={lesson.is_active ? 0.8 : 1}
+                style={styles.lessonCard}
+                onPress={() => goToLesson(lesson)}
+                activeOpacity={0.8}
               >
                 <View style={styles.lessonCardContent}>
                   <View style={[
                     styles.lessonIconContainer,
-                    { backgroundColor: `${categoryColor}15` },
-                    !lesson.is_active && styles.lessonIconContainerInactive
+                    { backgroundColor: `${categoryColor}15` }
                   ]}>
                     <Text style={styles.lessonIcon}>{lesson.icon}</Text>
                   </View>
                   
                   <View style={styles.lessonInfo}>
-                    <View style={styles.lessonHeader}>
-                      <Text style={[
-                        styles.lessonTitle,
-                        !lesson.is_active && styles.lessonTitleInactive
-                      ]}>
-                        {lesson.title}
-                      </Text>
-                      <View style={[
-                        styles.difficultyBadge,
-                        { backgroundColor: getDifficultyColor(lesson.difficulty) }
-                      ]}>
-                        <Text style={styles.difficultyText}>
-                          {getDifficultyLabel(lesson.difficulty)}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    <Text style={[
-                      styles.lessonDescription,
-                      !lesson.is_active && styles.lessonDescriptionInactive
-                    ]} numberOfLines={2}>
-                      {lesson.description}
+                    <Text style={styles.lessonTitle}>
+                      {lesson.title}
                     </Text>
                     
-                    <View style={styles.lessonMeta}>
-                      <View style={styles.lessonMetaItem}>
-                        <Text style={styles.lessonMetaIcon}>
-                          {lesson.is_active ? '✅' : '❌'}
-                        </Text>
-                        <Text style={styles.lessonMetaText}>
-                          {lesson.is_active 
-                            ? (t.language === 'es' ? 'Activa' : 'Active')
-                            : (t.language === 'es' ? 'Inactiva' : 'Inactive')
-                          }
-                        </Text>
-                      </View>
-                    </View>
+                    <Text style={styles.lessonDescription} numberOfLines={2}>
+                      {lesson.description}
+                    </Text>
                   </View>
 
                   <View style={styles.lessonActions}>
-                    {lesson.is_active ? (
-                      <View style={[styles.startButton, { backgroundColor: categoryColor }]}>
-                        <Text style={styles.startButtonText}>{t.lessons.start}</Text>
-                      </View>
-                    ) : (
-                      <View style={styles.inactiveButton}>
-                        <Text style={styles.inactiveButtonText}>{t.lessons.notAvailable}</Text>
-                      </View>
-                    )}
+                    <View style={[styles.startButton, { backgroundColor: categoryColor }]}>
+                      <Text style={styles.startButtonText}>{t.lessons.start}</Text>
+                    </View>
                   </View>
                 </View>
               </TouchableOpacity>
@@ -567,16 +489,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  progressBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  progressBadgeText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '700',
+  headerSpacer: {
+    width: 70,
   },
   headerContent: {
     marginBottom: 12,
@@ -601,8 +515,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoryTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
     color: 'white',
     marginBottom: 2,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -646,42 +560,6 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     fontWeight: '600',
   },
-  filterIndicator: {
-    backgroundColor: '#e8f0fe',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#4285f4',
-  },
-  filterIcon: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4285f4',
-  },
-  statusContainer: {
-    backgroundColor: '#e8f5e8',
-    marginHorizontal: 0,
-    marginBottom: 16,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
-  },
-  statusText: {
-    fontSize: 11,
-    color: '#2e7d32',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
@@ -700,15 +578,9 @@ const styles = StyleSheet.create({
     elevation: 4,
     overflow: 'hidden',
   },
-  lessonCardInactive: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    opacity: 0.7,
-  },
   lessonCardContent: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     padding: 16,
   },
   lessonIconContainer: {
@@ -719,72 +591,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 12,
   },
-  lessonIconContainerInactive: {
-    backgroundColor: '#f1f3f4',
-  },
   lessonIcon: {
     fontSize: 24,
   },
   lessonInfo: {
     flex: 1,
   },
-  lessonHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 6,
-  },
   lessonTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: '#1a1a1a',
     lineHeight: 20,
-    flex: 1,
-    marginRight: 8,
-  },
-  lessonTitleInactive: {
-    color: '#6b7280',
-  },
-  difficultyBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  difficultyText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#ffffff',
+    marginBottom: 6,
   },
   lessonDescription: {
     fontSize: 13,
     color: '#6b7280',
     lineHeight: 18,
-    marginBottom: 8,
-  },
-  lessonDescriptionInactive: {
-    color: '#9ca3af',
-  },
-  lessonMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  lessonMetaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8faff',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  lessonMetaIcon: {
-    fontSize: 10,
-    marginRight: 4,
-  },
-  lessonMetaText: {
-    fontSize: 10,
-    color: '#6b7280',
-    fontWeight: '500',
   },
   lessonActions: {
     alignItems: 'center',
@@ -804,17 +627,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     fontWeight: '700',
-  },
-  inactiveButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: '#e9ecef',
-  },
-  inactiveButtonText: {
-    color: '#6b7280',
-    fontSize: 12,
-    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',

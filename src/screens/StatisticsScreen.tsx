@@ -358,12 +358,7 @@ const StatisticsScreen = () => {
           <Text style={styles.backButtonText}>← Volver</Text>
         </TouchableOpacity>
         <Text style={styles.title}>📊 Mis Estadísticas</Text>
-        <TouchableOpacity 
-          style={styles.refreshButton}
-          onPress={onRefresh}
-        >
-          <Text style={styles.refreshButtonText}>🔄</Text>
-        </TouchableOpacity>
+        <View style={styles.headerSpacer} />
       </View>
 
       {/* Content */}
@@ -426,15 +421,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  refreshButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-  },
-  refreshButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
+  headerSpacer: {
+    width: 60,
   },
   title: {
     fontSize: 20,

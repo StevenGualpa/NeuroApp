@@ -445,31 +445,13 @@ const AchievementsScreen = () => {
           <Text style={styles.backButtonText}>← {language === 'es' ? 'Volver' : 'Back'}</Text>
         </TouchableOpacity>
         <Text style={styles.title}>🏆 {language === 'es' ? 'Logros' : 'Achievements'}</Text>
-        <TouchableOpacity 
-          style={styles.refreshButton}
-          onPress={onRefresh}
-          disabled={isRefreshing}
-        >
-          <Text style={styles.refreshButtonText}>
-            {isRefreshing ? '⟳' : '🔄'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.headerSpacer} />
       </View>
 
       {/* Stats + Categories */}
       <View style={styles.topSection}>
         {renderStatsHeader()}
         {renderCategoryFilter()}
-      </View>
-
-      {/* Status */}
-      <View style={styles.apiStatus}>
-        <Text style={styles.apiStatusText}>
-          🌍 {language === 'es' 
-            ? `Logros bilingües • Idioma: Español • ${achievements.length} logros`
-            : `Bilingual achievements • Language: English • ${achievements.length} achievements`
-          }
-        </Text>
       </View>
 
       {/* Achievements List */}
@@ -562,19 +544,6 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
-  },
-  refreshButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  refreshButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   headerSpacer: {
     width: 60,
@@ -671,22 +640,6 @@ const styles = StyleSheet.create({
   },
   categoryLabelActive: {
     color: '#ffffff',
-  },
-  apiStatus: {
-    backgroundColor: '#e8f5e8',
-    marginHorizontal: 15,
-    marginTop: 10,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#c8e6c9',
-  },
-  apiStatusText: {
-    fontSize: 11,
-    color: '#2e7d32',
-    fontWeight: '600',
-    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,

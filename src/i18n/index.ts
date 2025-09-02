@@ -375,7 +375,7 @@ export const es: Translations = {
 
   mainScreen: {
     title: 'NeuroApp',
-    subtitle: 'Aprendizaje Divertido',
+    subtitle: '¿Qué quieres hacer hoy?',
     welcome: 'Bienvenido',
   },
 
@@ -685,7 +685,7 @@ export const en: Translations = {
 
   mainScreen: {
     title: 'NeuroApp',
-    subtitle: 'Fun Learning',
+    subtitle: 'What do you want to do today?',
     welcome: 'Welcome',
   },
 

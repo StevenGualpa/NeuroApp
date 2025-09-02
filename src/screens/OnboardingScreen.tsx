@@ -48,7 +48,7 @@ const OnboardingScreen = () => {
     },
     {
       icon: '🎮',
-      title: '7 Tipos de Actividades',
+      title: '6 Tipos de Actividades',
       subtitle: 'Diversión Garantizada',
       description: 'Explora diferentes tipos de juegos educativos que desarrollan habilidades cognitivas, motoras y de comunicación.',
       color: '#FF6B6B',
@@ -71,7 +71,7 @@ const OnboardingScreen = () => {
       icon: '🌟',
       title: 'Categorías Educativas',
       subtitle: 'Contenido Organizado',
-      description: 'Explora diferentes ��reas de aprendizaje organizadas por categorías para un desarrollo integral.',
+      description: 'Explora diferentes areas de aprendizaje organizadas por categorías para un desarrollo integral.',
       color: '#FF9800',
     },
     {
