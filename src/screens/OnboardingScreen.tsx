@@ -8,78 +8,72 @@ import {
   TouchableOpacity,
   Dimensions,
   StatusBar,
+  Image,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const { width, height } = Dimensions.get('window');
+const isSmallScreen = height < 700;
+const isMediumScreen = height < 800;
 
 const OnboardingScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { language } = useLanguage();
   
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [showFeatures, setShowFeatures] = useState(false);
-  const [autoAdvance, setAutoAdvance] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  // Animation refs
+  // Animations
   const slideAnimation = useRef(new Animated.Value(0)).current;
   const logoAnimation = useRef(new Animated.Value(0)).current;
-  const contentAnimation = useRef(new Animated.Value(0)).current;
   const progressAnimation = useRef(new Animated.Value(0)).current;
-  const buttonAnimation = useRef(new Animated.Value(1)).current;
-  const featuresAnimation = useRef(new Animated.Value(0)).current;
   const pulseAnimation = useRef(new Animated.Value(1)).current;
-  const navButtonsAnimation = useRef(new Animated.Value(0)).current;
-  const prevButtonScale = useRef(new Animated.Value(1)).current;
-  const nextButtonScale = useRef(new Animated.Value(1)).current;
 
-  // Slides content with more context
+  // Slides data - optimized and bilingual
   const slides = [
     {
       icon: '🧠',
-      title: '¡Bienvenido a NeuroApp!',
-      subtitle: 'Tu Compañero de Aprendizaje',
-      description: 'Una aplicación educativa diseñada especialmente para hacer el aprendizaje divertido, interactivo y personalizado.',
-      audioText: 'Hola! Bienvenido a NeuroApp, tu compañero de aprendizaje. Esta es una aplicación educativa especial que hace que aprender sea divertido, interactivo y personalizado solo para ti.',
+      title: language === 'es' ? '¡Bienvenido a NeuroApp!' : 'Welcome to NeuroApp!',
+      description: language === 'es' 
+        ? 'Tu compañero de aprendizaje personalizado y divertido'
+        : 'Your personalized and fun learning companion',
       color: '#4285f4',
     },
     {
       icon: '🎮',
-      title: '6 Tipos de Actividades',
-      subtitle: 'Diversión Garantizada',
-      description: 'Explora diferentes tipos de juegos educativos que desarrollan habilidades cognitivas, motoras y de comunicación.',
+      title: language === 'es' ? 'Juegos Educativos' : 'Educational Games',
+      description: language === 'es'
+        ? '6 tipos de actividades interactivas para desarrollar habilidades'
+        : '6 types of interactive activities to develop skills',
       color: '#FF6B6B',
     },
     {
       icon: '🏆',
-      title: 'Sistema de Recompensas',
-      subtitle: 'Celebra Cada Logro',
-      description: 'Gana estrellas, desbloquea logros y ve tu progreso mientras aprendes. Cada pequeño paso cuenta.',
+      title: language === 'es' ? 'Sistema de Logros' : 'Achievement System',
+      description: language === 'es'
+        ? 'Gana estrellas y desbloquea logros mientras aprendes'
+        : 'Earn stars and unlock achievements while learning',
       color: '#4ECDC4',
     },
     {
       icon: '🎨',
-      title: 'Aprendizaje Personalizado',
-      subtitle: 'A Tu Propio Ritmo',
-      description: 'La aplicación se adapta a tu velocidad de aprendizaje. Sin presión, sin estrés, solo diversión educativa.',
+      title: language === 'es' ? 'Aprendizaje Adaptativo' : 'Adaptive Learning',
+      description: language === 'es'
+        ? 'La app se adapta a tu ritmo y estilo de aprendizaje'
+        : 'The app adapts to your pace and learning style',
       color: '#9C27B0',
     },
     {
-      icon: '🌟',
-      title: 'Categorías Educativas',
-      subtitle: 'Contenido Organizado',
-      description: 'Explora diferentes areas de aprendizaje organizadas por categorías para un desarrollo integral.',
-      color: '#FF9800',
-    },
-    {
       icon: '🚀',
-      title: '¡Todo Listo para Empezar!',
-      subtitle: 'Tu Aventura Comienza Ahora',
-      description: 'Tienes todo lo necesario para comenzar tu viaje de aprendizaje. ¡Vamos a explorar juntos!',
-      color: '#FFA726',
+      title: language === 'es' ? '¡Listo para Empezar!' : 'Ready to Start!',
+      description: language === 'es'
+        ? 'Tu aventura de aprendizaje comienza ahora'
+        : 'Your learning adventure begins now',
+      color: '#FF9800',
     },
   ];
 
@@ -87,200 +81,106 @@ const OnboardingScreen = () => {
 
   useEffect(() => {
     // Initial animations
-    Animated.sequence([
+    Animated.stagger(200, [
       Animated.timing(logoAnimation, {
         toValue: 1,
-        duration: 1000,
+        duration: 600,
         useNativeDriver: true,
       }),
-      Animated.timing(contentAnimation, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      // Show navigation buttons after content loads
-      Animated.timing(navButtonsAnimation, {
+      Animated.timing(slideAnimation, {
         toValue: 1,
         duration: 500,
         useNativeDriver: true,
-      }).start();
+      }),
+    ]).start();
 
-      // No auto-play audio - let user decide when to listen
-    });
-
-    // Continuous pulse animation for icon
+    // Pulse animation for icon
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnimation, {
           toValue: 1.1,
-          duration: 2000,
+          duration: 1500,
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnimation, {
           toValue: 1,
-          duration: 2000,
+          duration: 1500,
           useNativeDriver: true,
         }),
       ])
     );
     pulseLoop.start();
 
-    // Auto-advance slides with enhanced transitions (only if autoAdvance is true)
-    let slideInterval: NodeJS.Timeout | null = null;
+    return () => pulseLoop.stop();
+  }, []);
+
+  const navigateToSlide = (index: number) => {
+    if (index === currentSlide) return;
     
-    if (autoAdvance && !isDownloading) {
-      slideInterval = setInterval(() => {
-        if (currentSlide < slides.length - 1) {
-          setCurrentSlide(prev => prev + 1);
-          
-          // Simple slide transition animation for auto-advance
-          Animated.sequence([
-            Animated.timing(slideAnimation, {
-              toValue: 1,
-              duration: 400,
-              useNativeDriver: true,
-            }),
-            Animated.timing(slideAnimation, {
-              toValue: 0,
-              duration: 400,
-              useNativeDriver: true,
-            }),
-          ]).start();
-        }
-      }, 5000); // 5 seconds per slide
-    }
+    Animated.sequence([
+      Animated.timing(slideAnimation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnimation, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+    
+    setCurrentSlide(index);
+  };
 
-    return () => {
-      if (slideInterval) clearInterval(slideInterval);
-      pulseLoop.stop();
-    };
-  }, [currentSlide, isDownloading, autoAdvance]);
-
-  const handleNextSlide = () => {
+  const handleNext = () => {
     if (currentSlide < slides.length - 1) {
-      setAutoAdvance(false); // Disable auto-advance when user manually navigates
-      setCurrentSlide(prev => prev + 1);
-      
-      // Enhanced slide transition animation
-      Animated.sequence([
-        Animated.timing(slideAnimation, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnimation, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      navigateToSlide(currentSlide + 1);
+    } else {
+      handleStart();
     }
   };
 
-  const handlePrevSlide = () => {
+  const handlePrev = () => {
     if (currentSlide > 0) {
-      setAutoAdvance(false); // Disable auto-advance when user manually navigates
-      setCurrentSlide(prev => prev - 1);
-      
-      // Enhanced slide transition animation
-      Animated.sequence([
-        Animated.timing(slideAnimation, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnimation, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      navigateToSlide(currentSlide - 1);
     }
   };
 
-  const handlePrevButtonPress = () => {
-    Animated.sequence([
-      Animated.timing(prevButtonScale, {
-        toValue: 0.8,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(prevButtonScale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    handlePrevSlide();
-  };
-
-  const handleNextButtonPress = () => {
-    Animated.sequence([
-      Animated.timing(nextButtonScale, {
-        toValue: 0.8,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(nextButtonScale, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-    handleNextSlide();
-  };
-
-  const handleDownload = () => {
-    setIsDownloading(true);
+  const handleStart = () => {
+    setIsLoading(true);
     
-    // Button press animation
-    Animated.timing(buttonAnimation, {
-      toValue: 0.95,
-      duration: 100,
-      useNativeDriver: true,
-    }).start();
-
-    // Simulate download progress
-    const downloadInterval = setInterval(() => {
-      setDownloadProgress(prev => {
-        const newProgress = prev + Math.random() * 15 + 5;
+    // Simulate loading with progress
+    const loadingInterval = setInterval(() => {
+      setProgress(prev => {
+        const newProgress = prev + Math.random() * 20 + 10;
         
-        // Animate progress bar
         Animated.timing(progressAnimation, {
           toValue: newProgress / 100,
-          duration: 200,
+          duration: 150,
           useNativeDriver: false,
         }).start();
 
         if (newProgress >= 100) {
-          clearInterval(downloadInterval);
-          
-          // Complete animation
+          clearInterval(loadingInterval);
           setTimeout(() => {
-            Animated.timing(contentAnimation, {
-              toValue: 0,
-              duration: 500,
-              useNativeDriver: true,
-            }).start(() => {
-              navigation.replace('MainScreen');
-            });
-          }, 1000);
-          
+            navigation.replace('MainScreen');
+          }, 500);
           return 100;
         }
         
         return newProgress;
       });
-    }, 150);
+    }, 200);
   };
 
-  const getDownloadMessage = () => {
-    if (downloadProgress < 30) return 'Preparando tu aventura...';
-    if (downloadProgress < 60) return 'Cargando actividades divertidas...';
-    if (downloadProgress < 90) return 'Casi listo para jugar...';
-    return '¡Aventura lista! 🎉';
+  const getLoadingMessage = () => {
+    if (progress < 40) return language === 'es' ? 'Preparando tu aventura...' : 'Preparing your adventure...';
+    if (progress < 80) return language === 'es' ? 'Cargando actividades...' : 'Loading activities...';
+    return language === 'es' ? '¡Casi listo! 🎉' : 'Almost ready! 🎉';
   };
+
+  const isLastSlide = currentSlide === slides.length - 1;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: currentSlideData.color }]}>
@@ -288,9 +188,20 @@ const OnboardingScreen = () => {
       
       {/* Background decorations */}
       <View style={styles.backgroundDecorations}>
-        <Animated.View style={[styles.decoration1, { backgroundColor: 'rgba(255, 255, 255, 0.1)' }]} />
-        <Animated.View style={[styles.decoration2, { backgroundColor: 'rgba(255, 255, 255, 0.05)' }]} />
-        <Animated.View style={[styles.decoration3, { backgroundColor: 'rgba(255, 255, 255, 0.08)' }]} />
+        <View style={[styles.decoration1, { backgroundColor: 'rgba(255, 255, 255, 0.1)' }]} />
+        <View style={[styles.decoration2, { backgroundColor: 'rgba(255, 255, 255, 0.05)' }]} />
+      </View>
+
+      {/* Header with logo */}
+      <View style={styles.header}>
+        <View style={styles.logoContainer}>
+          <Image 
+            source={require('../assets/Logoapp.png')} 
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+          <Text style={styles.logoText}>NeuroApp</Text>
+        </View>
       </View>
 
       {/* Main Content */}
@@ -298,200 +209,129 @@ const OnboardingScreen = () => {
         style={[
           styles.content,
           {
-            opacity: contentAnimation,
+            opacity: slideAnimation,
             transform: [{
-              translateY: contentAnimation.interpolate({
+              translateY: slideAnimation.interpolate({
                 inputRange: [0, 1],
-                outputRange: [50, 0],
+                outputRange: [30, 0],
               })
             }]
           }
         ]}
       >
-        {/* Logo/Icon Section */}
+        {/* Icon Section */}
         <Animated.View 
           style={[
-            styles.logoSection,
+            styles.iconSection,
             {
-              opacity: logoAnimation,
-              transform: [
-                {
-                  scale: logoAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.5, 1],
-                  })
-                },
-                {
-                  rotate: slideAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0deg', '360deg'],
-                  })
-                }
-              ]
+              transform: [{ scale: pulseAnimation }]
             }
           ]}
         >
-          <Animated.View 
-            style={[
-              styles.iconContainer,
-              {
-                transform: [{ scale: pulseAnimation }]
-              }
-            ]}
-          >
+          <View style={styles.iconContainer}>
             <Text style={styles.slideIcon}>{currentSlideData.icon}</Text>
-          </Animated.View>
+          </View>
         </Animated.View>
 
-        {/* Content Section */}
-        <Animated.View 
-          style={[
-            styles.textSection,
-            {
-              transform: [{
-                translateX: slideAnimation.interpolate({
-                  inputRange: [0, 0.5, 1],
-                  outputRange: [0, -20, 0],
-                })
-              }]
-            }
-          ]}
-        >
+        {/* Text Section */}
+        <View style={styles.textSection}>
           <Text style={styles.title}>{currentSlideData.title}</Text>
-          <Text style={styles.subtitle}>{currentSlideData.subtitle}</Text>
           <Text style={styles.description}>{currentSlideData.description}</Text>
-        </Animated.View>
+        </View>
 
-        {/* Navigation Controls */}
-        {!isDownloading && (
-          <View style={styles.navigationContainer}>
-            {/* Navigation Buttons */}
-            <Animated.View 
+        {/* Progress Indicators */}
+        <View style={styles.progressIndicators}>
+          {slides.map((_, index) => (
+            <TouchableOpacity
+              key={index}
               style={[
-                styles.navigationButtons,
-                {
-                  opacity: navButtonsAnimation,
-                  transform: [{
-                    translateY: navButtonsAnimation.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [20, 0],
-                    })
-                  }]
-                }
+                styles.progressDot,
+                index === currentSlide && styles.progressDotActive,
               ]}
-            >
-              {/* Previous Button */}
-              <Animated.View style={{ transform: [{ scale: prevButtonScale }] }}>
-                <TouchableOpacity
-                  style={[
-                    styles.navButton,
-                    styles.prevButton,
-                    currentSlide === 0 && styles.navButtonDisabled
-                  ]}
-                  onPress={handlePrevButtonPress}
-                  disabled={currentSlide === 0}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.navButtonText,
-                    currentSlide === 0 && styles.navButtonTextDisabled
-                  ]}>‹</Text>
-                </TouchableOpacity>
-              </Animated.View>
-
-              {/* Progress Indicators */}
-              <View style={styles.progressIndicators}>
-                {slides.map((_, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.progressDot,
-                      index === currentSlide && styles.progressDotActive,
-                    ]}
-                    onPress={() => {
-                      setAutoAdvance(false); // Stop auto-advance permanently when user clicks dots
-                      setCurrentSlide(index);
-                    }}
-                    activeOpacity={0.7}
-                  />
-                ))}
-              </View>
-
-              {/* Next Button */}
-              <Animated.View style={{ transform: [{ scale: nextButtonScale }] }}>
-                <TouchableOpacity
-                  style={[
-                    styles.navButton,
-                    styles.nextButton,
-                    currentSlide === slides.length - 1 && styles.navButtonDisabled
-                  ]}
-                  onPress={handleNextButtonPress}
-                  disabled={currentSlide === slides.length - 1}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.navButtonText,
-                    currentSlide === slides.length - 1 && styles.navButtonTextDisabled
-                  ]}>›</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            </Animated.View>
-          </View>
-        )}
-
-        {/* Download Section */}
-        {currentSlide === slides.length - 1 && (
-          <View style={styles.downloadSection}>
-            {!isDownloading ? (
-              <Animated.View style={{ transform: [{ scale: buttonAnimation }] }}>
-                <TouchableOpacity
-                  style={styles.downloadButton}
-                  onPress={handleDownload}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.downloadButtonIcon}>🚀</Text>
-                  <Text style={styles.downloadButtonText}>¡Iniciar Mi Aventura!</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            ) : (
-              <View style={styles.downloadingContainer}>
-                <Text style={styles.downloadingTitle}>{getDownloadMessage()}</Text>
-                
-                {/* Progress Bar */}
-                <View style={styles.progressBarContainer}>
-                  <View style={styles.progressBar}>
-                    <Animated.View 
-                      style={[
-                        styles.progressBarFill,
-                        {
-                          width: progressAnimation.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: ['0%', '100%'],
-                          })
-                        }
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.progressText}>{Math.round(downloadProgress)}%</Text>
-                </View>
-
-                {/* Loading Animation */}
-                <View style={styles.loadingAnimationContainer}>
-                  <Text style={styles.loadingEmoji}>🎮</Text>
-                  <Text style={styles.loadingEmoji}>🧩</Text>
-                  <Text style={styles.loadingEmoji}>🎨</Text>
-                  <Text style={styles.loadingEmoji}>🎵</Text>
-                </View>
-              </View>
-            )}
-          </View>
-        )}
+              onPress={() => navigateToSlide(index)}
+              activeOpacity={0.7}
+            />
+          ))}
+        </View>
       </Animated.View>
+
+      {/* Loading Section */}
+      {isLoading && (
+        <View style={styles.loadingSection}>
+          <Text style={styles.loadingTitle}>{getLoadingMessage()}</Text>
+          
+          <View style={styles.progressBarContainer}>
+            <View style={styles.progressBar}>
+              <Animated.View 
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: progressAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0%', '100%'],
+                    })
+                  }
+                ]}
+              />
+            </View>
+            <Text style={styles.progressText}>{Math.round(progress)}%</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Navigation Buttons */}
+      {!isLoading && (
+        <View style={styles.navigationSection}>
+          <View style={styles.navigationButtons}>
+            {/* Previous Button */}
+            <TouchableOpacity
+              style={[
+                styles.navButton,
+                styles.prevButton,
+                currentSlide === 0 && styles.navButtonDisabled
+              ]}
+              onPress={handlePrev}
+              disabled={currentSlide === 0}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.navButtonText,
+                currentSlide === 0 && styles.navButtonTextDisabled
+              ]}>‹</Text>
+            </TouchableOpacity>
+
+            {/* Skip Button */}
+            <TouchableOpacity
+              style={styles.skipButton}
+              onPress={() => navigation.replace('MainScreen')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.skipButtonText}>
+                {language === 'es' ? 'Saltar' : 'Skip'}
+              </Text>
+            </TouchableOpacity>
+
+            {/* Next/Start Button */}
+            <TouchableOpacity
+              style={styles.navButton}
+              onPress={handleNext}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.navButtonText}>
+                {isLastSlide ? '🚀' : '›'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       {/* Footer */}
       <View style={styles.footer}>
         <Text style={styles.footerText}>
-          💝 Creado con amor para el aprendizaje divertido ✨
+          {language === 'es' 
+            ? '✨ Creado con amor para el aprendizaje ✨'
+            : '✨ Made with love for learning ✨'
+          }
         </Text>
       </View>
     </SafeAreaView>
@@ -509,99 +349,159 @@ const styles = StyleSheet.create({
   },
   decoration1: {
     position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    top: -50,
-    right: -50,
+    width: isSmallScreen ? 120 : 150,
+    height: isSmallScreen ? 120 : 150,
+    borderRadius: isSmallScreen ? 60 : 75,
+    top: -30,
+    right: -30,
   },
   decoration2: {
     position: 'absolute',
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    bottom: 100,
-    left: -30,
+    width: isSmallScreen ? 80 : 100,
+    height: isSmallScreen ? 80 : 100,
+    borderRadius: isSmallScreen ? 40 : 50,
+    bottom: isSmallScreen ? 80 : 120,
+    left: -20,
   },
-  decoration3: {
-    position: 'absolute',
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    top: height * 0.3,
-    right: 20,
+  header: {
+    alignItems: 'center',
+    paddingTop: isSmallScreen ? 10 : 20,
+    paddingBottom: isSmallScreen ? 10 : 20,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoImage: {
+    width: isSmallScreen ? 40 : 50,
+    height: isSmallScreen ? 40 : 50,
+    marginRight: 10,
+    borderRadius: isSmallScreen ? 20 : 25,
+  },
+  logoText: {
+    fontSize: isSmallScreen ? 20 : 24,
+    fontWeight: '900',
+    color: '#ffffff',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 30,
-    paddingVertical: 40,
+    paddingHorizontal: 20,
   },
-  logoSection: {
-    marginBottom: 40,
+  iconSection: {
+    marginBottom: isSmallScreen ? 20 : 30,
   },
   iconContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 80,
-    width: 160,
-    height: 160,
+    borderRadius: isSmallScreen ? 60 : 70,
+    width: isSmallScreen ? 120 : 140,
+    height: isSmallScreen ? 120 : 140,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
-    shadowRadius: 16,
+    shadowRadius: 12,
     elevation: 8,
   },
   slideIcon: {
-    fontSize: 80,
+    fontSize: isSmallScreen ? 60 : 70,
   },
   textSection: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: isSmallScreen ? 30 : 40,
+    paddingHorizontal: 10,
   },
   title: {
-    fontSize: 28,
+    fontSize: isSmallScreen ? 22 : 26,
     fontWeight: '900',
     color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: isSmallScreen ? 12 : 16,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 3,
   },
-  subtitle: {
-    fontSize: 18,
-    fontWeight: '700',
+  description: {
+    fontSize: isSmallScreen ? 14 : 16,
     color: 'rgba(255, 255, 255, 0.9)',
     textAlign: 'center',
-    marginBottom: 16,
-  },
-  description: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: isSmallScreen ? 20 : 24,
     fontWeight: '500',
-    paddingHorizontal: 10,
   },
-  navigationContainer: {
-    width: '100%',
+  progressIndicators: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 40,
+    justifyContent: 'center',
+  },
+  progressDot: {
+    width: isSmallScreen ? 8 : 10,
+    height: isSmallScreen ? 8 : 10,
+    borderRadius: isSmallScreen ? 4 : 5,
+    backgroundColor: 'rgba(255, 255, 255, 0.4)',
+    marginHorizontal: isSmallScreen ? 4 : 6,
+  },
+  progressDotActive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    transform: [{ scale: 1.3 }],
+  },
+  loadingSection: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    transform: [{ translateY: -50 }],
+  },
+  loadingTitle: {
+    fontSize: isSmallScreen ? 16 : 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 20,
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  progressBarContainer: {
+    width: '80%',
+    alignItems: 'center',
+  },
+  progressBar: {
+    width: '100%',
+    height: isSmallScreen ? 8 : 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: isSmallScreen ? 4 : 5,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: isSmallScreen ? 4 : 5,
+  },
+  progressText: {
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  navigationSection: {
+    paddingHorizontal: 20,
+    paddingBottom: isSmallScreen ? 10 : 20,
   },
   navigationButtons: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 20,
   },
   navButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: isSmallScreen ? 45 : 50,
+    height: isSmallScreen ? 45 : 50,
+    borderRadius: isSmallScreen ? 22.5 : 25,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderWidth: 2,
     borderColor: 'rgba(255, 255, 255, 0.3)',
@@ -618,7 +518,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   navButtonText: {
-    fontSize: 28,
+    fontSize: isSmallScreen ? 24 : 28,
     fontWeight: '900',
     color: '#ffffff',
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
@@ -629,110 +529,28 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.3)',
   },
   prevButton: {
-    marginRight: 10,
+    // Specific styles for previous button if needed
   },
-  nextButton: {
-    marginLeft: 10,
-  },
-  progressIndicators: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  progressDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    marginHorizontal: 6,
+  skipButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
-  progressDotActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderColor: 'rgba(255, 255, 255, 0.9)',
-    transform: [{ scale: 1.3 }],
-  },
-  downloadSection: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  downloadButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 25,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  downloadButtonIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  downloadButtonText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#4285f4',
-  },
-  downloadingContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  downloadingTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 24,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
-  },
-  progressBarContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  progressBar: {
-    width: '80%',
-    height: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 6,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#ffffff',
-    borderRadius: 6,
-  },
-  progressText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
-  loadingAnimationContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '60%',
-  },
-  loadingEmoji: {
-    fontSize: 32,
-    opacity: 0.7,
+  skipButtonText: {
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
   footer: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: isSmallScreen ? 10 : 20,
     alignItems: 'center',
   },
   footerText: {
-    fontSize: 14,
+    fontSize: isSmallScreen ? 12 : 14,
     color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'center',
     fontWeight: '500',
