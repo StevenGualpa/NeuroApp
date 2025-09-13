@@ -16,7 +16,7 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import ApiService, { Lesson, Category, Step, Option } from '../services/ApiService';
+import ApiService, { Lesson, Category, Step, Option, Activity } from '../services/ApiService';
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 import GameIntroAnimation from '../components/GameIntroAnimation';
@@ -187,17 +187,44 @@ const CombinedLessonScreen = () => {
     
     console.log(`🔄 [CombinedLessonScreen] Cargando todos los pasos de ${sourceLessons.length} lecciones...`);
     
+    // Si hay un tipo de actividad específico, obtener su ID
+    let activityTypeId = null;
+    if (activityType) {
+      try {
+        const activities = await ApiService.getActivities();
+        const selectedActivity = activities.find(activity => activity.name === activityType);
+        if (selectedActivity) {
+          activityTypeId = selectedActivity.ID;
+          console.log(`🎯 [CombinedLessonScreen] Filtrando por tipo de actividad: ${activityType} (ID: ${activityTypeId})`);
+        }
+      } catch (error) {
+        console.error('❌ Error obteniendo tipos de actividad:', error);
+      }
+    }
+    
     // Cargar todos los pasos de todas las lecciones
     const allStepsPromises = sourceLessons.map(async (lesson) => {
       try {
         const stepsData = await ApiService.getStepsByLessonWithOptions(lesson.ID);
+        
+        // Filtrar pasos por tipo de actividad si está especificado
+        let filteredSteps = stepsData;
+        if (activityTypeId) {
+          filteredSteps = stepsData.filter(step => step.activity_type_id === activityTypeId);
+          console.log(`🔍 [CombinedLessonScreen] Lección "${lesson.title}": ${stepsData.length} pasos → ${filteredSteps.length} filtrados`);
+        }
+        
+        // Si no hay pasos que coincidan con el filtro, retornar array vacío
+        if (filteredSteps.length === 0) {
+          return [];
+        }
         
         // Procesar textos bilingües de la lección
         const processedLessonTitle = BilingualTextProcessor.extractText(lesson.title || '', language);
         const processedLessonDescription = BilingualTextProcessor.extractText(lesson.description || '', language);
         
         // Procesar cada paso y agregar información de la lección
-        return stepsData.map(step => {
+        return filteredSteps.map(step => {
           const processedStepText = BilingualTextProcessor.extractText(step.text || '', language);
           
           return {
@@ -228,7 +255,7 @@ const CombinedLessonScreen = () => {
       return a.sort_order - b.sort_order;
     });
     
-    console.log(`✅ [CombinedLessonScreen] ${sortedSteps.length} pasos cargados y procesados`);
+    console.log(`✅ [CombinedLessonScreen] ${sortedSteps.length} pasos cargados y procesados${activityType ? ` para actividad "${activityType}"` : ''}`);
     setAllSteps(sortedSteps);
   };
 
