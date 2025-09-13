@@ -23,6 +23,16 @@ import UniversalImage from '../components/UniversalImage';
 
 const { width } = Dimensions.get('window');
 
+// Paleta de colores de acento para categorías
+const accentColors = [
+  { bg: '#F9FAFB', accent: '#4F46E5', shadow: 'rgba(79, 70, 229, 0.15)' }, // Azul índigo
+  { bg: '#F9FAFB', accent: '#22C55E', shadow: 'rgba(34, 197, 94, 0.15)' },  // Verde brillante
+  { bg: '#F9FAFB', accent: '#F97316', shadow: 'rgba(249, 115, 22, 0.15)' }, // Naranja cálido
+  { bg: '#F9FAFB', accent: '#EAB308', shadow: 'rgba(234, 179, 8, 0.15)' },  // Amarillo dorado
+  { bg: '#F9FAFB', accent: '#EC4899', shadow: 'rgba(236, 72, 153, 0.15)' }, // Rosa fuerte
+  { bg: '#F9FAFB', accent: '#8B5CF6', shadow: 'rgba(139, 92, 246, 0.15)' }, // Violeta
+];
+
 type CategoryMenuScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 type CategoryMenuScreenRouteProp = {
   params: {
@@ -308,6 +318,10 @@ const CategoryMenuScreen = () => {
     return category.is_active ? '#4CAF50' : '#F44336';
   };
 
+  const getCategoryColors = (index: number) => {
+    return accentColors[index % accentColors.length];
+  };
+
   const renderLoadingState = () => (
     <View style={styles.loadingContainer}>
       <ActivityIndicator size="large" color="#4285f4" />
@@ -353,6 +367,8 @@ const CategoryMenuScreen = () => {
   );
 
   const renderCategoryCard = (category: Category, index: number) => {
+    const colors = getCategoryColors(index);
+    
     return (
       <Animated.View
         key={category.ID}
@@ -376,8 +392,10 @@ const CategoryMenuScreen = () => {
           style={[
             styles.card,
             { 
-              backgroundColor: category.color || '#4285f4',
-              shadowColor: category.color || '#4285f4',
+              backgroundColor: colors.bg,
+              shadowColor: colors.shadow,
+              borderWidth: 2,
+              borderColor: colors.accent,
             }
           ]}
           onPress={() => goToSubLessons(category)}
@@ -385,50 +403,29 @@ const CategoryMenuScreen = () => {
           onPressOut={() => handlePressOut(index)}
           activeOpacity={0.9}
         >
-          {/* Status Badge */}
-          <View style={[
-            styles.statusBadge,
-            { backgroundColor: getStatusColor(category) }
-          ]}>
-            <Text style={styles.statusText}>{getCategoryStatus(category)}</Text>
-          </View>
-
           {/* Icon Container */}
           <View style={styles.iconContainer}>
-            <View style={styles.imageCircle}>
-              <UniversalImage
-                imageUrl={category.icon}
-                imageType="categorias"
-                fallbackEmoji="📚"
-                size="medium"
-                style={styles.categoryIcon}
-              />
-            </View>
+            <UniversalImage
+              imageUrl={category.icon}
+              imageType="categorias"
+              fallbackEmoji="📚"
+              size="large"
+              style={[styles.categoryIcon, { width: 160, height: 160 }]}
+            />
           </View>
 
           {/* Content */}
           <View style={styles.cardContent}>
-            <Text style={styles.cardTitle} numberOfLines={2}>
+            <Text style={[styles.cardTitle, { color: '#111827' }]} numberOfLines={2}>
               {category.name}
             </Text>
-            <Text style={styles.cardDescription} numberOfLines={3}>
+            <Text style={[styles.cardDescription, { color: '#374151' }]} numberOfLines={3}>
               {category.description}
             </Text>
           </View>
 
-          {/* Play Button */}
-          <View style={styles.playButtonContainer}>
-            <View style={[
-              styles.playButton,
-              { opacity: category.is_active ? 1 : 0.5 }
-            ]}>
-              <Text style={styles.playButtonText}>▶</Text>
-            </View>
-          </View>
-
-          {/* Decorative Elements */}
-          <View style={styles.decorativeCircle1} />
-          <View style={styles.decorativeCircle2} />
+          {/* Accent Dot */}
+          <View style={[styles.accentDot, { backgroundColor: colors.accent }]} />
         </TouchableOpacity>
       </Animated.View>
     );
@@ -501,7 +498,7 @@ export default CategoryMenuScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8faff',
+    backgroundColor: '#F9FAFB',
   },
   header: {
     backgroundColor: '#ffffff',
@@ -622,9 +619,9 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   card: {
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 16,
-    minHeight: 180,
+    minHeight: 220,
     shadowOffset: {
       width: 0,
       height: 6,
@@ -667,9 +664,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   imageCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -686,7 +683,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
   categoryIcon: {
-    borderRadius: 25,
+    borderRadius: 8,
   },
   cardContent: {
     flex: 1,
@@ -695,23 +692,17 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 14,
     fontWeight: '800',
-    color: '#ffffff',
+    color: '#2D3436',
     textAlign: 'center',
     marginBottom: 6,
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
     minHeight: 32,
   },
   cardDescription: {
     fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#6b7280',
     textAlign: 'center',
     marginBottom: 8,
     lineHeight: 14,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 1,
     minHeight: 42,
   },
   playButtonContainer: {
@@ -753,5 +744,18 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  accentDot: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    shadowColor: 'rgba(0, 0, 0, 0.2)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 2,
   },
 });

@@ -10,8 +10,7 @@ import OnboardingScreen from '../screens/OnboardingScreen';
 
 // Pantallas de navegación
 import CategoryMenuScreen from '../screens/CategoryMenuScreen';
-import LessonListScreen from '../screens/LessonListScreen';
-import LessonScreen from '../screens/LessonScreen';
+import CombinedLessonScreen from '../screens/CombinedLessonScreen';
 import ActivityMenuScreen from '../screens/ActivityMenuScreen';
 
 // Pantallas de juegos
@@ -75,8 +74,7 @@ const AppNavigator = () => (
       {/* Pantallas de Navegación */}
       <Stack.Screen name="activityMenu" component={ActivityMenuScreen} />
       <Stack.Screen name="categoryMenu" component={CategoryMenuScreen} />
-      <Stack.Screen name="lessonList" component={LessonListScreen} />
-      <Stack.Screen name="lesson" component={LessonScreen} />
+      <Stack.Screen name="lessonList" component={CombinedLessonScreen} />
       
       {/* Pantallas de Juegos */}
       <Stack.Screen name="memoryGame" component={MemoryGameScreen} />

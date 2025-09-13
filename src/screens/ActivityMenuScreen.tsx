@@ -23,18 +23,14 @@ import ActivityImage from '../components/ActivityImage';
 
 const { width } = Dimensions.get('window');
 
-// Configuración de colores y emojis para las actividades
-const activityConfig = [
-  { emoji: '🎯', color: '#FF6B6B', shadowColor: '#FF4757', gradient: ['#FF6B6B', '#FF5252'] },
-  { emoji: '🔢', color: '#4ECDC4', shadowColor: '#26D0CE', gradient: ['#4ECDC4', '#26A69A'] },
-  { emoji: '🧩', color: '#45B7D1', shadowColor: '#3742FA', gradient: ['#45B7D1', '#2196F3'] },
-  { emoji: '🎨', color: '#FFA726', shadowColor: '#FF9800', gradient: ['#FFA726', '#FF9800'] },
-  { emoji: '🎵', color: '#AB47BC', shadowColor: '#9C27B0', gradient: ['#AB47BC', '#9C27B0'] },
-  { emoji: '🌟', color: '#66BB6A', shadowColor: '#4CAF50', gradient: ['#66BB6A', '#4CAF50'] },
-  { emoji: '🔍', color: '#FF9800', shadowColor: '#F57C00', gradient: ['#FF9800', '#F57C00'] },
-  { emoji: '🎪', color: '#E91E63', shadowColor: '#C2185B', gradient: ['#E91E63', '#C2185B'] },
-  { emoji: '🚀', color: '#9C27B0', shadowColor: '#7B1FA2', gradient: ['#9C27B0', '#7B1FA2'] },
-  { emoji: '⭐', color: '#FF5722', shadowColor: '#D84315', gradient: ['#FF5722', '#D84315'] },
+// Paleta de colores de acento para actividades
+const accentColors = [
+  { bg: '#F9FAFB', accent: '#4F46E5', shadow: 'rgba(79, 70, 229, 0.15)' }, // Azul índigo
+  { bg: '#F9FAFB', accent: '#22C55E', shadow: 'rgba(34, 197, 94, 0.15)' },  // Verde brillante
+  { bg: '#F9FAFB', accent: '#F97316', shadow: 'rgba(249, 115, 22, 0.15)' }, // Naranja cálido
+  { bg: '#F9FAFB', accent: '#EAB308', shadow: 'rgba(234, 179, 8, 0.15)' },  // Amarillo dorado
+  { bg: '#F9FAFB', accent: '#EC4899', shadow: 'rgba(236, 72, 153, 0.15)' }, // Rosa fuerte
+  { bg: '#F9FAFB', accent: '#8B5CF6', shadow: 'rgba(139, 92, 246, 0.15)' }, // Violeta
 ];
 
 const ActivityMenuScreen = () => {
@@ -241,8 +237,8 @@ const ActivityMenuScreen = () => {
     }
   };
 
-  const getActivityConfig = (index: number) => {
-    return activityConfig[index % activityConfig.length];
+  const getActivityColors = (index: number) => {
+    return accentColors[index % accentColors.length];
   };
 
   const getActivityStatus = (activity: Activity) => {
@@ -285,7 +281,7 @@ const ActivityMenuScreen = () => {
   );
 
   const renderActivityCard = (activity: Activity, index: number) => {
-    const config = getActivityConfig(index);
+    const colors = getActivityColors(index);
     
     return (
       <Animated.View
@@ -310,8 +306,10 @@ const ActivityMenuScreen = () => {
           style={[
             styles.card,
             { 
-              backgroundColor: config.color,
-              shadowColor: config.shadowColor,
+              backgroundColor: colors.bg,
+              shadowColor: colors.shadow,
+              borderWidth: 2,
+              borderColor: colors.accent,
             }
           ]}
           onPress={() => goToActivityCategory(activity)}
@@ -322,39 +320,26 @@ const ActivityMenuScreen = () => {
           
           {/* Icon Container */}
           <View style={styles.iconContainer}>
-            <View style={styles.imageCircle}>
-              <ActivityImage
-                imageUrl={activity.icon}
-                fallbackEmoji={config.emoji}
-                size="small"
-                style={styles.activityImage}
-              />
-            </View>
+            <ActivityImage
+              imageUrl={activity.icon}
+              fallbackEmoji="🎮"
+              size="large"
+              style={[styles.activityImage, { width: 160, height: 160 }]}
+            />
           </View>
 
           {/* Content */}
           <View style={styles.cardContent}>
-            <Text style={styles.cardTitle} numberOfLines={2}>
+            <Text style={[styles.cardTitle, { color: '#111827' }]} numberOfLines={2}>
               {activity.name}
             </Text>
-            <Text style={styles.cardDescription} numberOfLines={3}>
+            <Text style={[styles.cardDescription, { color: '#374151' }]} numberOfLines={3}>
               {activity.description}
             </Text>
           </View>
 
-          {/* Play Button */}
-          <View style={styles.playButtonContainer}>
-            <View style={[
-              styles.playButton,
-              { opacity: activity.is_active ? 1 : 0.5 }
-            ]}>
-              <Text style={styles.playButtonText}>▶</Text>
-            </View>
-          </View>
-          
-          {/* Decorative Elements */}
-          <View style={styles.decorativeCircle1} />
-          <View style={styles.decorativeCircle2} />
+          {/* Accent Dot */}
+          <View style={[styles.accentDot, { backgroundColor: colors.accent }]} />
         </TouchableOpacity>
       </Animated.View>
     );
@@ -435,7 +420,7 @@ export default ActivityMenuScreen;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8faff',
+    backgroundColor: '#F9FAFB',
   },
   header: {
     backgroundColor: '#ffffff',
@@ -556,9 +541,9 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   card: {
-    borderRadius: 20,
+    borderRadius: 16,
     padding: 16,
-    minHeight: 200,
+    minHeight: 220,
     shadowOffset: {
       width: 0,
       height: 6,
@@ -571,7 +556,7 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   imageCircle: {
     width: 70,
@@ -654,5 +639,18 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  accentDot: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    shadowColor: 'rgba(0, 0, 0, 0.2)',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 2,
   },
 });
