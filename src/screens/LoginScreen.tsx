@@ -20,6 +20,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import AuthService from '../services/AuthService';
 import { useLanguage } from '../contexts/LanguageContext';
+import PasswordRecoveryModal from '../components/PasswordRecoveryModal';
 
 const { width, height } = Dimensions.get('window');
 const isSmallScreen = height < 700;
@@ -36,6 +37,7 @@ const LoginScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
+  const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { t, language } = useLanguage();
@@ -200,6 +202,25 @@ const LoginScreen = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Password recovery handlers
+  const handleForgotPassword = () => {
+    setShowRecoveryModal(true);
+  };
+
+  const handleRecoveryModalClose = () => {
+    setShowRecoveryModal(false);
+  };
+
+  const handleRecoverySuccess = () => {
+    Alert.alert(
+      language === 'es' ? '¡Contraseña actualizada!' : 'Password updated!',
+      language === 'es' 
+        ? 'Tu contraseña ha sido cambiada exitosamente. Ya puedes iniciar sesión con tu nueva contraseña.'
+        : 'Your password has been successfully changed. You can now sign in with your new password.',
+      [{ text: t.common.ok }]
+    );
+  };
+
   const renderInput = (
     field: keyof typeof formData,
     placeholder: string,
@@ -338,13 +359,7 @@ const LoginScreen = () => {
             {!isRegisterMode && (
               <TouchableOpacity 
                 style={styles.forgotPasswordButton}
-                onPress={() => Alert.alert(
-                  language === 'es' ? 'Recuperar contraseña' : 'Recover password',
-                  language === 'es' 
-                    ? 'Para recuperar tu contraseña, contacta al administrador del sistema.'
-                    : 'To recover your password, contact the system administrator.',
-                  [{ text: t.common.ok }]
-                )}
+                onPress={handleForgotPassword}
                 disabled={isLoading}
               >
                 <Text style={styles.forgotPasswordText}>{t.login.forgotPassword}</Text>
@@ -425,6 +440,13 @@ const LoginScreen = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Password Recovery Modal */}
+      <PasswordRecoveryModal
+        visible={showRecoveryModal}
+        onClose={handleRecoveryModalClose}
+        onSuccess={handleRecoverySuccess}
+      />
     </SafeAreaView>
   );
 };

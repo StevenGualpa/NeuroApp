@@ -673,6 +673,41 @@ class ApiService {
     });
   }
 
+  // Password Recovery endpoints
+  async recoverPassword(username: string): Promise<{ message: string }> {
+    return this.makeRequest<{ message: string }>(API_ENDPOINTS.AUTH_RECOVER_PASSWORD, {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+    });
+  }
+
+  async verifyRecoveryCode(code: string): Promise<{ 
+    state: 'not_found' | 'expired' | 'used' | 'verified'; 
+    user_id?: number;
+  }> {
+    return this.makeRequest<{ 
+      state: 'not_found' | 'expired' | 'used' | 'verified'; 
+      user_id?: number;
+    }>(API_ENDPOINTS.AUTH_VERIFY_CODE, {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  async consumeRecoveryCode(code: string): Promise<{ message: string }> {
+    return this.makeRequest<{ message: string }>(API_ENDPOINTS.AUTH_CONSUME_CODE, {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
+  }
+
+  async resetPassword(userId: number, password: string): Promise<{ message: string }> {
+    return this.makeRequest<{ message: string }>(API_ENDPOINTS.AUTH_RESET_PASSWORD, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, password }),
+    });
+  }
+
   // Health check
   async healthCheck(): Promise<string> {
     return this.makeRequest<string>(API_ENDPOINTS.HEALTH);

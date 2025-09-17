@@ -37,6 +37,10 @@ export const API_ENDPOINTS = {
   // Authentication
   AUTH_LOGIN: '/auth/login',
   AUTH_REGISTER: '/auth/register',
+  AUTH_RECOVER_PASSWORD: '/auth/recover-password',
+  AUTH_VERIFY_CODE: '/auth/verify-code',
+  AUTH_CONSUME_CODE: '/auth/consume-code',
+  AUTH_RESET_PASSWORD: '/auth/reset-password',
   
   // Users
   USERS: '/users',

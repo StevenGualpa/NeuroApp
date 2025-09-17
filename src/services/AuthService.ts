@@ -339,6 +339,147 @@ class AuthService {
     return this.authState.userStats;
   }
 
+  // Password Recovery Methods
+
+  // Step 1: Request password recovery code
+  async recoverPassword(username: string): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('🔑 Requesting password recovery for:', username);
+
+      const response = await ApiService.recoverPassword(username);
+
+      console.log('✅ Password recovery request successful');
+
+      return {
+        success: true,
+        message: response.message || 'Se ha enviado un código de recuperación a tu correo electrónico',
+      };
+    } catch (error) {
+      console.error('❌ Password recovery request failed:', error);
+      
+      let message = 'Error de conexión. Verifica tu internet.';
+      if (error instanceof Error) {
+        if (error.message.includes('404')) {
+          message = 'Usuario no encontrado.';
+        } else if (error.message.includes('500')) {
+          message = 'Error del servidor. Intenta más tarde.';
+        } else if (error.message.includes('fetch') || error.message.includes('network')) {
+          message = 'No se pudo conectar al servidor. Verifica tu conexión a internet.';
+        } else {
+          message = error.message;
+        }
+      }
+
+      return {
+        success: false,
+        message,
+      };
+    }
+  }
+
+  // Step 2: Verify recovery code
+  async verifyRecoveryCode(code: string): Promise<{ 
+    success: boolean; 
+    message: string; 
+    state?: 'not_found' | 'expired' | 'used' | 'verified';
+    userId?: number;
+  }> {
+    try {
+      console.log('🔍 Verifying recovery code:', code);
+
+      const response = await ApiService.verifyRecoveryCode(code);
+
+      console.log('✅ Code verification response:', response.state);
+
+      const messages = {
+        not_found: 'Código no válido o no encontrado',
+        expired: 'El código ha expirado. Solicita uno nuevo',
+        used: 'Este código ya fue utilizado',
+        verified: 'Código verificado correctamente',
+      };
+
+      return {
+        success: response.state === 'verified',
+        message: messages[response.state] || 'Estado desconocido',
+        state: response.state,
+        userId: response.user_id,
+      };
+    } catch (error) {
+      console.error('❌ Code verification failed:', error);
+      
+      return {
+        success: false,
+        message: 'Error al verificar el código. Intenta nuevamente.',
+      };
+    }
+  }
+
+  // Step 3: Reset password with userId
+  async resetPassword(userId: number, newPassword: string): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('🔐 Resetting password for user ID:', userId);
+
+      if (newPassword.length < 6) {
+        return {
+          success: false,
+          message: 'La nueva contraseña debe tener al menos 6 caracteres',
+        };
+      }
+
+      const response = await ApiService.resetPassword(userId, newPassword);
+
+      console.log('✅ Password reset successful');
+
+      return {
+        success: true,
+        message: response.message || 'Contraseña cambiada exitosamente',
+      };
+    } catch (error) {
+      console.error('❌ Password reset failed:', error);
+      
+      let message = 'Error al cambiar la contraseña.';
+      if (error instanceof Error) {
+        if (error.message.includes('400')) {
+          message = 'Datos inválidos. La contraseña debe tener al menos 6 caracteres.';
+        } else if (error.message.includes('404')) {
+          message = 'Usuario no encontrado.';
+        } else if (error.message.includes('500')) {
+          message = 'Error del servidor. Intenta más tarde.';
+        } else {
+          message = error.message;
+        }
+      }
+
+      return {
+        success: false,
+        message,
+      };
+    }
+  }
+
+  // Step 4 (Optional): Mark code as consumed
+  async consumeRecoveryCode(code: string): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log('🔒 Consuming recovery code:', code);
+
+      const response = await ApiService.consumeRecoveryCode(code);
+
+      console.log('✅ Code consumed successfully');
+
+      return {
+        success: true,
+        message: response.message || 'Código marcado como utilizado',
+      };
+    } catch (error) {
+      console.error('❌ Code consumption failed:', error);
+      
+      return {
+        success: false,
+        message: 'Error al marcar código como utilizado',
+      };
+    }
+  }
+
   // Guest login (for demo purposes)
   async guestLogin(): Promise<void> {
     const guestUser: User = {
