@@ -243,6 +243,9 @@ const MemoryGameScreen = () => {
 
   // Initialize adaptive reinforcement service
   useEffect(() => {
+    // Sincronizar idioma de voz con el idioma actual
+    audioService.current.syncWithAppLanguage(language);
+    
     adaptiveService.current.initialize(
       (helpCardIndex) => {
         // Handle help trigger
@@ -277,7 +280,7 @@ const MemoryGameScreen = () => {
       adaptiveService.current.cleanup();
       audioService.current.cleanup();
     };
-  }, [step]);
+  }, [step, language]);
 
   const initializeCards = useCallback(() => {
     const duplicated: Card[] =

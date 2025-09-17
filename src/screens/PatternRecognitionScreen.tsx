@@ -251,6 +251,9 @@ const PatternRecognitionScreen = () => {
 
   // Initialize adaptive reinforcement service
   useEffect(() => {
+    // Sincronizar idioma de voz con el idioma actual
+    audioService.current.syncWithAppLanguage(language);
+    
     adaptiveService.current.initialize(
       (helpOptionIndex: number) => {
         // Handle help trigger - NO ACTIVAR SI EL JUEGO YA TERMINÓ
@@ -298,7 +301,7 @@ const PatternRecognitionScreen = () => {
       adaptiveService.current.cleanup();
       audioService.current.cleanup();
     };
-  }, [processedStep, processedOptions, step.activityType, gameCompleted, score]);
+  }, [processedStep, processedOptions, step.activityType, gameCompleted, score, language]);
 
   useEffect(() => {
     // Animación de entrada para la secuencia

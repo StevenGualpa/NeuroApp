@@ -233,6 +233,9 @@ const OrderStepsScreen = () => {
 
   // Initialize adaptive reinforcement service
   useEffect(() => {
+    // Sincronizar idioma de voz con el idioma actual
+    audioService.current.syncWithAppLanguage(language);
+    
     adaptiveService.current.initialize(
       (helpStepIndex) => {
         // Handle help trigger
@@ -271,7 +274,7 @@ const OrderStepsScreen = () => {
       adaptiveService.current.cleanup();
       audioService.current.cleanup();
     };
-  }, [step, selectedOrder, shuffledOptions]);
+  }, [step, selectedOrder, shuffledOptions, language]);
 
   useEffect(() => {
     const initStatus: any = {};

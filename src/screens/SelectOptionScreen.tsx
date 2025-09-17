@@ -294,6 +294,9 @@ const SelectOptionScreen = () => {
   useEffect(() => {
     const correctOptionIndex = step.options?.findIndex(option => option.correct) ?? -1;
     
+    // Sincronizar idioma de voz con el idioma actual
+    audioService.current.syncWithAppLanguage(language);
+    
     adaptiveService.current.initialize(
       (helpOptionIndex) => {
         // NO ACTIVAR SI EL JUEGO YA TERMINÓ
@@ -343,7 +346,7 @@ const SelectOptionScreen = () => {
       adaptiveService.current.cleanup();
       audioService.current.cleanup();
     };
-  }, [step, gameCompleted, score, triggerHelpForOption]);
+  }, [step, gameCompleted, score, triggerHelpForOption, language]);
 
   const showFeedbackAnimation = useCallback((type: 'success' | 'error' | 'winner' | 'loser') => {
     setAnimationType(type);

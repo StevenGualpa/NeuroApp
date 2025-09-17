@@ -1,6 +1,7 @@
 // src/services/AudioService.ts
 import { Platform } from 'react-native';
 import Tts from 'react-native-tts';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AudioConfig {
   volume: number;
@@ -23,6 +24,7 @@ class AudioService {
 
   private constructor() {
     this.initializeAudio();
+    this.loadLanguageFromStorage();
   }
 
   static getInstance(): AudioService {
@@ -40,6 +42,18 @@ class AudioService {
       console.log('✅ [AudioService] Audio inicializado');
     } catch (error) {
       console.error('❌ [AudioService] Error inicializando audio:', error);
+    }
+  }
+
+  private async loadLanguageFromStorage() {
+    try {
+      const storedLanguage = await AsyncStorage.getItem('@NeuroApp:language');
+      if (storedLanguage && (storedLanguage === 'es' || storedLanguage === 'en')) {
+        await this.setLanguage(storedLanguage);
+        console.log(`🌍 [AudioService] Idioma cargado desde storage: ${storedLanguage}`);
+      }
+    } catch (error) {
+      console.error('❌ [AudioService] Error cargando idioma desde storage:', error);
     }
   }
 
@@ -100,6 +114,14 @@ class AudioService {
       console.log(`🌍 [AudioService] Idioma establecido: ${this.config.language}`);
     } catch (error) {
       console.error('❌ [AudioService] Error estableciendo idioma:', error);
+    }
+  }
+
+  // Método para sincronizar con el idioma de la aplicación
+  async syncWithAppLanguage(language: 'es' | 'en') {
+    if (this.config.language !== language) {
+      await this.setLanguage(language);
+      console.log(`🔄 [AudioService] Sincronizado con idioma de la app: ${language}`);
     }
   }
 

@@ -265,6 +265,9 @@ const DragDropScreen = () => {
 
   // Initialize adaptive reinforcement service
   useEffect(() => {
+    // Sincronizar idioma de voz con el idioma actual
+    audioService.current.syncWithAppLanguage(language);
+    
     adaptiveService.current.initialize(
       (helpItemIndex) => {
         // Handle help trigger
@@ -299,7 +302,7 @@ const DragDropScreen = () => {
       adaptiveService.current.cleanup();
       audioService.current.cleanup();
     };
-  }, [step]);
+  }, [step, language]);
 
   // Update zone bounds when layout changes
   const updateZoneBounds = useCallback((zone: string) => {

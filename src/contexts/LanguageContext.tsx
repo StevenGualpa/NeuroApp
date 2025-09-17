@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Language, Translations, translations, DEFAULT_LANGUAGE } from '../i18n';
 import { useAuth } from '../hooks/useAuth';
 import ApiService from '../services/ApiService';
+import AudioService from '../services/AudioService';
 
 interface LanguageContextType {
   language: Language;
@@ -49,6 +50,15 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       if (storedLanguage && (storedLanguage === 'es' || storedLanguage === 'en')) {
         setLanguage(storedLanguage as Language);
         console.log('🌍 [LanguageContext] Idioma cargado desde storage:', storedLanguage);
+        
+        // Sincronizar con AudioService
+        try {
+          const audioService = AudioService.getInstance();
+          await audioService.syncWithAppLanguage(storedLanguage as Language);
+          console.log('🔊 [LanguageContext] AudioService sincronizado con idioma cargado');
+        } catch (audioError) {
+          console.error('❌ [LanguageContext] Error sincronizando AudioService al cargar:', audioError);
+        }
       }
     } catch (error) {
       console.error('❌ [LanguageContext] Error loading language from storage:', error);
@@ -71,6 +81,15 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
           setLanguage(userLanguage);
           await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, userLanguage);
           console.log('🌍 [LanguageContext] Idioma cargado desde usuario:', userLanguage);
+          
+          // Sincronizar con AudioService
+          try {
+            const audioService = AudioService.getInstance();
+            await audioService.syncWithAppLanguage(userLanguage);
+            console.log('🔊 [LanguageContext] AudioService sincronizado con idioma del usuario');
+          } catch (audioError) {
+            console.error('❌ [LanguageContext] Error sincronizando AudioService con usuario:', audioError);
+          }
         }
       }
     } catch (error) {
@@ -87,6 +106,15 @@ export const LanguageProvider: React.FC<LanguageProviderProps> = ({ children }) 
       
       // Save to AsyncStorage
       await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, newLanguage);
+      
+      // Sincronizar con AudioService
+      try {
+        const audioService = AudioService.getInstance();
+        await audioService.syncWithAppLanguage(newLanguage);
+        console.log('🔊 [LanguageContext] AudioService sincronizado con nuevo idioma');
+      } catch (audioError) {
+        console.error('❌ [LanguageContext] Error sincronizando AudioService:', audioError);
+      }
       
       // Update user setting if user is logged in
       if (user?.id) {

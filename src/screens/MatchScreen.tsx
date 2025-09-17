@@ -230,6 +230,9 @@ const MatchScreen = () => {
 
   // Initialize adaptive reinforcement service
   useEffect(() => {
+    // Sincronizar idioma de voz con el idioma actual
+    audioService.current.syncWithAppLanguage(language);
+    
     adaptiveService.current.initialize(
       (helpOptionIndex) => {
         // Handle help trigger
@@ -267,7 +270,7 @@ const MatchScreen = () => {
       adaptiveService.current.cleanup();
       audioService.current.cleanup();
     };
-  }, [step, processedOptions]);
+  }, [step, processedOptions, language]);
 
   useEffect(() => {
     // Entrance animations
