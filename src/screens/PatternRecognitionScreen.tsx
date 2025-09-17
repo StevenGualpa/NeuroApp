@@ -26,6 +26,7 @@ import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
+import { Image } from 'react-native';
 
 type PatternRecognitionRouteProp = RouteProp<RootStackParamList, 'patternRecognition'>;
 
@@ -113,6 +114,45 @@ const PatternRecognitionScreen = () => {
   const [optionScales] = useState(
     step.options?.map(() => new Animated.Value(1)) || []
   );
+
+  // Image error states for sequence and options
+  const [sequenceImageErrors, setSequenceImageErrors] = useState<boolean[]>([]);
+  const [optionImageErrors, setOptionImageErrors] = useState<boolean[]>([]);
+
+  // Helper function to check if icon is a URL or emoji
+  const isImageUrl = useCallback((icon: string) => {
+    return icon && (icon.startsWith('http://') || icon.startsWith('https://'));
+  }, []);
+
+  // Initialize image error states when step changes
+  useEffect(() => {
+    if (step.sequence) {
+      setSequenceImageErrors(new Array(step.sequence.length).fill(false));
+    }
+    if (step.options) {
+      setOptionImageErrors(new Array(step.options.length).fill(false));
+    }
+  }, [step.sequence, step.options]);
+
+  // Handle image error for sequence items
+  const handleSequenceImageError = useCallback((sequenceIndex: number) => {
+    console.log(`❌ [PatternRecognitionScreen] Error loading sequence image ${sequenceIndex + 1}`);
+    setSequenceImageErrors(prev => {
+      const newErrors = [...prev];
+      newErrors[sequenceIndex] = true;
+      return newErrors;
+    });
+  }, []);
+
+  // Handle image error for option items
+  const handleOptionImageError = useCallback((optionIndex: number) => {
+    console.log(`❌ [PatternRecognitionScreen] Error loading option image ${optionIndex + 1}`);
+    setOptionImageErrors(prev => {
+      const newErrors = [...prev];
+      newErrors[optionIndex] = true;
+      return newErrors;
+    });
+  }, []);
 
   // Adaptive reinforcement states
   const [isHelpActive, setIsHelpActive] = useState(false);
@@ -825,7 +865,22 @@ const PatternRecognitionScreen = () => {
           },
         ]}
       >
-        <Text style={styles.sequenceIcon}>{item}</Text>
+        {isImageUrl(item) && !sequenceImageErrors[index] ? (
+          <Image
+            source={{ uri: item }}
+            style={styles.sequenceImage}
+            resizeMode="contain"
+            onError={() => handleSequenceImageError(index)}
+            onLoad={() => console.log(`✅ [PatternRecognitionScreen] Sequence image loaded ${index + 1}: ${item}`)}
+          />
+        ) : (
+          <Text style={styles.sequenceIcon}>
+            {isImageUrl(item) && sequenceImageErrors[index] 
+              ? '🖼️' // Fallback emoji when image fails to load
+              : item // Original emoji or fallback
+            }
+          </Text>
+        )}
       </Animated.View>
     );
   };
@@ -1000,7 +1055,22 @@ const PatternRecognitionScreen = () => {
                       isAnswered && selectedAnswer === option.icon && option.correct && styles.iconContainerCorrect,
                       isAnswered && selectedAnswer === option.icon && !option.correct && styles.iconContainerIncorrect,
                     ]}>
-                      <Text style={styles.optionIcon}>{option.icon}</Text>
+                      {isImageUrl(option.icon) && !optionImageErrors[index] ? (
+                        <Image
+                          source={{ uri: option.icon }}
+                          style={styles.optionImage}
+                          resizeMode="contain"
+                          onError={() => handleOptionImageError(index)}
+                          onLoad={() => console.log(`✅ [PatternRecognitionScreen] Option image loaded ${index + 1}: ${option.icon}`)}
+                        />
+                      ) : (
+                        <Text style={styles.optionIcon}>
+                          {isImageUrl(option.icon) && optionImageErrors[index] 
+                            ? '🖼️' // Fallback emoji when image fails to load
+                            : option.icon // Original emoji or fallback
+                          }
+                        </Text>
+                      )}
                     </View>
                     <Text style={getOptionTextStyle(index, option.correct || false)}>
                       {option.label}
@@ -1252,6 +1322,11 @@ const styles = StyleSheet.create({
   sequenceIcon: {
     fontSize: 20,
   },
+  sequenceImage: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+  },
   missingText: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -1336,6 +1411,11 @@ const styles = StyleSheet.create({
   },
   optionIcon: {
     fontSize: 28,
+  },
+  optionImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
   },
   optionLabel: {
     fontSize: 12,

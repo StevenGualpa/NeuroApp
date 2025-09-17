@@ -26,6 +26,7 @@ import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
+import { Image } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -114,15 +115,40 @@ const SelectOptionScreen = () => {
   const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
   const audioService = useRef(AudioService.getInstance());
 
+  // Image error states for each option
+  const [imageErrors, setImageErrors] = useState<boolean[]>([]);
+
   // Memoized values
   const totalOptions = useMemo(() => step.options?.length || 0, [step.options]);
   const totalItems = 1; // Solo una respuesta correcta en selección
+
+  // Helper function to check if icon is a URL or emoji
+  const isImageUrl = useCallback((icon: string) => {
+    return icon && (icon.startsWith('http://') || icon.startsWith('https://'));
+  }, []);
+
+  // Initialize image error states when step changes
+  useEffect(() => {
+    if (step.options) {
+      setImageErrors(new Array(step.options.length).fill(false));
+    }
+  }, [step.options]);
+
+  // Handle image error for specific option
+  const handleImageError = useCallback((optionIndex: number) => {
+    console.log(`❌ [SelectOptionScreen] Error loading image for option ${optionIndex + 1}`);
+    setImageErrors(prev => {
+      const newErrors = [...prev];
+      newErrors[optionIndex] = true;
+      return newErrors;
+    });
+  }, []);
 
   // Process step content when language changes
   useEffect(() => {
     console.log(`🌍 [SelectOptionScreen] Procesando contenido para idioma: ${language}`);
     processStepForLanguage();
-  }, [language]);
+  }, [language, processStepForLanguage]);
 
   // Initialize achievements service
   useEffect(() => {
@@ -200,61 +226,6 @@ const SelectOptionScreen = () => {
     });
   }, [rawStep, language]);
 
-  // Initialize adaptive reinforcement service
-  useEffect(() => {
-    const correctOptionIndex = step.options?.findIndex(option => option.correct) ?? -1;
-    
-    adaptiveService.current.initialize(
-      (helpOptionIndex) => {
-        // NO ACTIVAR SI EL JUEGO YA TERMINÓ
-        if (gameCompleted || score === 1) {
-          console.log('🛑 [SelectOptionScreen] Juego completado, ignorando ayuda');
-          return;
-        }
-        
-        // Handle help trigger
-        if (helpOptionIndex === -1) {
-          // Inactivity help - find correct option
-          const correctIndex = step.options?.findIndex(option => option.correct) ?? -1;
-          if (correctIndex !== -1) {
-            triggerHelpForOption(correctIndex);
-          }
-        } else {
-          // Error-based help
-          triggerHelpForOption(helpOptionIndex);
-        }
-      },
-      (message, activityType) => {
-        // NO REPRODUCIR SI EL JUEGO YA TERMINÓ
-        if (gameCompleted || score === 1) {
-          console.log('🛑 [SelectOptionScreen] Juego completado, ignorando audio de ayuda');
-          return;
-        }
-        
-        // Handle audio help - use step's helpMessage if available, otherwise use service message
-        let helpMessage: string;
-        
-        if (step.helpMessage) {
-          helpMessage = step.helpMessage;
-          console.log(`🔊 Using custom lesson help: ${helpMessage}`);
-        } else {
-          helpMessage = message;
-          console.log(`🔊 Using default help for ${activityType}: ${helpMessage}`);
-        }
-        
-        console.log(`🔊 About to play TTS: ${helpMessage}`);
-        audioService.current.playTextToSpeech(helpMessage);
-      },
-      step.activityType // Pass the activity type to the service
-    );
-
-    return () => {
-      console.log(`🔊 SelectOptionScreen: Cleaning up services`);
-      adaptiveService.current.cleanup();
-      audioService.current.cleanup();
-    };
-  }, [step, gameCompleted, score]);
-
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, completionTime: number, firstTry: boolean): number => {
     const maxTime = 30000; // 30 seconds as baseline
@@ -318,6 +289,61 @@ const SelectOptionScreen = () => {
       helpBlinkAnimation.setValue(1);
     }, 5000);
   }, [helpBlinkAnimation, isHelpActive, gameCompleted, score]);
+
+  // Initialize adaptive reinforcement service
+  useEffect(() => {
+    const correctOptionIndex = step.options?.findIndex(option => option.correct) ?? -1;
+    
+    adaptiveService.current.initialize(
+      (helpOptionIndex) => {
+        // NO ACTIVAR SI EL JUEGO YA TERMINÓ
+        if (gameCompleted || score === 1) {
+          console.log('🛑 [SelectOptionScreen] Juego completado, ignorando ayuda');
+          return;
+        }
+        
+        // Handle help trigger
+        if (helpOptionIndex === -1) {
+          // Inactivity help - find correct option
+          const correctIndex = step.options?.findIndex(option => option.correct) ?? -1;
+          if (correctIndex !== -1) {
+            triggerHelpForOption(correctIndex);
+          }
+        } else {
+          // Error-based help
+          triggerHelpForOption(helpOptionIndex);
+        }
+      },
+      (message, activityType) => {
+        // NO REPRODUCIR SI EL JUEGO YA TERMINÓ
+        if (gameCompleted || score === 1) {
+          console.log('🛑 [SelectOptionScreen] Juego completado, ignorando audio de ayuda');
+          return;
+        }
+        
+        // Handle audio help - use step's helpMessage if available, otherwise use service message
+        let helpMessage: string;
+        
+        if (step.helpMessage) {
+          helpMessage = step.helpMessage;
+          console.log(`🔊 Using custom lesson help: ${helpMessage}`);
+        } else {
+          helpMessage = message;
+          console.log(`🔊 Using default help for ${activityType}: ${helpMessage}`);
+        }
+        
+        console.log(`🔊 About to play TTS: ${helpMessage}`);
+        audioService.current.playTextToSpeech(helpMessage);
+      },
+      step.activityType // Pass the activity type to the service
+    );
+
+    return () => {
+      console.log(`🔊 SelectOptionScreen: Cleaning up services`);
+      adaptiveService.current.cleanup();
+      audioService.current.cleanup();
+    };
+  }, [step, gameCompleted, score, triggerHelpForOption]);
 
   const showFeedbackAnimation = useCallback((type: 'success' | 'error' | 'winner' | 'loser') => {
     setAnimationType(type);
@@ -540,7 +566,7 @@ const SelectOptionScreen = () => {
         console.log(`🎯 [SelectOptionScreen] Estados para modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${false}, showStars=true, showCelebration=${showCelebration}`);
       }, 300);
     }
-  }, [animationType, score, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation, isHelpActive, helpBlinkAnimation]);
+  }, [animationType, score, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation]);
 
   const handlePress = useCallback((correct: boolean, index: number) => {
     if (isAnswered || gameCompleted) return;
@@ -881,7 +907,22 @@ const SelectOptionScreen = () => {
                         isAnswered && selectedOption === idx && option.correct && styles.iconContainerCorrect,
                         isAnswered && selectedOption === idx && !option.correct && styles.iconContainerIncorrect,
                       ]}>
-                        <Text style={styles.optionIcon}>{option.icon}</Text>
+                        {isImageUrl(option.icon) && !imageErrors[idx] ? (
+                          <Image
+                            source={{ uri: option.icon }}
+                            style={styles.optionImage}
+                            resizeMode="contain"
+                            onError={() => handleImageError(idx)}
+                            onLoad={() => console.log(`✅ [SelectOptionScreen] Image loaded for option ${idx + 1}: ${option.icon}`)}
+                          />
+                        ) : (
+                          <Text style={styles.optionIcon}>
+                            {isImageUrl(option.icon) && imageErrors[idx] 
+                              ? '🖼️' // Fallback emoji when image fails to load
+                              : option.icon // Original emoji or fallback
+                            }
+                          </Text>
+                        )}
                       </View>
                       <Text style={getOptionTextStyle(idx, option.correct || false)}>
                         {option.label}
@@ -1149,6 +1190,11 @@ const styles = StyleSheet.create({
   },
   optionIcon: {
     fontSize: 28,
+  },
+  optionImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
   },
   optionLabel: {
     fontSize: 12,

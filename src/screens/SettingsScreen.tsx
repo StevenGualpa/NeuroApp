@@ -445,94 +445,144 @@ const SettingsScreen = () => {
     loadSettings();
   }, [loadSettings]);
 
-  // Render different control types
-  const renderBooleanControl = (setting: SettingItem) => (
-    <TouchableOpacity
-      style={[
-        styles.booleanControl,
-        { backgroundColor: setting.value === 'true' ? setting.color : '#E8E8E8' }
-      ]}
-      onPress={() => updateSetting(setting.key, setting.value === 'true' ? 'false' : 'true')}
-      disabled={saving}
-    >
-      <Text style={styles.booleanIcon}>
-        {setting.value === 'true' ? '✅' : '❌'}
-      </Text>
-      <Text style={[
-        styles.booleanText,
-        { color: setting.value === 'true' ? '#FFFFFF' : '#666666' }
-      ]}>
-        {setting.value === 'true' ? t.common.yes : t.common.no}
-      </Text>
-    </TouchableOpacity>
-  );
+  // Check if setting is enabled (only language settings are enabled)
+  const isSettingEnabled = (key: string): boolean => {
+    return key === 'app_language' || key === 'voice_language';
+  };
 
-  const renderSelectControl = (setting: SettingItem) => (
-    <View style={styles.selectContainer}>
-      {setting.options?.map((option) => (
+  // Render different control types
+  const renderBooleanControl = (setting: SettingItem) => {
+    const enabled = isSettingEnabled(setting.key);
+    
+    if (!enabled) {
+      return (
+        <View style={[styles.maintenanceControl]}>
+          <Text style={styles.maintenanceIcon}>🔧</Text>
+          <Text style={styles.maintenanceText}>
+            {language === 'es' ? 'En mantenimiento' : 'Under maintenance'}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.booleanControl,
+          { backgroundColor: setting.value === 'true' ? setting.color : '#E8E8E8' }
+        ]}
+        onPress={() => updateSetting(setting.key, setting.value === 'true' ? 'false' : 'true')}
+        disabled={saving}
+      >
+        <Text style={styles.booleanIcon}>
+          {setting.value === 'true' ? '✅' : '❌'}
+        </Text>
+        <Text style={[
+          styles.booleanText,
+          { color: setting.value === 'true' ? '#FFFFFF' : '#666666' }
+        ]}>
+          {setting.value === 'true' ? t.common.yes : t.common.no}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderSelectControl = (setting: SettingItem) => {
+    const enabled = isSettingEnabled(setting.key);
+    
+    if (!enabled) {
+      return (
+        <View style={[styles.maintenanceControl]}>
+          <Text style={styles.maintenanceIcon}>🔧</Text>
+          <Text style={styles.maintenanceText}>
+            {language === 'es' ? 'En mantenimiento' : 'Under maintenance'}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.selectContainer}>
+        {setting.options?.map((option) => (
+          <TouchableOpacity
+            key={option}
+            style={[
+              styles.selectOption,
+              {
+                backgroundColor: setting.value === option ? setting.color : '#F0F0F0',
+                borderColor: setting.value === option ? setting.color : '#E0E0E0',
+              }
+            ]}
+            onPress={() => updateSetting(setting.key, option)}
+            disabled={saving}
+          >
+            <Text style={[
+              styles.selectText,
+              { color: setting.value === option ? '#FFFFFF' : '#666666' }
+            ]}>
+              {getOptionLabel(option)}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  const renderNumberControl = (setting: SettingItem) => {
+    const enabled = isSettingEnabled(setting.key);
+    
+    if (!enabled) {
+      return (
+        <View style={[styles.maintenanceControl]}>
+          <Text style={styles.maintenanceIcon}>🔧</Text>
+          <Text style={styles.maintenanceText}>
+            {language === 'es' ? 'En mantenimiento' : 'Under maintenance'}
+          </Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.numberContainer}>
         <TouchableOpacity
-          key={option}
-          style={[
-            styles.selectOption,
-            {
-              backgroundColor: setting.value === option ? setting.color : '#F0F0F0',
-              borderColor: setting.value === option ? setting.color : '#E0E0E0',
-            }
-          ]}
-          onPress={() => updateSetting(setting.key, option)}
+          style={[styles.numberButton, { backgroundColor: setting.color }]}
+          onPress={() => {
+            const currentValue = parseFloat(setting.value) || 0;
+            const step = setting.step || 1;
+            const min = setting.min || 0;
+            const newValue = Math.max(min, currentValue - step);
+            updateSetting(setting.key, newValue.toString());
+          }}
           disabled={saving}
         >
-          <Text style={[
-            styles.selectText,
-            { color: setting.value === option ? '#FFFFFF' : '#666666' }
-          ]}>
-            {getOptionLabel(option)}
-          </Text>
+          <Text style={styles.numberButtonText}>−</Text>
         </TouchableOpacity>
-      ))}
-    </View>
-  );
-
-  const renderNumberControl = (setting: SettingItem) => (
-    <View style={styles.numberContainer}>
-      <TouchableOpacity
-        style={[styles.numberButton, { backgroundColor: setting.color }]}
-        onPress={() => {
-          const currentValue = parseFloat(setting.value) || 0;
-          const step = setting.step || 1;
-          const min = setting.min || 0;
-          const newValue = Math.max(min, currentValue - step);
-          updateSetting(setting.key, newValue.toString());
-        }}
-        disabled={saving}
-      >
-        <Text style={styles.numberButtonText}>−</Text>
-      </TouchableOpacity>
-      
-      <View style={[styles.numberDisplay, { borderColor: setting.color }]}>
-        <Text style={styles.numberValue}>
-          {setting.key === 'audio_volume' 
-            ? Math.round(parseFloat(setting.value) * 100) + '%'
-            : setting.value + (setting.key.includes('minutes') ? ' min' : setting.key.includes('seconds') ? ' seg' : '')
-          }
-        </Text>
+        
+        <View style={[styles.numberDisplay, { borderColor: setting.color }]}>
+          <Text style={styles.numberValue}>
+            {setting.key === 'audio_volume' 
+              ? Math.round(parseFloat(setting.value) * 100) + '%'
+              : setting.value + (setting.key.includes('minutes') ? ' min' : setting.key.includes('seconds') ? ' seg' : '')
+            }
+          </Text>
+        </View>
+        
+        <TouchableOpacity
+          style={[styles.numberButton, { backgroundColor: setting.color }]}
+          onPress={() => {
+            const currentValue = parseFloat(setting.value) || 0;
+            const step = setting.step || 1;
+            const max = setting.max || 100;
+            const newValue = Math.min(max, currentValue + step);
+            updateSetting(setting.key, newValue.toString());
+          }}
+          disabled={saving}
+        >
+          <Text style={styles.numberButtonText}>+</Text>
+        </TouchableOpacity>
       </View>
-      
-      <TouchableOpacity
-        style={[styles.numberButton, { backgroundColor: setting.color }]}
-        onPress={() => {
-          const currentValue = parseFloat(setting.value) || 0;
-          const step = setting.step || 1;
-          const max = setting.max || 100;
-          const newValue = Math.min(max, currentValue + step);
-          updateSetting(setting.key, newValue.toString());
-        }}
-        disabled={saving}
-      >
-        <Text style={styles.numberButtonText}>+</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   const renderSettingCard = (setting: SettingItem) => (
     <Animated.View
@@ -891,6 +941,27 @@ const styles = StyleSheet.create({
   booleanText: {
     fontSize: 12,
     fontWeight: '600',
+  },
+  maintenanceControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 20,
+    minWidth: 140,
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  maintenanceIcon: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  maintenanceText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#999999',
   },
   selectContainer: {
     flexDirection: 'row',

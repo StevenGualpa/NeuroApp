@@ -27,6 +27,7 @@ import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
+import { Image } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -110,6 +111,31 @@ const OrderStepsScreen = () => {
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
+
+  // Image error states for each option
+  const [imageErrors, setImageErrors] = useState<boolean[]>([]);
+
+  // Helper function to check if icon is a URL or emoji
+  const isImageUrl = useCallback((icon: string) => {
+    return icon && (icon.startsWith('http://') || icon.startsWith('https://'));
+  }, []);
+
+  // Initialize image error states when step changes
+  useEffect(() => {
+    if (step.options) {
+      setImageErrors(new Array(step.options.length).fill(false));
+    }
+  }, [step.options]);
+
+  // Handle image error for specific option
+  const handleImageError = useCallback((optionIndex: number) => {
+    console.log(`❌ [OrderStepsScreen] Error loading image for option ${optionIndex + 1}`);
+    setImageErrors(prev => {
+      const newErrors = [...prev];
+      newErrors[optionIndex] = true;
+      return newErrors;
+    });
+  }, []);
 
   // Adaptive reinforcement states
   const [isHelpActive, setIsHelpActive] = useState(false);
@@ -723,13 +749,32 @@ const OrderStepsScreen = () => {
           activeOpacity={0.8}
         >
           <View style={styles.optionContent}>
-            <Text style={[
-              styles.optionIcon,
-              itemStatus === 'correct' && styles.optionIconCorrect,
-              itemStatus === 'wrong' && styles.optionIconWrong,
-            ]}>
-              {item.icon}
-            </Text>
+            <View style={styles.iconContainer}>
+              {isImageUrl(item.icon) && !imageErrors[index] ? (
+                <Image
+                  source={{ uri: item.icon }}
+                  style={[
+                    styles.optionImage,
+                    itemStatus === 'correct' && styles.optionIconCorrect,
+                    itemStatus === 'wrong' && styles.optionIconWrong,
+                  ]}
+                  resizeMode="contain"
+                  onError={() => handleImageError(index)}
+                  onLoad={() => console.log(`✅ [OrderStepsScreen] Image loaded for step ${index + 1}: ${item.icon}`)}
+                />
+              ) : (
+                <Text style={[
+                  styles.optionIcon,
+                  itemStatus === 'correct' && styles.optionIconCorrect,
+                  itemStatus === 'wrong' && styles.optionIconWrong,
+                ]}>
+                  {isImageUrl(item.icon) && imageErrors[index] 
+                    ? '🖼️' // Fallback emoji when image fails to load
+                    : item.icon // Original emoji or fallback
+                  }
+                </Text>
+              )}
+            </View>
             <Text style={[
               styles.optionLabel,
               itemStatus === 'correct' && styles.optionLabelCorrect,
@@ -1080,8 +1125,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
   optionIcon: {
     fontSize: 32,
+    marginBottom: 8,
+  },
+  optionImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
     marginBottom: 8,
   },
   optionIconCorrect: {

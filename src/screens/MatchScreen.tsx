@@ -26,6 +26,7 @@ import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
+import { Image } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -105,6 +106,31 @@ const MatchScreen = () => {
   const optionAnimations = useRef(
     step.options?.map(() => new Animated.Value(0)) || []
   ).current;
+
+  // Image error states for each option
+  const [imageErrors, setImageErrors] = useState<boolean[]>([]);
+
+  // Helper function to check if icon is a URL or emoji
+  const isImageUrl = useCallback((icon: string) => {
+    return icon && (icon.startsWith('http://') || icon.startsWith('https://'));
+  }, []);
+
+  // Initialize image error states when step changes
+  useEffect(() => {
+    if (step.options) {
+      setImageErrors(new Array(step.options.length).fill(false));
+    }
+  }, [step.options]);
+
+  // Handle image error for specific option
+  const handleImageError = useCallback((optionIndex: number) => {
+    console.log(`❌ [MatchScreen] Error loading image for option ${optionIndex + 1}`);
+    setImageErrors(prev => {
+      const newErrors = [...prev];
+      newErrors[optionIndex] = true;
+      return newErrors;
+    });
+  }, []);
 
   // Adaptive reinforcement states
   const [isHelpActive, setIsHelpActive] = useState(false);
@@ -791,7 +817,22 @@ const MatchScreen = () => {
                       isAnswered && selectedOption === idx && option.correct && styles.iconContainerCorrect,
                       isAnswered && selectedOption === idx && !option.correct && styles.iconContainerIncorrect,
                     ]}>
-                      <Text style={styles.icon}>{option.icon}</Text>
+                      {isImageUrl(option.icon) && !imageErrors[idx] ? (
+                        <Image
+                          source={{ uri: option.icon }}
+                          style={styles.optionImage}
+                          resizeMode="contain"
+                          onError={() => handleImageError(idx)}
+                          onLoad={() => console.log(`✅ [MatchScreen] Image loaded for option ${idx + 1}: ${option.icon}`)}
+                        />
+                      ) : (
+                        <Text style={styles.icon}>
+                          {isImageUrl(option.icon) && imageErrors[idx] 
+                            ? '🖼️' // Fallback emoji when image fails to load
+                            : option.icon // Original emoji or fallback
+                          }
+                        </Text>
+                      )}
                     </View>
                     <Text style={[
                       styles.label,
@@ -1047,6 +1088,11 @@ const styles = StyleSheet.create({
   },
   icon: {
     fontSize: 28,
+  },
+  optionImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
   },
   label: {
     fontSize: 12,

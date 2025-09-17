@@ -2,6 +2,59 @@
 
 NeuroApp es una aplicación móvil educativa diseñada específicamente para usuarios neurodivergentes, que ofrece actividades interactivas, gamificación y un sistema de progreso personalizado.
 
+## 📱 **Versión Actual: 2.2.0**
+
+### 🎉 **NUEVA VERSIÓN 2.2 - ¡DISPONIBLE AHORA!**
+
+#### 🖼️ **SOPORTE COMPLETO DE IMÁGENES**
+**La funcionalidad estrella de esta versión**
+- ✅ **6 actividades mejoradas** con imágenes reales del servidor
+- ✅ **Sistema robusto** de fallback a emojis si las imágenes fallan
+- ✅ **Detección automática** entre URLs de imágenes y emojis
+- ✅ **Logging detallado** para debugging y monitoreo
+
+#### ⚙️ **CONFIGURACIONES SIMPLIFICADAS**
+- ✅ **Modo mantenimiento**: Solo idioma y voz idioma están activos
+- ✅ **Interfaz clara**: Mensaje "En mantenimiento" para opciones deshabilitadas
+- ✅ **Soporte multiidioma**: Mensajes en español e inglés
+- ✅ **Diseño consistente**: Estilo visual uniforme
+
+### 📥 **Descargar APK v2.2**
+- **Archivo**: `NeuroApp-v2.2-2024-12-19.apk`
+- **Tamaño**: 67.9 MB
+- **Versión**: 2.2.0 (código 3)
+- **Fecha**: 19 de Diciembre, 2024
+- **Requisitos**: Android 5.0+ (API 21)
+
+### 🎯 **Actividades con Soporte de Imágenes**
+
+| Actividad | Tamaño de Imagen | Estado |
+|-----------|------------------|--------|
+| **Selecciona Opción** | 50x50px | ✅ |
+| **Arrastra y Suelta** | 32x32px / 20x20px | ✅ |
+| **Ordena Pasos** | 40x40px | ✅ |
+| **Memoria Visual** | 60% carta | ✅ |
+| **Asocia Elementos** | 40x40px | ✅ |
+| **Reconocimiento Patrones** | 30x30px / 40x40px | ✅ |
+
+### 📊 **Comparación de Versiones**
+
+| Característica | v1.2 | v2.2 |
+|----------------|------|------|
+| **Imágenes del servidor** | ❌ | ✅ |
+| **Actividades con imágenes** | 0 | 6 |
+| **Fallback robusto** | N/A | ✅ |
+| **Configuraciones activas** | Todas | Solo idiomas |
+| **Modo mantenimiento** | ❌ | ✅ |
+| **Logging de imágenes** | ❌ | ✅ |
+
+### 🔄 **Flujo de Navegación (Mantenido desde v1.2)**
+```
+Actividades → Categorías → Preguntas directas → Juegos (3 pasos)
+```
+
+---
+
 ## 📱 Manual de Usuario - Aplicación Móvil
 
 ### 🔐 **Pantallas de Autenticación**
@@ -141,10 +194,12 @@ NeuroApp es una aplicación móvil educativa diseñada específicamente para usu
 
 **Funcionalidades:**
 - **Preguntas de opción múltiple:** Presenta una pregunta con varias opciones
+- **🖼️ NUEVO v2.2: Soporte de imágenes:** Imágenes reales del servidor (50x50px)
 - **Feedback inmediato:** Respuesta visual y auditiva a las selecciones
 - **Sistema de ayuda:** Pistas automáticas después de errores o inactividad
 - **Gamificación:** Sistema de estrellas basado en rendimiento
 - **Progreso en tiempo real:** Seguimiento de intentos y errores
+- **🛡️ Fallback robusto:** Si una imagen falla, muestra emoji automáticamente
 
 **Mecánica del juego:**
 1. Se presenta una pregunta con 2-4 opciones
@@ -369,13 +424,51 @@ NeuroApp es una aplicación móvil educativa diseñada específicamente para usu
 
 ## 🚀 Instalación y Configuración
 
-### Requisitos Previos
+### 📱 **Instalación de APK v2.2 (Usuarios Finales)**
+
+#### **🎉 APK v2.2 - RECOMENDADA**
+**Archivo**: `NeuroApp-v2.2-2024-12-19.apk` (67.9 MB)
+
+#### **Opción 1: Instalación Directa**
+1. Descarga el archivo `NeuroApp-v2.2-2024-12-19.apk` desde la carpeta raíz del proyecto
+2. Transfiere el archivo a tu dispositivo Android
+3. En tu dispositivo, ve a **Configuración > Seguridad**
+4. Habilita **"Fuentes desconocidas"** o **"Instalar aplicaciones desconocidas"**
+5. Abre el archivo APK y toca **"Instalar"**
+6. Una vez instalada, puedes deshabilitar "Fuentes desconocidas" por seguridad
+
+#### **Opción 2: Instalación con ADB**
+```bash
+# Instalación nueva
+adb install NeuroApp-v2.2-2024-12-19.apk
+
+# Actualización sobre versión anterior
+adb install -r NeuroApp-v2.2-2024-12-19.apk
+```
+
+#### **Opción 3: APK Alternativa (v1.0)**
+Si necesitas la versión anterior:
+```bash
+adb install android/app/build/outputs/apk/release/app-release.apk
+```
+
+#### **Requisitos del Sistema**
+- **Android**: 5.0 (API 21) o superior
+- **RAM**: Mínimo 2GB recomendado
+- **Almacenamiento**: 100MB libres
+- **Conexión**: Internet requerida para cargar contenido
+
+---
+
+### 🛠️ **Desarrollo (Para Desarrolladores)**
+
+#### **Requisitos Previos**
 - Node.js (versión 18 o superior)
 - React Native CLI
 - Android Studio (para Android)
 - Xcode (para iOS)
 
-### Instalación
+#### **Instalación para Desarrollo**
 
 1. **Clonar el repositorio:**
 ```bash
@@ -412,6 +505,18 @@ yarn android
 npm run ios
 # o
 yarn ios
+```
+
+#### **Generar Nueva APK de Release**
+```bash
+# Opción 1: Usar script automatizado
+./build-release.bat
+
+# Opción 2: Comandos manuales
+cd android
+./gradlew clean
+cd ..
+npx react-native build-android --mode=release
 ```
 
 ### Configuración del Backend

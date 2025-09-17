@@ -27,6 +27,7 @@ import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
+import { Image } from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -217,6 +218,31 @@ const DragDropScreen = () => {
   const [helpBlinkAnimation] = useState(new Animated.Value(1));
   const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
   const audioService = useRef(AudioService.getInstance());
+
+  // Image error states for each option
+  const [imageErrors, setImageErrors] = useState<boolean[]>([]);
+
+  // Helper function to check if icon is a URL or emoji
+  const isImageUrl = useCallback((icon: string) => {
+    return icon && (icon.startsWith('http://') || icon.startsWith('https://'));
+  }, []);
+
+  // Initialize image error states when step changes
+  useEffect(() => {
+    if (step.options) {
+      setImageErrors(new Array(step.options.length).fill(false));
+    }
+  }, [step.options]);
+
+  // Handle image error for specific option
+  const handleImageError = useCallback((optionIndex: number) => {
+    console.log(`❌ [DragDropScreen] Error loading image for option ${optionIndex + 1}`);
+    setImageErrors(prev => {
+      const newErrors = [...prev];
+      newErrors[optionIndex] = true;
+      return newErrors;
+    });
+  }, []);
 
   // Refs for zone positions
   const zoneRefs = useRef<{ [key: string]: View | null }>({});
@@ -929,7 +955,22 @@ const DragDropScreen = () => {
                     <View style={styles.placedItemsContainer}>
                       {(zoneItems[zone] || []).map((placedItem: PlacedItem, i: number) => (
                         <View key={i} style={styles.placedItem}>
-                          <Text style={styles.placedIcon}>{placedItem.option.icon}</Text>
+                          {isImageUrl(placedItem.option.icon) && !imageErrors[placedItem.index] ? (
+                            <Image
+                              source={{ uri: placedItem.option.icon }}
+                              style={styles.placedItemImage}
+                              resizeMode="contain"
+                              onError={() => handleImageError(placedItem.index)}
+                              onLoad={() => console.log(`✅ [DragDropScreen] Image loaded for placed item: ${placedItem.option.icon}`)}
+                            />
+                          ) : (
+                            <Text style={styles.placedIcon}>
+                              {isImageUrl(placedItem.option.icon) && imageErrors[placedItem.index] 
+                                ? '🖼️' // Fallback emoji when image fails to load
+                                : placedItem.option.icon // Original emoji or fallback
+                              }
+                            </Text>
+                          )}
                         </View>
                       ))}
                     </View>
@@ -975,9 +1016,24 @@ const DragDropScreen = () => {
                       height: '100%',
                     }}
                   >
-                    <Text style={[styles.optionIcon, isPlaced && styles.placedIconStyle]}>
-                      {option.icon}
-                    </Text>
+                    <View style={styles.iconContainer}>
+                      {isImageUrl(option.icon) && !imageErrors[idx] ? (
+                        <Image
+                          source={{ uri: option.icon }}
+                          style={styles.draggableImage}
+                          resizeMode="contain"
+                          onError={() => handleImageError(idx)}
+                          onLoad={() => console.log(`✅ [DragDropScreen] Image loaded for draggable ${idx + 1}: ${option.icon}`)}
+                        />
+                      ) : (
+                        <Text style={[styles.optionIcon, isPlaced && styles.placedIconStyle]}>
+                          {isImageUrl(option.icon) && imageErrors[idx] 
+                            ? '🖼️' // Fallback emoji when image fails to load
+                            : option.icon // Original emoji or fallback
+                          }
+                        </Text>
+                      )}
+                    </View>
                     <Text style={[styles.optionLabel, isPlaced && styles.placedLabelStyle]}>
                       {option.label}
                     </Text>
@@ -1236,6 +1292,21 @@ const styles = StyleSheet.create({
   },
   placedIcon: {
     fontSize: 16,
+  },
+  placedItemImage: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+  },
+  iconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  draggableImage: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
   },
   optionsContainer: {
     marginBottom: 16,

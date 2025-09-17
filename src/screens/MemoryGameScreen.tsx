@@ -27,6 +27,7 @@ import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
+import { Image } from 'react-native';
 
 type MemoryGameRouteProp = RouteProp<RootStackParamList, 'memoryGame'>;
 
@@ -119,6 +120,31 @@ const MemoryGameScreen = () => {
   });
   const [startTime] = useState<number>(Date.now());
   const [showStars, setShowStars] = useState(false);
+
+  // Image error states for each option
+  const [imageErrors, setImageErrors] = useState<boolean[]>([]);
+
+  // Helper function to check if icon is a URL or emoji
+  const isImageUrl = useCallback((icon: string) => {
+    return icon && (icon.startsWith('http://') || icon.startsWith('https://'));
+  }, []);
+
+  // Initialize image error states when step changes
+  useEffect(() => {
+    if (step.options) {
+      setImageErrors(new Array(step.options.length).fill(false));
+    }
+  }, [step.options]);
+
+  // Handle image error for specific option
+  const handleImageError = useCallback((optionIndex: number) => {
+    console.log(`❌ [MemoryGameScreen] Error loading image for option ${optionIndex + 1}`);
+    setImageErrors(prev => {
+      const newErrors = [...prev];
+      newErrors[optionIndex] = true;
+      return newErrors;
+    });
+  }, []);
 
   // Adaptive reinforcement states
   const [isHelpActive, setIsHelpActive] = useState(false);
@@ -815,6 +841,9 @@ const MemoryGameScreen = () => {
 
     const isBlinking = isHelpActive && blinkingCardIds.includes(card.id);
 
+    // Find the original option index for this card's icon to handle image errors
+    const originalOptionIndex = step.options?.findIndex(option => option.icon === card.icon) ?? -1;
+
     return (
       <TouchableWithoutFeedback key={card.id} onPress={() => flipCard(card)}>
         <Animated.View 
@@ -848,12 +877,29 @@ const MemoryGameScreen = () => {
               },
             ]}
           >
-            <Text style={styles.cardIcon}>{card.icon}</Text>
+            <View style={styles.cardIconContainer}>
+              {isImageUrl(card.icon) && originalOptionIndex >= 0 && !imageErrors[originalOptionIndex] ? (
+                <Image
+                  source={{ uri: card.icon }}
+                  style={styles.cardImage}
+                  resizeMode="contain"
+                  onError={() => handleImageError(originalOptionIndex)}
+                  onLoad={() => console.log(`✅ [MemoryGameScreen] Image loaded for card: ${card.icon}`)}
+                />
+              ) : (
+                <Text style={styles.cardIcon}>
+                  {isImageUrl(card.icon) && originalOptionIndex >= 0 && imageErrors[originalOptionIndex] 
+                    ? '🖼️' // Fallback emoji when image fails to load
+                    : card.icon // Original emoji or fallback
+                  }
+                </Text>
+              )}
+            </View>
           </Animated.View>
         </Animated.View>
       </TouchableWithoutFeedback>
     );
-  }, [flipCard, isHelpActive, blinkingCardIds, helpBlinkAnimation]);
+  }, [flipCard, isHelpActive, blinkingCardIds, helpBlinkAnimation, step.options, imageErrors, isImageUrl, handleImageError]);
 
   // Process achievement queue when it changes
   useEffect(() => {
@@ -1178,8 +1224,19 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
+  cardIconContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    height: '100%',
+  },
   cardIcon: {
     fontSize: 28,
+  },
+  cardImage: {
+    width: CARD_SIZE * 0.6,
+    height: CARD_SIZE * 0.6,
+    borderRadius: 8,
   },
   cardFace: {
     backfaceVisibility: 'hidden',
