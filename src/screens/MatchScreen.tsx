@@ -260,7 +260,7 @@ const MatchScreen = () => {
         }
         
         console.log(`🔊 About to play TTS: ${helpMessage}`);
-        audioService.current.playTextToSpeech(helpMessage);
+        audioService.current.playTextToSpeech(helpMessage, true); // true indica que es mensaje de ayuda
       },
       step.activityType // Pass the activity type to the service
     );

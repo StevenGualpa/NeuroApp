@@ -8,6 +8,8 @@ interface AudioConfig {
   speed: number;
   language: string;
   enabled: boolean;
+  voiceSpeed: 'slow' | 'normal' | 'fast';
+  voiceHelpEnabled: boolean;
 }
 
 class AudioService {
@@ -17,6 +19,8 @@ class AudioService {
     speed: 1.0,
     language: 'es',
     enabled: true,
+    voiceSpeed: 'normal',
+    voiceHelpEnabled: true,
   };
   
   private isSpeaking = false;
@@ -25,6 +29,9 @@ class AudioService {
   private constructor() {
     this.initializeAudio();
     this.loadLanguageFromStorage();
+    this.loadVoiceSpeedFromStorage();
+    this.loadVolumeFromStorage();
+    this.loadVoiceHelpFromStorage();
   }
 
   static getInstance(): AudioService {
@@ -125,21 +132,143 @@ class AudioService {
     }
   }
 
-  setEnabled(enabled: boolean) {
-    this.config.enabled = enabled;
-    console.log(`🔧 [AudioService] Audio ${enabled ? 'habilitado' : 'deshabilitado'}`);
+  // Métodos para velocidad de voz
+  async setVoiceSpeed(speed: 'slow' | 'normal' | 'fast') {
+    this.config.voiceSpeed = speed;
+    
+    // Convertir velocidad a valor numérico para TTS
+    const speedValues = {
+      'slow': 0.6,
+      'normal': 1.0,
+      'fast': 1.4,
+    };
+    
+    const ttsSpeed = speedValues[speed];
+    this.config.speed = ttsSpeed; // Actualizar el speed interno
+    
+    try {
+      await Tts.setDefaultRate(ttsSpeed);
+      console.log(`⚡ [AudioService] Velocidad de voz establecida: ${speed} (${ttsSpeed})`);
+    } catch (error) {
+      console.error('❌ [AudioService] Error estableciendo velocidad de voz:', error);
+    }
   }
 
-  // Text-to-Speech methods
-  async playTextToSpeech(text: string) {
+  async getVoiceSpeed(): Promise<'slow' | 'normal' | 'fast'> {
+    return this.config.voiceSpeed;
+  }
+
+  async getVolume(): Promise<number> {
+    return this.config.volume;
+  }
+
+  // Métodos para voz amiga
+  async setVoiceHelpEnabled(enabled: boolean) {
+    this.config.voiceHelpEnabled = enabled;
+    console.log(`🗣️ [AudioService] Voz Amiga ${enabled ? 'habilitada' : 'deshabilitada'}`);
+  }
+
+  async getVoiceHelpEnabled(): Promise<boolean> {
+    return this.config.voiceHelpEnabled;
+  }
+
+  // Método de prueba para verificar volumen y velocidad
+  async testAudioSettings() {
     if (!this.config.enabled || this.isSpeaking || !this.isInitialized) {
       console.log('🔇 [AudioService] TTS deshabilitado, ya hablando, o no inicializado');
       return;
     }
 
     try {
-      console.log(`🗣️ [AudioService] Reproduciendo TTS: "${text}"`);
-      await Tts.speak(text);
+      const testMessage = this.config.language === 'es' 
+        ? `Prueba de audio. Volumen: ${Math.round(this.config.volume * 100)}%. Velocidad: ${this.config.voiceSpeed}.`
+        : `Audio test. Volume: ${Math.round(this.config.volume * 100)}%. Speed: ${this.config.voiceSpeed}.`;
+      
+      console.log(`🧪 [AudioService] Probando configuración de audio: ${testMessage}`);
+      await this.playTextToSpeech(testMessage);
+    } catch (error) {
+      console.error('❌ [AudioService] Error en prueba de audio:', error);
+    }
+  }
+
+  // Cargar configuración de velocidad desde storage
+  private async loadVoiceSpeedFromStorage() {
+    try {
+      const storedSpeed = await AsyncStorage.getItem('@NeuroApp:voice_speed');
+      if (storedSpeed && ['slow', 'normal', 'fast'].includes(storedSpeed)) {
+        await this.setVoiceSpeed(storedSpeed as 'slow' | 'normal' | 'fast');
+        console.log(`🌍 [AudioService] Velocidad de voz cargada desde storage: ${storedSpeed}`);
+      }
+    } catch (error) {
+      console.error('❌ [AudioService] Error cargando velocidad de voz desde storage:', error);
+    }
+  }
+
+  // Cargar configuración de volumen desde storage
+  private async loadVolumeFromStorage() {
+    try {
+      const storedVolume = await AsyncStorage.getItem('@NeuroApp:audio_volume');
+      if (storedVolume) {
+        const volume = parseFloat(storedVolume);
+        if (!isNaN(volume) && volume >= 0 && volume <= 1) {
+          await this.setVolume(volume);
+          console.log(`🔊 [AudioService] Volumen cargado desde storage: ${volume}`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [AudioService] Error cargando volumen desde storage:', error);
+    }
+  }
+
+  // Cargar configuración de voz amiga desde storage
+  private async loadVoiceHelpFromStorage() {
+    try {
+      const storedVoiceHelp = await AsyncStorage.getItem('@NeuroApp:voice_help_enabled');
+      if (storedVoiceHelp && (storedVoiceHelp === 'true' || storedVoiceHelp === 'false')) {
+        const voiceHelpEnabled = storedVoiceHelp === 'true';
+        await this.setVoiceHelpEnabled(voiceHelpEnabled);
+        console.log(`🗣️ [AudioService] Voz Amiga cargada desde storage: ${voiceHelpEnabled}`);
+      }
+    } catch (error) {
+      console.error('❌ [AudioService] Error cargando Voz Amiga desde storage:', error);
+    }
+  }
+
+  setEnabled(enabled: boolean) {
+    this.config.enabled = enabled;
+    console.log(`🔧 [AudioService] Audio ${enabled ? 'habilitado' : 'deshabilitado'}`);
+  }
+
+  // Text-to-Speech methods
+  async playTextToSpeech(text: string, isHelpMessage: boolean = false) {
+    if (!this.config.enabled || this.isSpeaking || !this.isInitialized) {
+      console.log('🔇 [AudioService] TTS deshabilitado, ya hablando, o no inicializado');
+      return;
+    }
+
+    // Si es un mensaje de ayuda y la voz amiga está deshabilitada, no reproducir
+    if (isHelpMessage && !this.config.voiceHelpEnabled) {
+      console.log('🔇 [AudioService] Voz Amiga deshabilitada, no reproduciendo mensaje de ayuda');
+      return;
+    }
+
+    try {
+      console.log(`🗣️ [AudioService] Reproduciendo TTS: "${text}" con volumen: ${this.config.volume}`);
+      
+      // Usar opciones de speak para aplicar volumen y velocidad
+      const options = {
+        androidParams: {
+          KEY_PARAM_PAN: 0,
+          KEY_PARAM_VOLUME: this.config.volume,
+          KEY_PARAM_STREAM: 'STREAM_MUSIC',
+        },
+        iosParams: {
+          rate: this.config.speed,
+          volume: this.config.volume,
+        },
+      };
+      
+      await Tts.speak(text, options);
     } catch (error) {
       console.error('❌ [AudioService] Error en TTS:', error);
     }

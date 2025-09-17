@@ -12,6 +12,7 @@ import {
   Animated,
   Vibration,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
@@ -102,6 +103,111 @@ const SettingsScreen = () => {
           max: getSettingMax(setting.key),
           step: getSettingStep(setting.key),
         }));
+        
+        // Check for voice_speed in AsyncStorage if not in server settings
+        const voiceSpeedSetting = transformedSettings.find(s => s.key === 'voice_speed');
+        if (!voiceSpeedSetting) {
+          try {
+            const storedVoiceSpeed = await AsyncStorage.getItem('@NeuroApp:voice_speed');
+            if (storedVoiceSpeed && ['slow', 'normal', 'fast'].includes(storedVoiceSpeed)) {
+              transformedSettings.push({
+                key: 'voice_speed',
+                value: storedVoiceSpeed,
+                category: 'audio',
+                title: getSettingTitle('voice_speed'),
+                description: getSettingDescription('voice_speed'),
+                type: getSettingType('voice_speed'),
+                icon: getSettingIcon('voice_speed'),
+                color: getSettingColor('voice_speed'),
+                options: getSettingOptions('voice_speed'),
+              });
+              console.log('🔊 [SettingsScreen] Velocidad de voz cargada desde AsyncStorage:', storedVoiceSpeed);
+            }
+          } catch (storageError) {
+            console.error('❌ [SettingsScreen] Error cargando velocidad de voz desde AsyncStorage:', storageError);
+          }
+        }
+
+        // Check for audio_volume in AsyncStorage if not in server settings
+        const volumeSetting = transformedSettings.find(s => s.key === 'audio_volume');
+        if (!volumeSetting) {
+          try {
+            const storedVolume = await AsyncStorage.getItem('@NeuroApp:audio_volume');
+            if (storedVolume) {
+              const volume = parseFloat(storedVolume);
+              if (!isNaN(volume) && volume >= 0 && volume <= 1) {
+                transformedSettings.push({
+                  key: 'audio_volume',
+                  value: storedVolume,
+                  category: 'audio',
+                  title: getSettingTitle('audio_volume'),
+                  description: getSettingDescription('audio_volume'),
+                  type: getSettingType('audio_volume'),
+                  icon: getSettingIcon('audio_volume'),
+                  color: getSettingColor('audio_volume'),
+                  min: getSettingMin('audio_volume'),
+                  max: getSettingMax('audio_volume'),
+                  step: getSettingStep('audio_volume'),
+                });
+                console.log('🔊 [SettingsScreen] Volumen cargado desde AsyncStorage:', storedVolume);
+              }
+            }
+          } catch (storageError) {
+            console.error('❌ [SettingsScreen] Error cargando volumen desde AsyncStorage:', storageError);
+          }
+        }
+
+        // Check for voice_help_enabled in AsyncStorage if not in server settings
+        const voiceHelpSetting = transformedSettings.find(s => s.key === 'voice_help_enabled');
+        if (!voiceHelpSetting) {
+          try {
+            const storedVoiceHelp = await AsyncStorage.getItem('@NeuroApp:voice_help_enabled');
+            if (storedVoiceHelp && (storedVoiceHelp === 'true' || storedVoiceHelp === 'false')) {
+              transformedSettings.push({
+                key: 'voice_help_enabled',
+                value: storedVoiceHelp,
+                category: 'audio',
+                title: getSettingTitle('voice_help_enabled'),
+                description: getSettingDescription('voice_help_enabled'),
+                type: getSettingType('voice_help_enabled'),
+                icon: getSettingIcon('voice_help_enabled'),
+                color: getSettingColor('voice_help_enabled'),
+              });
+              console.log('🗣️ [SettingsScreen] Voz Amiga cargada desde AsyncStorage:', storedVoiceHelp);
+            }
+          } catch (storageError) {
+            console.error('❌ [SettingsScreen] Error cargando Voz Amiga desde AsyncStorage:', storageError);
+          }
+        }
+
+        // Check for help_delay_seconds in AsyncStorage if not in server settings
+        const helpDelaySetting = transformedSettings.find(s => s.key === 'help_delay_seconds');
+        if (!helpDelaySetting) {
+          try {
+            const storedHelpDelay = await AsyncStorage.getItem('@NeuroApp:help_delay_seconds');
+            if (storedHelpDelay) {
+              const delaySeconds = parseInt(storedHelpDelay);
+              if (!isNaN(delaySeconds) && delaySeconds >= 1 && delaySeconds <= 30) {
+                transformedSettings.push({
+                  key: 'help_delay_seconds',
+                  value: storedHelpDelay,
+                  category: 'gameplay',
+                  title: getSettingTitle('help_delay_seconds'),
+                  description: getSettingDescription('help_delay_seconds'),
+                  type: getSettingType('help_delay_seconds'),
+                  icon: getSettingIcon('help_delay_seconds'),
+                  color: getSettingColor('help_delay_seconds'),
+                  min: getSettingMin('help_delay_seconds'),
+                  max: getSettingMax('help_delay_seconds'),
+                  step: getSettingStep('help_delay_seconds'),
+                });
+                console.log('⏱️ [SettingsScreen] Tiempo de Ayuda cargado desde AsyncStorage:', storedHelpDelay);
+              }
+            }
+          } catch (storageError) {
+            console.error('❌ [SettingsScreen] Error cargando Tiempo de Ayuda desde AsyncStorage:', storageError);
+          }
+        }
         
         setSettings(transformedSettings);
         console.log('✅ [SettingsScreen] Configuraciones cargadas:', transformedSettings.length);
@@ -403,6 +509,61 @@ const SettingsScreen = () => {
       // Special handling for app_language
       if (key === 'app_language') {
         await changeLanguage(value as 'es' | 'en');
+      } 
+      // Special handling for voice_speed
+      else if (key === 'voice_speed') {
+        // Update AudioService
+        const AudioService = require('../services/AudioService').default;
+        const audioService = AudioService.getInstance();
+        await audioService.setVoiceSpeed(value as 'slow' | 'normal' | 'fast');
+        
+        // Save to AsyncStorage
+        await AsyncStorage.setItem('@NeuroApp:voice_speed', value);
+        
+        // Update on server
+        await ApiService.updateUserSetting(user.id, key, { value });
+      }
+      // Special handling for audio_volume
+      else if (key === 'audio_volume') {
+        // Update AudioService
+        const AudioService = require('../services/AudioService').default;
+        const audioService = AudioService.getInstance();
+        const volumeValue = parseFloat(value);
+        await audioService.setVolume(volumeValue);
+        
+        // Save to AsyncStorage
+        await AsyncStorage.setItem('@NeuroApp:audio_volume', value);
+        
+        // Update on server
+        await ApiService.updateUserSetting(user.id, key, { value });
+      }
+      // Special handling for voice_help_enabled
+      else if (key === 'voice_help_enabled') {
+        // Update AudioService
+        const AudioService = require('../services/AudioService').default;
+        const audioService = AudioService.getInstance();
+        const voiceHelpEnabled = value === 'true';
+        await audioService.setVoiceHelpEnabled(voiceHelpEnabled);
+        
+        // Save to AsyncStorage
+        await AsyncStorage.setItem('@NeuroApp:voice_help_enabled', value);
+        
+        // Update on server
+        await ApiService.updateUserSetting(user.id, key, { value });
+      }
+      // Special handling for help_delay_seconds
+      else if (key === 'help_delay_seconds') {
+        // Update AdaptiveReinforcementService
+        const AdaptiveReinforcementService = require('../services/AdaptiveReinforcementService').default;
+        const adaptiveService = AdaptiveReinforcementService.getInstance();
+        const delaySeconds = parseInt(value);
+        await adaptiveService.setInactivityTimeout(delaySeconds * 1000); // Convert to milliseconds
+        
+        // Save to AsyncStorage
+        await AsyncStorage.setItem('@NeuroApp:help_delay_seconds', value);
+        
+        // Update on server
+        await ApiService.updateUserSetting(user.id, key, { value });
       } else {
         await ApiService.updateUserSetting(user.id, key, { value });
       }
@@ -445,9 +606,9 @@ const SettingsScreen = () => {
     loadSettings();
   }, [loadSettings]);
 
-  // Check if setting is enabled (only language settings are enabled)
+  // Check if setting is enabled (language, voice speed, volume, voice help, and help delay settings are enabled)
   const isSettingEnabled = (key: string): boolean => {
-    return key === 'app_language' || key === 'voice_language';
+    return key === 'app_language' || key === 'voice_language' || key === 'voice_speed' || key === 'audio_volume' || key === 'voice_help_enabled' || key === 'help_delay_seconds';
   };
 
   // Render different control types
@@ -524,6 +685,27 @@ const SettingsScreen = () => {
             </Text>
           </TouchableOpacity>
         ))}
+        
+        {/* Test button for voice speed */}
+        {setting.key === 'voice_speed' && (
+          <TouchableOpacity
+            style={[styles.testButton, { backgroundColor: setting.color }]}
+            onPress={async () => {
+              try {
+                const AudioService = require('../services/AudioService').default;
+                const audioService = AudioService.getInstance();
+                await audioService.testAudioSettings();
+              } catch (error) {
+                console.error('❌ [SettingsScreen] Error testing voice speed:', error);
+              }
+            }}
+            disabled={saving}
+          >
+            <Text style={styles.testButtonText}>
+              {language === 'es' ? '🎤 Probar' : '🎤 Test'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -580,6 +762,57 @@ const SettingsScreen = () => {
         >
           <Text style={styles.numberButtonText}>+</Text>
         </TouchableOpacity>
+        
+        {/* Test button for volume */}
+        {setting.key === 'audio_volume' && (
+          <TouchableOpacity
+            style={[styles.testButton, { backgroundColor: setting.color }]}
+            onPress={async () => {
+              try {
+                const AudioService = require('../services/AudioService').default;
+                const audioService = AudioService.getInstance();
+                await audioService.testAudioSettings();
+              } catch (error) {
+                console.error('❌ [SettingsScreen] Error testing volume:', error);
+              }
+            }}
+            disabled={saving}
+          >
+            <Text style={styles.testButtonText}>
+              {language === 'es' ? '🎤 Probar' : '🎤 Test'}
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Test button for help delay */}
+        {setting.key === 'help_delay_seconds' && (
+          <TouchableOpacity
+            style={[styles.testButton, { backgroundColor: setting.color }]}
+            onPress={async () => {
+              try {
+                const AdaptiveReinforcementService = require('../services/AdaptiveReinforcementService').default;
+                const adaptiveService = AdaptiveReinforcementService.getInstance();
+                const currentTimeout = adaptiveService.getInactivityTimeout();
+                const timeoutSeconds = Math.round(currentTimeout / 1000);
+                
+                const testMessage = language === 'es' 
+                  ? `Tiempo de ayuda configurado en ${timeoutSeconds} segundos` 
+                  : `Help delay configured to ${timeoutSeconds} seconds`;
+                
+                const AudioService = require('../services/AudioService').default;
+                const audioService = AudioService.getInstance();
+                await audioService.playTextToSpeech(testMessage);
+              } catch (error) {
+                console.error('❌ [SettingsScreen] Error testing help delay:', error);
+              }
+            }}
+            disabled={saving}
+          >
+            <Text style={styles.testButtonText}>
+              {language === 'es' ? '⏱️ Probar' : '⏱️ Test'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
   };
@@ -981,6 +1214,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  testButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    marginTop: 8,
+    alignItems: 'center',
+  },
+  testButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   numberContainer: {
     flexDirection: 'row',

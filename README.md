@@ -1,97 +1,121 @@
 # 🧠 NeuroApp - Aplicación Educativa para Usuarios Neurodivergentes
 
-NeuroApp es una aplicación móvil educativa diseñada específicamente para usuarios neurodivergentes, que ofrece actividades interactivas, gamificación y un sistema de progreso personalizado.
+NeuroApp es una aplicación móvil educativa diseñada específicamente para usuarios neurodivergentes, que ofrece actividades interactivas, gamificación, sistema de progreso personalizado y configuraciones avanzadas de accesibilidad.
 
-## 📱 **Versión Actual: 2.2.0**
+## 📱 **Versión Actual: 2.3.0**
 
-### 🎉 **NUEVA VERSIÓN 2.2 - ¡DISPONIBLE AHORA!**
+### 🎉 **NUEVA VERSIÓN 2.3 - ¡DISPONIBLE AHORA!**
+
+#### 🔧 **CONFIGURACIONES AVANZADAS COMPLETAS**
+**La funcionalidad estrella de esta versión**
+- ✅ **6 configuraciones activas** completamente funcionales
+- ✅ **Sistema de recuperación de contraseña** con modal multi-paso
+- ✅ **Soporte multiidioma completo** en toda la aplicación
+- ✅ **Sistema de voz adaptativo** con configuración de velocidad y volumen
+- ✅ **Control de tiempo de ayuda** personalizable (1-30 segundos)
+- ✅ **Voz Amiga** para asistencia en actividades
 
 #### 🖼️ **SOPORTE COMPLETO DE IMÁGENES**
-**La funcionalidad estrella de esta versión**
 - ✅ **6 actividades mejoradas** con imágenes reales del servidor
 - ✅ **Sistema robusto** de fallback a emojis si las imágenes fallan
 - ✅ **Detección automática** entre URLs de imágenes y emojis
 - ✅ **Logging detallado** para debugging y monitoreo
 
-#### ⚙️ **CONFIGURACIONES SIMPLIFICADAS**
-- ✅ **Modo mantenimiento**: Solo idioma y voz idioma están activos
-- ✅ **Interfaz clara**: Mensaje "En mantenimiento" para opciones deshabilitadas
-- ✅ **Soporte multiidioma**: Mensajes en español e inglés
-- ✅ **Diseño consistente**: Estilo visual uniforme
-
-### 📥 **Descargar APK v2.2**
-- **Archivo**: `NeuroApp-v2.2-2024-12-19.apk`
-- **Tamaño**: 67.9 MB
-- **Versión**: 2.2.0 (código 3)
+### 📥 **Descargar APK v2.3**
+- **Archivo**: `NeuroApp-v2.3-2024-12-19.apk`
+- **Tamaño**: 68.5 MB
+- **Versión**: 2.3.0 (código 4)
 - **Fecha**: 19 de Diciembre, 2024
 - **Requisitos**: Android 5.0+ (API 21)
 
-### 🎯 **Actividades con Soporte de Imágenes**
+---
 
-| Actividad | Tamaño de Imagen | Estado |
-|-----------|------------------|--------|
-| **Selecciona Opción** | 50x50px | ✅ |
-| **Arrastra y Suelta** | 32x32px / 20x20px | ✅ |
-| **Ordena Pasos** | 40x40px | ✅ |
-| **Memoria Visual** | 60% carta | ✅ |
-| **Asocia Elementos** | 40x40px | ✅ |
-| **Reconocimiento Patrones** | 30x30px / 40x40px | ✅ |
+## 🎯 **CARACTERÍSTICAS PRINCIPALES**
 
-### 📊 **Comparación de Versiones**
+### 🔐 **Sistema de Autenticación Completo**
+- **Login seguro** con email/username y contraseña
+- **Registro de usuarios** con validación completa
+- **Recuperación de contraseña** con modal multi-paso:
+  - Ingreso de username
+  - Verificación de código OTP (3 minutos de validez)
+  - Reset de contraseña
+  - Confirmación de éxito
+- **Persistencia de sesión** automática
 
-| Característica | v1.2 | v2.2 |
-|----------------|------|------|
-| **Imágenes del servidor** | ❌ | ✅ |
-| **Actividades con imágenes** | 0 | 6 |
-| **Fallback robusto** | N/A | ✅ |
-| **Configuraciones activas** | Todas | Solo idiomas |
-| **Modo mantenimiento** | ❌ | ✅ |
-| **Logging de imágenes** | ❌ | ✅ |
+### 🎮 **6 Actividades Interactivas**
+| Actividad | Descripción | Imágenes | Estado |
+|-----------|-------------|----------|--------|
+| **Selecciona Opción** | Preguntas de opción múltiple | 50x50px | ✅ |
+| **Arrastra y Suelta** | Clasificación por categorías | 32x32px / 20x20px | ✅ |
+| **Ordena Pasos** | Secuenciación lógica | 40x40px | ✅ |
+| **Memoria Visual** | Juego de memoria con cartas | 60% carta | ✅ |
+| **Asocia Elementos** | Conexión de conceptos | 40x40px | ✅ |
+| **Reconocimiento Patrones** | Identificación de secuencias | 30x30px / 40x40px | ✅ |
 
-### 🔄 **Flujo de Navegación (Mantenido desde v1.2)**
-```
-Actividades → Categorías → Preguntas directas → Juegos (3 pasos)
-```
+### ⚙️ **Configuraciones Avanzadas**
+| Configuración | Categoría | Estado | Descripción |
+|---------------|-----------|--------|-------------|
+| **🌐 Idioma** | General | ✅ | Español/Inglés completo |
+| **⚡ Velocidad de Voz** | Audio | ✅ | Lento/Normal/Rápido |
+| **🔊 Volumen** | Audio | ✅ | 0% - 100% |
+| **🗣️ Voz Amiga** | Audio | ✅ | Ayuda con voz en actividades |
+| **⏱️ Tiempo de Ayuda** | Juegos | ✅ | 1-30 segundos de espera |
+| **🎯 Otras configuraciones** | Varias | 🔄 | En desarrollo |
+
+### 🧠 **Sistema de Ayuda Adaptativo**
+- **Detección de inactividad** personalizable (1-30 segundos)
+- **Análisis de errores** con pistas específicas
+- **Escalamiento de ayuda** gradual
+- **Audio contextual** con voz configurable
+- **Ayuda visual** con efectos de foco
+
+### 🏆 **Gamificación Completa**
+- **Sistema de estrellas** (1-3 estrellas por rendimiento)
+- **Logros y reconocimientos** por diferentes hitos
+- **Progreso visual** con barras e indicadores
+- **Celebraciones animadas** para reforzar logros
+- **Estadísticas detalladas** de rendimiento
 
 ---
 
-## 📱 Manual de Usuario - Aplicación Móvil
+## 📱 **MANUAL DE USUARIO**
 
 ### 🔐 **Pantallas de Autenticación**
 
-#### **LoginScreen** - Pantalla de Inicio de Sesión
+#### **LoginScreen** - Inicio de Sesión
 **Ubicación:** `src/screens/LoginScreen.tsx`
 
 **Funcionalidades:**
-- **Inicio de sesión:** Los usuarios pueden ingresar con email/username y contraseña
-- **Navegación a registro:** Botón para crear una nueva cuenta
-- **Validación de campos:** Verificación de datos antes del envío
-- **Manejo de errores:** Mensajes claros en caso de credenciales incorrectas
-- **Persistencia:** Guarda la sesión del usuario automáticamente
+- **Inicio de sesión** con email/username y contraseña
+- **Recuperación de contraseña** con modal multi-paso
+- **Validación de campos** en tiempo real
+- **Manejo de errores** con mensajes claros
+- **Persistencia de sesión** automática
 
 **Elementos de la interfaz:**
 - Campo de email/username
 - Campo de contraseña
 - Botón "Iniciar Sesión"
 - Enlace "¿No tienes cuenta? Regístrate"
-- Indicador de carga durante la autenticación
+- Enlace "¿Olvidaste tu contraseña?"
+- Indicador de carga
 
----
-
-#### **OnboardingScreen** - Pantalla de Bienvenida
-**Ubicación:** `src/screens/OnboardingScreen.tsx`
+#### **PasswordRecoveryModal** - Recuperación de Contraseña
+**Ubicación:** `src/components/PasswordRecoveryModal.tsx`
 
 **Funcionalidades:**
-- **Introducción a la app:** Presenta las características principales
-- **Tutorial interactivo:** Guía paso a paso para nuevos usuarios
-- **Configuración inicial:** Permite establecer preferencias básicas
-- **Navegación fluida:** Transición suave hacia la pantalla principal
+- **Modal multi-paso** con 4 etapas
+- **Verificación de código OTP** con validez de 3 minutos
+- **Reset de contraseña** seguro
+- **Persistencia de código** para reanudar flujo
+- **Animaciones suaves** y feedback visual
+- **Soporte multiidioma** completo
 
-**Elementos de la interfaz:**
-- Slides informativos con ilustraciones
-- Botones de navegación (Anterior/Siguiente)
-- Indicadores de progreso
-- Botón "Comenzar" al final del tutorial
+**Flujo de recuperación:**
+1. **Ingreso de username** → Envío de código
+2. **Verificación de código** → Validación OTP
+3. **Reset de contraseña** → Nueva contraseña
+4. **Confirmación** → Éxito y cierre
 
 ---
 
@@ -101,89 +125,48 @@ Actividades → Categorías → Preguntas directas → Juegos (3 pasos)
 **Ubicación:** `src/screens/MainScreen.tsx`
 
 **Funcionalidades:**
-- **Dashboard principal:** Vista general del progreso del usuario
-- **Acceso rápido:** Botones para acceder a diferentes secciones
-- **Estadísticas resumidas:** Muestra estrellas ganadas, actividades completadas
-- **Navegación central:** Hub principal para todas las funcionalidades
-
-**Elementos de la interfaz:**
-- Saludo personalizado con nombre del usuario
-- Tarjetas de progreso con estadísticas
-- Botones de acceso rápido a actividades
-- Menú de navegación inferior
-- Notificaciones de logros recientes
-
----
+- **Dashboard principal** con vista general del progreso
+- **Acceso rápido** a todas las secciones
+- **Estadísticas resumidas** (estrellas, actividades completadas)
+- **Navegación central** a todas las funcionalidades
+- **Tarjetas de menú** sin flechas (diseño limpio)
 
 #### **ActivityMenuScreen** - Menú de Actividades
 **Ubicación:** `src/screens/ActivityMenuScreen.tsx`
 
 **Funcionalidades:**
-- **Selección de actividades:** Lista de todos los tipos de juegos disponibles
-- **Vista previa:** Descripción breve de cada actividad
-- **Filtrado:** Organización por dificultad o categoría
-- **Progreso visual:** Indicadores de completado por actividad
-
-**Tipos de actividades disponibles:**
-1. **Selecciona la Opción Correcta** - Preguntas de opción múltiple
-2. **Ordena los Pasos** - Secuenciación lógica
-3. **Arrastra y Suelta** - Clasificación por categorías
-4. **Asocia Elementos** - Conexión de conceptos relacionados
-5. **Memoria Visual** - Juegos de memoria y concentración
-6. **Reconocimiento de Patrones** - Identificación de secuencias
-
----
+- **Selección de actividades** con vista previa
+- **Filtrado por dificultad** y categoría
+- **Progreso visual** por actividad
+- **Navegación intuitiva** a cada tipo de juego
 
 #### **CategoryMenuScreen** - Menú de Categorías
 **Ubicación:** `src/screens/CategoryMenuScreen.tsx`
 
 **Funcionalidades:**
-- **Navegación por categorías:** Organización temática del contenido
-- **Vista de progreso:** Muestra el avance en cada categoría
-- **Filtros dinámicos:** Selección por tipo de actividad
-- **Acceso directo:** Navegación rápida a lecciones específicas
-
-**Elementos de la interfaz:**
-- Tarjetas de categorías con íconos coloridos
-- Barras de progreso por categoría
-- Contador de lecciones completadas
-- Botones de filtro por tipo de actividad
-
----
+- **Navegación por categorías** temáticas
+- **Vista de progreso** por categoría
+- **Filtros dinámicos** por tipo de actividad
+- **Acceso directo** a lecciones específicas
 
 #### **LessonListScreen** - Lista de Lecciones
 **Ubicación:** `src/screens/LessonListScreen.tsx`
 
 **Funcionalidades:**
-- **Exploración de lecciones:** Lista completa de lecciones por categoría
-- **Indicadores de estado:** Muestra lecciones completadas, en progreso y bloqueadas
-- **Información detallada:** Descripción, dificultad y duración estimada
-- **Acceso controlado:** Sistema de desbloqueo progresivo
-
-**Elementos de la interfaz:**
-- Lista scrolleable de lecciones
-- Íconos de estado (completado, en progreso, bloqueado)
-- Indicadores de dificultad (fácil, medio, difícil)
-- Estrellas ganadas por lección
-- Botón de acceso a cada lección
-
----
+- **Exploración de lecciones** por categoría
+- **Indicadores de estado** (completado, en progreso, bloqueado)
+- **Información detallada** de cada lección
+- **Sistema de desbloqueo** progresivo
 
 #### **LessonScreen** - Pantalla de Lección
 **Ubicación:** `src/screens/LessonScreen.tsx`
 
 **Funcionalidades:**
-- **Vista detallada:** Información completa de la lección seleccionada
-- **Lista de pasos:** Todos los ejercicios incluidos en la lección
-- **Progreso de lección:** Seguimiento del avance paso a paso
-- **Navegación de pasos:** Acceso directo a ejercicios específicos
-
-**Elementos de la interfaz:**
-- Título y descripción de la lección
-- Lista de pasos con indicadores de completado
-- Barra de progreso general
-- Botón "Comenzar" o "Continuar"
-- Estadísticas de la lección
+- **Vista detallada** de la lección seleccionada
+- **Lista de pasos** con indicadores de completado
+- **Progreso de lección** paso a paso
+- **Navegación directa** a ejercicios específicos
+- **Soporte multiidioma** en títulos de actividades
 
 ---
 
@@ -193,117 +176,63 @@ Actividades → Categorías → Preguntas directas → Juegos (3 pasos)
 **Ubicación:** `src/screens/SelectOptionScreen.tsx`
 
 **Funcionalidades:**
-- **Preguntas de opción múltiple:** Presenta una pregunta con varias opciones
-- **🖼️ NUEVO v2.2: Soporte de imágenes:** Imágenes reales del servidor (50x50px)
-- **Feedback inmediato:** Respuesta visual y auditiva a las selecciones
-- **Sistema de ayuda:** Pistas automáticas después de errores o inactividad
-- **Gamificación:** Sistema de estrellas basado en rendimiento
-- **Progreso en tiempo real:** Seguimiento de intentos y errores
-- **🛡️ Fallback robusto:** Si una imagen falla, muestra emoji automáticamente
-
-**Mecánica del juego:**
-1. Se presenta una pregunta con 2-4 opciones
-2. El usuario selecciona una opción tocándola
-3. Feedback inmediato (correcto/incorrecto)
-4. Si es incorrecto, puede intentar nuevamente
-5. Sistema de ayuda destaca la respuesta correcta tras varios errores
-6. Completado cuando selecciona la respuesta correcta
-
-**Sistema de puntuación:**
-- ⭐⭐⭐ Respuesta correcta en el primer intento
-- ⭐⭐ Respuesta correcta en 2-3 intentos
-- ⭐ Respuesta correcta con más intentos o ayuda
-
----
+- **Preguntas de opción múltiple** con 2-4 opciones
+- **🖼️ Soporte de imágenes** reales del servidor (50x50px)
+- **🛡️ Fallback robusto** a emojis si las imágenes fallan
+- **Feedback inmediato** visual y auditivo
+- **Sistema de ayuda adaptativo** con tiempo configurable
+- **Gamificación** con sistema de estrellas
+- **Soporte multiidioma** completo
 
 #### **OrderStepsScreen** - Ordena los Pasos
 **Ubicación:** `src/screens/OrderStepsScreen.tsx`
 
 **Funcionalidades:**
-- **Secuenciación lógica:** Organizar elementos en el orden correcto
-- **Drag & Drop:** Interfaz intuitiva de arrastrar y soltar
-- **Validación automática:** Verificación del orden al completar
-- **Pistas visuales:** Ayudas para identificar la secuencia correcta
-
-**Mecánica del juego:**
-1. Se presentan elementos desordenados
-2. El usuario arrastra cada elemento a su posición correcta
-3. Validación automática al colocar todos los elementos
-4. Feedback visual para posiciones correctas/incorrectas
-5. Posibilidad de reordenar hasta conseguir la secuencia correcta
-
----
+- **Secuenciación lógica** de elementos
+- **Interfaz drag & drop** intuitiva
+- **Validación automática** del orden
+- **Pistas visuales** para identificar secuencias
+- **Sistema de ayuda** con tiempo configurable
 
 #### **DragDropScreen** - Arrastra y Suelta
 **Ubicación:** `src/screens/DragDropScreen.tsx`
 
 **Funcionalidades:**
-- **Clasificación por categorías:** Organizar elementos en grupos
-- **Zonas de destino:** Áreas específicas para cada categoría
-- **Validación por zona:** Verificación de colocación correcta
-- **Feedback táctil:** Vibración y efectos visuales
-
-**Mecánica del juego:**
-1. Se muestran elementos mezclados y zonas de destino
-2. El usuario arrastra cada elemento a la zona correspondiente
-3. Validación inmediata al soltar en cada zona
-4. Elementos incorrectos regresan a su posición original
-5. Completado cuando todos los elementos están correctamente clasificados
-
----
+- **Clasificación por categorías** con zonas de destino
+- **Validación por zona** de colocación
+- **Feedback táctil** con vibración
+- **Efectos visuales** de confirmación
+- **Sistema de ayuda** adaptativo
 
 #### **MatchScreen** - Asocia Elementos
 **Ubicación:** `src/screens/MatchScreen.tsx`
 
 **Funcionalidades:**
-- **Conexión de conceptos:** Relacionar elementos que van juntos
-- **Interfaz de emparejamiento:** Sistema de selección por pares
-- **Validación de relaciones:** Verificación de conexiones correctas
-- **Progreso visual:** Indicadores de pares completados
-
-**Mecánica del juego:**
-1. Se presentan elementos en dos columnas
-2. El usuario selecciona un elemento de cada columna
-3. Validación automática de la relación
-4. Pares correctos se marcan como completados
-5. Pares incorrectos se deseleccionan para nuevo intento
-
----
+- **Conexión de conceptos** relacionados
+- **Interfaz de emparejamiento** por pares
+- **Validación de relaciones** automática
+- **Progreso visual** de pares completados
+- **Sistema de ayuda** contextual
 
 #### **MemoryGameScreen** - Memoria Visual
 **Ubicación:** `src/screens/MemoryGameScreen.tsx`
 
 **Funcionalidades:**
-- **Juego de memoria:** Encontrar pares de cartas idénticas
-- **Diferentes niveles:** Variación en número de cartas
-- **Tiempo de memorización:** Período inicial para observar las cartas
-- **Contador de intentos:** Seguimiento de movimientos realizados
-
-**Mecánica del juego:**
-1. Las cartas se muestran brevemente al inicio
-2. Se voltean todas las cartas
-3. El usuario selecciona dos cartas por turno
-4. Si coinciden, permanecen visibles
-5. Si no coinciden, se voltean nuevamente
-6. Completado cuando todos los pares están encontrados
-
----
+- **Juego de memoria** con cartas idénticas
+- **Diferentes niveles** de dificultad
+- **Tiempo de memorización** inicial
+- **Contador de intentos** en tiempo real
+- **Soporte multiidioma** en mensajes de rendimiento
 
 #### **PatternRecognitionScreen** - Reconocimiento de Patrones
 **Ubicación:** `src/screens/PatternRecognitionScreen.tsx`
 
 **Funcionalidades:**
-- **Identificación de secuencias:** Reconocer patrones en series
-- **Completar secuencias:** Encontrar el elemento faltante
-- **Diferentes tipos de patrones:** Numéricos, visuales, lógicos
-- **Dificultad progresiva:** Patrones más complejos en niveles avanzados
-
-**Mecánica del juego:**
-1. Se presenta una secuencia con un elemento faltante
-2. Se ofrecen varias opciones para completar el patrón
-3. El usuario selecciona la opción que completa la secuencia
-4. Validación inmediata de la respuesta
-5. Explicación del patrón tras respuesta correcta
+- **Identificación de secuencias** en series
+- **Completar patrones** con elemento faltante
+- **Diferentes tipos** de patrones (numéricos, visuales, lógicos)
+- **Dificultad progresiva** por niveles
+- **Explicación de patrones** tras respuesta correcta
 
 ---
 
@@ -313,150 +242,141 @@ Actividades → Categorías → Preguntas directas → Juegos (3 pasos)
 **Ubicación:** `src/screens/StatisticsScreen.tsx`
 
 **Funcionalidades:**
-- **Métricas detalladas:** Estadísticas completas de rendimiento
-- **Gráficos visuales:** Representación gráfica del progreso
-- **Comparación temporal:** Evolución del rendimiento en el tiempo
-- **Análisis por actividad:** Desglose de estadísticas por tipo de juego
-
-**Métricas mostradas:**
-- Total de actividades completadas
-- Estrellas ganadas
-- Tiempo total de juego
-- Días consecutivos jugando
-- Actividad favorita
-- Tasa de mejora
-- Puntos de exploración
-
----
+- **Métricas detalladas** de rendimiento
+- **Gráficos visuales** del progreso
+- **Comparación temporal** de evolución
+- **Análisis por actividad** específica
 
 #### **AchievementsScreen** - Pantalla de Logros
 **Ubicación:** `src/screens/AchievementsScreen.tsx`
 
 **Funcionalidades:**
-- **Galería de logros:** Todos los logros disponibles y desbloqueados
-- **Categorización:** Logros organizados por tipo y rareza
-- **Progreso de logros:** Indicadores de progreso para logros en curso
-- **Detalles de logros:** Descripción y requisitos para desbloquear
-
-**Tipos de logros:**
-- **Común:** Logros básicos de progreso
-- **Raro:** Logros por rendimiento destacado
-- **Épico:** Logros por hitos importantes
-- **Legendario:** Logros por excelencia excepcional
-
-**Categorías:**
-- Progreso general
-- Perfección en actividades
-- Constancia y dedicación
-- Exploración y descubrimiento
-- Mejora y superación
+- **Galería de logros** disponibles y desbloqueados
+- **Categorización** por tipo y rareza
+- **Progreso de logros** en curso
+- **Detalles de requisitos** para desbloquear
 
 ---
 
 ### ⚙️ **Pantallas de Configuración**
 
-#### **SettingsScreen** - Configuraciones
+#### **SettingsScreen** - Configuraciones Avanzadas
 **Ubicación:** `src/screens/SettingsScreen.tsx`
 
 **Funcionalidades:**
-- **Configuraciones de usuario:** Personalización de la experiencia
-- **Configuraciones de accesibilidad:** Adaptaciones para necesidades específicas
-- **Configuraciones de audio:** Control de sonidos y narración
-- **Configuraciones de idioma:** Cambio entre español e inglés
-- **Gestión de cuenta:** Opciones de perfil y privacidad
+- **6 configuraciones activas** completamente funcionales
+- **Sincronización automática** con servicios
+- **Persistencia** en AsyncStorage y servidor
+- **Botones de prueba** para configuraciones de audio
+- **Interfaz intuitiva** con controles específicos
 
-**Opciones disponibles:**
-- **Audio y Sonido:**
-  - Activar/desactivar efectos de sonido
-  - Activar/desactivar narración por voz
-  - Control de volumen
-  - Velocidad de narración
+**Configuraciones disponibles:**
 
-- **Accesibilidad:**
-  - Tamaño de texto
-  - Contraste alto
-  - Tiempo de respuesta extendido
-  - Ayudas visuales adicionales
+##### 🌐 **Idioma (General)**
+- **Español/Inglés** con cambio dinámico
+- **Sincronización** con AudioService
+- **Persistencia** automática
 
-- **Idioma:**
-  - Español
-  - Inglés
-  - Cambio dinámico de contenido
+##### ⚡ **Velocidad de Voz (Audio)**
+- **Lento** (0.6x) - Para usuarios que necesitan más tiempo
+- **Normal** (1.0x) - Velocidad estándar
+- **Rápido** (1.4x) - Para usuarios avanzados
+- **Aplicación inmediata** en TTS
 
-- **Perfil:**
-  - Editar información personal
-  - Cambiar contraseña
-  - Configuraciones de privacidad
+##### 🔊 **Volumen (Audio)**
+- **Rango**: 0% - 100%
+- **Paso**: 5% por clic
+- **Aplicación**: Inmediata en TTS
+- **Prueba**: Botón de test con mensaje de voz
 
----
+##### 🗣️ **Voz Amiga (Audio)**
+- **Habilitada/Deshabilitada** para mensajes de ayuda
+- **Control granular** de asistencia por voz
+- **Sincronización** con sistema de ayuda adaptativo
 
-### 🔧 **Características Técnicas**
-
-#### **Sistema de Ayuda Adaptativo**
-- **Detección de inactividad:** Ofrece ayuda tras períodos sin interacción
-- **Análisis de errores:** Proporciona pistas específicas según el tipo de error
-- **Escalamiento de ayuda:** Aumenta gradualmente el nivel de asistencia
-- **Audio contextual:** Narración y explicaciones por voz
-
-#### **Sistema de Gamificación**
-- **Estrellas por rendimiento:** 1-3 estrellas según la calidad de la ejecución
-- **Sistema de logros:** Reconocimientos por diferentes tipos de progreso
-- **Progreso visual:** Barras e indicadores de avance
-- **Celebraciones:** Animaciones y efectos para reforzar logros
-
-#### **Soporte Multiidioma**
-- **Contenido bilingüe:** Español e inglés integrados
-- **Cambio dinámico:** Alternancia instantánea entre idiomas
-- **Procesamiento inteligente:** Extracción automática de texto según idioma seleccionado
-
-#### **Persistencia de Datos**
-- **Almacenamiento local:** AsyncStorage para datos offline
-- **Sincronización con servidor:** Backup automático del progreso
-- **Recuperación de sesión:** Continuidad tras cerrar la aplicación
-
-#### **Accesibilidad**
-- **Diseño inclusivo:** Interfaz adaptada para usuarios neurodivergentes
-- **Feedback múltiple:** Visual, auditivo y táctil
-- **Navegación simplificada:** Flujos intuitivos y claros
-- **Personalización:** Adaptación a necesidades individuales
+##### ⏱️ **Tiempo de Ayuda (Juegos)**
+- **Rango**: 1-30 segundos
+- **Paso**: 1 segundo por clic
+- **Aplicación**: Inmediata en todas las actividades
+- **Prueba**: Botón de test con confirmación de tiempo
 
 ---
 
-## 🚀 Instalación y Configuración
+## 🔧 **CARACTERÍSTICAS TÉCNICAS**
 
-### 📱 **Instalación de APK v2.2 (Usuarios Finales)**
+### 🎯 **Sistema de Ayuda Adaptativo**
+**Ubicación:** `src/services/AdaptiveReinforcementService.ts`
 
-#### **🎉 APK v2.2 - RECOMENDADA**
-**Archivo**: `NeuroApp-v2.2-2024-12-19.apk` (67.9 MB)
+**Funcionalidades:**
+- **Tiempo de inactividad** configurable (1-30 segundos)
+- **Detección de errores** consecutivos
+- **Escalamiento de ayuda** gradual
+- **Mensajes contextuales** por tipo de actividad
+- **Sincronización** con configuraciones de usuario
+
+### 🎵 **Sistema de Audio Avanzado**
+**Ubicación:** `src/services/AudioService.ts`
+
+**Funcionalidades:**
+- **Text-to-Speech** con configuración completa
+- **Control de velocidad** (lento/normal/rápido)
+- **Control de volumen** (0-100%)
+- **Soporte multiidioma** automático
+- **Voz Amiga** configurable
+- **Persistencia** de configuraciones
+
+### 🌐 **Soporte Multiidioma Completo**
+**Ubicación:** `src/i18n/index.ts`
+
+**Funcionalidades:**
+- **Español e Inglés** integrados
+- **Cambio dinámico** sin reiniciar app
+- **Procesamiento inteligente** de texto bilingüe
+- **Sincronización** con AudioService
+- **Traducciones completas** en todas las pantallas
+
+### 💾 **Persistencia de Datos**
+- **AsyncStorage** para datos offline
+- **Sincronización automática** con servidor
+- **Recuperación de sesión** tras cerrar app
+- **Backup de configuraciones** en servidor
+
+### ♿ **Accesibilidad**
+- **Diseño inclusivo** para usuarios neurodivergentes
+- **Feedback múltiple** (visual, auditivo, táctil)
+- **Navegación simplificada** e intuitiva
+- **Personalización completa** de experiencia
+
+---
+
+## 🚀 **INSTALACIÓN Y CONFIGURACIÓN**
+
+### 📱 **Instalación de APK v2.3 (Usuarios Finales)**
+
+#### **🎉 APK v2.3 - RECOMENDADA**
+**Archivo**: `NeuroApp-v2.3-2024-12-19.apk` (68.5 MB)
 
 #### **Opción 1: Instalación Directa**
-1. Descarga el archivo `NeuroApp-v2.2-2024-12-19.apk` desde la carpeta raíz del proyecto
-2. Transfiere el archivo a tu dispositivo Android
-3. En tu dispositivo, ve a **Configuración > Seguridad**
-4. Habilita **"Fuentes desconocidas"** o **"Instalar aplicaciones desconocidas"**
+1. Descarga el archivo `NeuroApp-v2.3-2024-12-19.apk`
+2. Transfiere a tu dispositivo Android
+3. Ve a **Configuración > Seguridad**
+4. Habilita **"Fuentes desconocidas"**
 5. Abre el archivo APK y toca **"Instalar"**
-6. Una vez instalada, puedes deshabilitar "Fuentes desconocidas" por seguridad
 
 #### **Opción 2: Instalación con ADB**
 ```bash
 # Instalación nueva
-adb install NeuroApp-v2.2-2024-12-19.apk
+adb install NeuroApp-v2.3-2024-12-19.apk
 
 # Actualización sobre versión anterior
-adb install -r NeuroApp-v2.2-2024-12-19.apk
-```
-
-#### **Opción 3: APK Alternativa (v1.0)**
-Si necesitas la versión anterior:
-```bash
-adb install android/app/build/outputs/apk/release/app-release.apk
+adb install -r NeuroApp-v2.3-2024-12-19.apk
 ```
 
 #### **Requisitos del Sistema**
 - **Android**: 5.0 (API 21) o superior
 - **RAM**: Mínimo 2GB recomendado
 - **Almacenamiento**: 100MB libres
-- **Conexión**: Internet requerida para cargar contenido
+- **Conexión**: Internet requerida para contenido
 
 ---
 
@@ -519,8 +439,7 @@ cd ..
 npx react-native build-android --mode=release
 ```
 
-### Configuración del Backend
-
+### **Configuración del Backend**
 La aplicación se conecta al backend desplegado en: `https://facturago.onrender.com`
 
 Para desarrollo local, modificar la configuración en:
@@ -528,32 +447,42 @@ Para desarrollo local, modificar la configuración en:
 
 ---
 
-## 🛠️ Desarrollo
+## 🏗️ **ARQUITECTURA DEL PROYECTO**
 
-### Estructura del Proyecto
-
+### **Estructura del Proyecto**
 ```
 NeuroApp/
 ├── src/
 │   ├── components/          # Componentes reutilizables
+│   │   ├── PasswordRecoveryModal.tsx  # Modal de recuperación
+│   │   ├── GameIntroAnimation.tsx     # Introducción a juegos
+│   │   ├── GameCompletionModal.tsx    # Modal de finalización
+│   │   └── MenuGrid.tsx               # Grid de menú
 │   ├── screens/            # Pantallas de la aplicación
-│   ├── navigation/         # Configuración de navegación
-│   ��── hooks/              # Hooks personalizados
+│   │   ├── LoginScreen.tsx            # Pantalla de login
+│   │   ├── MainScreen.tsx             # Pantalla principal
+│   │   ├── SettingsScreen.tsx         # Configuraciones
+│   │   └── [6 pantallas de juegos]    # Actividades
 │   ├── services/           # Servicios y APIs
+│   │   ├── AudioService.ts            # Sistema de audio
+│   │   ├── AdaptiveReinforcementService.ts  # Ayuda adaptativa
+│   │   ├── AuthService.ts             # Autenticación
+│   │   └── UserSettingsService.ts     # Configuraciones
 │   ├── contexts/           # Contextos de React
-│   ├── utils/              # Utilidades y helpers
-│   ├── types/              # Definiciones de tipos
-│   ├── constants/          # Constantes de la aplicación
-│   ├── config/             # Configuraciones
+│   │   ├── AuthContext.tsx            # Contexto de autenticación
+│   │   └── LanguageContext.tsx        # Contexto de idioma
 │   ├── i18n/               # Internacionalización
-│   └── assets/             # Recursos estáticos
+│   │   └── index.ts                   # Traducciones
+│   ├── utils/              # Utilidades
+│   │   └── activityTranslations.ts    # Traducciones de actividades
+│   └── config/             # Configuraciones
+│       └── api.ts                     # Endpoints de API
 ├── android/                # Configuración Android
 ├── ios/                    # Configuración iOS
 └── Backend/                # Código del servidor
 ```
 
-### Scripts Disponibles
-
+### **Scripts Disponibles**
 - `npm start` - Iniciar Metro bundler
 - `npm run android` - Ejecutar en Android
 - `npm run ios` - Ejecutar en iOS
@@ -562,7 +491,41 @@ NeuroApp/
 
 ---
 
-## 📞 Soporte y Contacto
+## 📊 **COMPARACIÓN DE VERSIONES**
+
+| Característica | v1.2 | v2.2 | v2.3 |
+|----------------|------|------|------|
+| **Imágenes del servidor** | ❌ | ✅ | ✅ |
+| **Actividades con imágenes** | 0 | 6 | 6 |
+| **Configuraciones activas** | Todas | Solo idiomas | 6 completas |
+| **Recuperación de contraseña** | ❌ | ❌ | ✅ |
+| **Soporte multiidioma completo** | ❌ | ❌ | ✅ |
+| **Sistema de voz configurable** | ❌ | ❌ | ✅ |
+| **Tiempo de ayuda personalizable** | ❌ | ❌ | ✅ |
+| **Voz Amiga** | ❌ | ❌ | ✅ |
+| **Modal multi-paso** | ❌ | ❌ | ✅ |
+| **Sincronización automática** | ❌ | ❌ | ✅ |
+
+---
+
+## 🎯 **ROADMAP FUTURO**
+
+### **Próximas Versiones**
+- **v2.4**: Configuraciones de accesibilidad avanzadas
+- **v2.5**: Sistema de notificaciones push
+- **v2.6**: Modo offline completo
+- **v3.0**: Rediseño completo de UI/UX
+
+### **Funcionalidades en Desarrollo**
+- **Configuraciones de accesibilidad** (tamaño de fuente, contraste)
+- **Sistema de notificaciones** personalizables
+- **Modo offline** para actividades sin conexión
+- **Análisis de progreso** más detallado
+- **Sistema de recompensas** expandido
+
+---
+
+## 📞 **SOPORTE Y CONTACTO**
 
 Para soporte técnico o consultas sobre la aplicación, contactar al equipo de desarrollo.
 

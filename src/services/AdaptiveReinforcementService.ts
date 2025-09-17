@@ -47,6 +47,9 @@ export class AdaptiveReinforcementService {
       blinkingTimer: null,
       helpAlreadyShown: false
     };
+
+    // Cargar configuración desde AsyncStorage
+    this.loadInactivityTimeoutFromStorage();
   }
 
   public static getInstance(): AdaptiveReinforcementService {
@@ -54,6 +57,34 @@ export class AdaptiveReinforcementService {
       AdaptiveReinforcementService.instance = new AdaptiveReinforcementService();
     }
     return AdaptiveReinforcementService.instance;
+  }
+
+  // Método para actualizar el tiempo de inactividad
+  public setInactivityTimeout(timeoutMs: number) {
+    this.config.inactivityTimeoutMs = Math.max(1000, Math.min(30000, timeoutMs)); // Entre 1 y 30 segundos
+    console.log(`⏱️ [AdaptiveReinforcementService] Tiempo de inactividad actualizado: ${this.config.inactivityTimeoutMs}ms`);
+  }
+
+  // Método para obtener el tiempo de inactividad actual
+  public getInactivityTimeout(): number {
+    return this.config.inactivityTimeoutMs;
+  }
+
+  // Cargar configuración de tiempo de inactividad desde AsyncStorage
+  private async loadInactivityTimeoutFromStorage() {
+    try {
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      const storedDelay = await AsyncStorage.getItem('@NeuroApp:help_delay_seconds');
+      if (storedDelay) {
+        const delaySeconds = parseInt(storedDelay);
+        if (!isNaN(delaySeconds) && delaySeconds >= 1 && delaySeconds <= 30) {
+          this.config.inactivityTimeoutMs = delaySeconds * 1000; // Convert to milliseconds
+          console.log(`⏱️ [AdaptiveReinforcementService] Tiempo de inactividad cargado desde storage: ${delaySeconds}s`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ [AdaptiveReinforcementService] Error cargando tiempo de inactividad desde storage:', error);
+    }
   }
 
   public initialize(
