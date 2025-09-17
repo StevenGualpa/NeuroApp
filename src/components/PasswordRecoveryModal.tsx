@@ -12,9 +12,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import AuthService from '../services/AuthService';
 import { useLanguage } from '../contexts/LanguageContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -41,6 +43,8 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [userId, setUserId] = useState<number>(0);
   const [errorMessage, setErrorMessage] = useState('');
+  const [focusedInput, setFocusedInput] = useState<string>('');
+  const [lastUsername, setLastUsername] = useState<string>('');
 
   const { language } = useLanguage();
 
@@ -61,36 +65,83 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
     setUserId(0);
     setErrorMessage('');
     setIsLoading(false);
+    setFocusedInput('');
   };
 
-  // Modal animations
+  // Check for active recovery code
+  const checkActiveCode = async () => {
+    const storedCode = await AsyncStorage.getItem('@neuroapp_recovery_code');
+    const storedUsername = await AsyncStorage.getItem('@neuroapp_recovery_username');
+    const storedTimestamp = await AsyncStorage.getItem('@neuroapp_recovery_timestamp');
+
+    if (storedCode && storedUsername && storedTimestamp) {
+      const timestamp = parseInt(storedTimestamp);
+      const now = Date.now();
+      const threeMinutes = 3 * 60 * 1000; // 3 minutos en milisegundos
+
+      // Si el código fue enviado hace menos de 3 minutos
+      if (now - timestamp < threeMinutes) {
+        try {
+          const result = await AuthService.verifyRecoveryCode(storedCode);
+          
+          if (result.success) {
+            // El código sigue siendo válido, ir directamente al paso 2
+            setUsername(storedUsername);
+            setLastUsername(storedUsername);
+            setUserId(result.userId || 0);
+            setCurrentStep('code');
+            return true;
+          } else if (result.state === 'expired' || result.state === 'used') {
+            // El código expiró o fue usado, limpiar storage
+            await clearStoredRecoveryData();
+          }
+        } catch (error) {
+          // Error al verificar, limpiar storage
+          await clearStoredRecoveryData();
+        }
+      } else {
+        // El código es muy viejo, limpiar storage
+        await clearStoredRecoveryData();
+      }
+    }
+    
+    return false;
+  };
+
+  // Clear stored recovery data
+  const clearStoredRecoveryData = async () => {
+    await Promise.all([
+      AsyncStorage.removeItem('@neuroapp_recovery_code'),
+      AsyncStorage.removeItem('@neuroapp_recovery_username'),
+      AsyncStorage.removeItem('@neuroapp_recovery_timestamp'),
+    ]);
+  };
+
+  // Modal animations and initialization
   useEffect(() => {
     if (visible) {
       resetModal();
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(scaleAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      
+      // Check for active recovery code first
+      checkActiveCode().then((hasActiveCode) => {
+        // Start animations after checking for active code
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scaleAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+            tension: 100,
+            friction: 8,
+          }),
+        ]).start();
+      });
     } else {
       Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: height,
-          duration: 250,
-          useNativeDriver: true,
-        }),
         Animated.timing(fadeAnim, {
           toValue: 0,
           duration: 250,
@@ -167,6 +218,14 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
       const result = await AuthService.recoverPassword(username.trim());
       
       if (result.success) {
+        // Store recovery data for future sessions
+        const timestamp = Date.now().toString();
+        await Promise.all([
+          AsyncStorage.setItem('@neuroapp_recovery_username', username.trim()),
+          AsyncStorage.setItem('@neuroapp_recovery_timestamp', timestamp),
+        ]);
+        
+        setLastUsername(username.trim());
         loadingLoop.stop();
         setIsLoading(false);
         setCurrentStep('code');
@@ -191,11 +250,18 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
       const result = await AuthService.verifyRecoveryCode(code.trim());
       
       if (result.success && result.userId) {
+        // Store the verified code for potential re-verification
+        await AsyncStorage.setItem('@neuroapp_recovery_code', code.trim());
+        
         setUserId(result.userId);
         loadingLoop.stop();
         setIsLoading(false);
         setCurrentStep('password');
       } else {
+        // If code is expired, used or invalid, clear stored data
+        if (result.state === 'expired' || result.state === 'used') {
+          await clearStoredRecoveryData();
+        }
         throw new Error(result.message);
       }
     } catch (error) {
@@ -219,6 +285,9 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
         // Optional: consume the code
         await AuthService.consumeRecoveryCode(code);
         
+        // Clear all stored recovery data since the process is complete
+        await clearStoredRecoveryData();
+        
         loadingLoop.stop();
         setIsLoading(false);
         setCurrentStep('success');
@@ -233,6 +302,7 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
   };
 
   const handleClose = () => {
+    // Don't clear data on close - let the user continue later if they want
     onClose();
   };
 
@@ -261,14 +331,19 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
             </View>
             
             <View style={styles.inputContainer}>
-              <View style={styles.inputWrapper}>
+              <View style={[
+                styles.inputWrapper,
+                focusedInput === 'username' && styles.inputWrapperFocused
+              ]}>
                 <Text style={styles.inputIcon}>👤</Text>
                 <TextInput
                   style={styles.input}
                   placeholder={language === 'es' ? 'Nombre de usuario' : 'Username'}
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor="#94a3b8"
                   value={username}
                   onChangeText={setUsername}
+                  onFocus={() => setFocusedInput('username')}
+                  onBlur={() => setFocusedInput('')}
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={!isLoading}
@@ -286,28 +361,54 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
               <Text style={styles.stepTitle}>
                 {language === 'es' ? 'Verificar código' : 'Verify code'}
               </Text>
-              <Text style={styles.stepDescription}>
-                {language === 'es' 
-                  ? 'Ingresa el código de 6 dígitos enviado a tu correo electrónico'
-                  : 'Enter the 6-digit code sent to your email'
+              <Text style={[styles.stepDescription, styles.compactDescription]}>
+                {lastUsername && username === lastUsername
+                  ? (language === 'es' 
+                      ? `Código activo detectado. Ingresa los 6 dígitos.`
+                      : `Active code detected. Enter the 6 digits.`)
+                  : (language === 'es' 
+                      ? 'Ingresa el código de 6 dígitos de tu correo'
+                      : 'Enter the 6-digit code from your email')
                 }
               </Text>
             </View>
             
             <View style={styles.inputContainer}>
-              <View style={styles.inputWrapper}>
+              <View style={[
+                styles.inputWrapper,
+                focusedInput === 'code' && styles.inputWrapperFocused
+              ]}>
                 <Text style={styles.inputIcon}>🔢</Text>
                 <TextInput
                   style={[styles.input, styles.codeInput]}
                   placeholder="123456"
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor="#94a3b8"
                   value={code}
                   onChangeText={setCode}
+                  onFocus={() => setFocusedInput('code')}
+                  onBlur={() => setFocusedInput('')}
                   keyboardType="numeric"
                   maxLength={6}
                   editable={!isLoading}
                 />
               </View>
+              
+              {/* Option to request new code */}
+              {lastUsername && username === lastUsername && (
+                <TouchableOpacity 
+                  style={styles.requestNewCodeButton}
+                  onPress={() => {
+                    setCurrentStep('username');
+                    setCode('');
+                    setErrorMessage('');
+                  }}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.requestNewCodeText}>
+                    {language === 'es' ? '¿Solicitar nuevo código?' : 'Request new code?'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         );
@@ -320,23 +421,28 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
               <Text style={styles.stepTitle}>
                 {language === 'es' ? 'Nueva contraseña' : 'New password'}
               </Text>
-              <Text style={styles.stepDescription}>
+              <Text style={[styles.stepDescription, styles.compactDescription]}>
                 {language === 'es' 
-                  ? 'Ingresa tu nueva contraseña (mínimo 6 caracteres)'
-                  : 'Enter your new password (minimum 6 characters)'
+                  ? 'Nueva contraseña (mín. 6 caracteres)'
+                  : 'New password (min. 6 characters)'
                 }
               </Text>
             </View>
             
             <View style={styles.inputContainer}>
-              <View style={styles.inputWrapper}>
+              <View style={[
+                styles.inputWrapper,
+                focusedInput === 'newPassword' && styles.inputWrapperFocused
+              ]}>
                 <Text style={styles.inputIcon}>🔒</Text>
                 <TextInput
                   style={styles.input}
                   placeholder={language === 'es' ? 'Nueva contraseña' : 'New password'}
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor="#94a3b8"
                   value={newPassword}
                   onChangeText={setNewPassword}
+                  onFocus={() => setFocusedInput('newPassword')}
+                  onBlur={() => setFocusedInput('')}
                   secureTextEntry={!showPassword}
                   editable={!isLoading}
                 />
@@ -348,14 +454,19 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                 </TouchableOpacity>
               </View>
               
-              <View style={styles.inputWrapper}>
+              <View style={[
+                styles.inputWrapper,
+                focusedInput === 'confirmPassword' && styles.inputWrapperFocused
+              ]}>
                 <Text style={styles.inputIcon}>🔐</Text>
                 <TextInput
                   style={styles.input}
                   placeholder={language === 'es' ? 'Confirmar contraseña' : 'Confirm password'}
-                  placeholderTextColor="#9ca3af"
+                  placeholderTextColor="#94a3b8"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
+                  onFocus={() => setFocusedInput('confirmPassword')}
+                  onBlur={() => setFocusedInput('')}
                   secureTextEntry={!showPassword}
                   editable={!isLoading}
                 />
@@ -477,32 +588,26 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
           { opacity: fadeAnim }
         ]}
       >
-        <TouchableOpacity 
-          style={styles.overlayTouchable}
-          activeOpacity={1}
-          onPress={handleClose}
-        />
-        
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.keyboardView}
-        >
-          <Animated.View 
-            style={[
-              styles.modalContainer,
-              {
-                transform: [
-                  { translateY: slideAnim },
-                  { scale: scaleAnim }
-                ]
-              }
-            ]}
+        <TouchableWithoutFeedback onPress={handleClose}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.keyboardView}
           >
-            <ScrollView 
-              showsVerticalScrollIndicator={false}
-              bounces={false}
-              style={styles.scrollContent}
-            >
+            <TouchableWithoutFeedback onPress={() => {}}>
+              <Animated.View 
+                style={[
+                  styles.modalContainer,
+                  {
+                    transform: [{ scale: scaleAnim }]
+                  }
+                ]}
+              >
+            <View style={styles.modalContent}>
+              {/* Modal Handle */}
+              <View style={styles.modalHandle}>
+                <View style={styles.handleBar} />
+              </View>
+
               {/* Header */}
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
@@ -517,21 +622,53 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
                 </TouchableOpacity>
               </View>
 
-              {/* Error Message */}
-              {errorMessage ? (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+              {/* Progress Bar */}
+              {currentStep !== 'success' && (
+                <View style={styles.progressBarContainer}>
+                  <View style={styles.progressBarBackground}>
+                    <Animated.View 
+                      style={[
+                        styles.progressBar,
+                        {
+                          width: `${
+                            currentStep === 'username' ? 33 : 
+                            currentStep === 'code' ? 66 : 
+                            currentStep === 'password' ? 100 : 0
+                          }%`
+                        }
+                      ]}
+                    />
+                  </View>
                 </View>
-              ) : null}
+              )}
 
-              {/* Step Content */}
-              {renderStepContent()}
+              {/* Scrollable Content */}
+              <ScrollView 
+                showsVerticalScrollIndicator={false}
+                bounces={true}
+                style={styles.scrollableContent}
+                keyboardShouldPersistTaps="handled"
+              >
+                {/* Error Message */}
+                {errorMessage ? (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>⚠️ {errorMessage}</Text>
+                  </View>
+                ) : null}
 
-              {/* Action Buttons */}
-              {renderActionButtons()}
-            </ScrollView>
-          </Animated.View>
-        </KeyboardAvoidingView>
+                {/* Step Content */}
+                {renderStepContent()}
+              </ScrollView>
+
+              {/* Fixed Action Buttons */}
+              <View style={styles.fixedButtonContainer}>
+                {renderActionButtons()}
+              </View>
+            </View>
+              </Animated.View>
+            </TouchableWithoutFeedback>
+          </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
       </Animated.View>
     </Modal>
   );
@@ -540,203 +677,322 @@ const PasswordRecoveryModal: React.FC<PasswordRecoveryModalProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 16,
+    paddingTop: height * 0.15,
+    paddingBottom: 20,
   },
   overlayTouchable: {
     flex: 1,
   },
   keyboardView: {
-    justifyContent: 'flex-end',
+    flex: 1,
+    justifyContent: 'flex-start',
   },
   modalContainer: {
     backgroundColor: '#ffffff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: height * 0.9,
+    borderRadius: 24,
+    maxHeight: height * 0.85,
     minHeight: height * 0.6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 20,
   },
-  scrollContent: {
+  modalContent: {
     flex: 1,
+  },
+  scrollableContent: {
+    flex: 1,
+  },
+  fixedButtonContainer: {
+    backgroundColor: '#ffffff',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#f1f5f9',
+  },
+  modalHandle: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  handleBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 2,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#4285f4',
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1f2937',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   closeButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    padding: 10,
+    borderRadius: 24,
+    backgroundColor: '#f8fafc',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   closeButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6b7280',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#64748b',
+  },
+  progressBarContainer: {
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    backgroundColor: '#ffffff',
+  },
+  progressBarBackground: {
+    height: 4,
+    backgroundColor: '#e2e8f0',
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#4285f4',
+    borderRadius: 2,
   },
   errorContainer: {
-    marginHorizontal: 20,
+    marginHorizontal: 24,
     marginTop: 16,
-    padding: 12,
+    padding: 14,
     backgroundColor: '#fef2f2',
-    borderRadius: 8,
+    borderRadius: 14,
     borderWidth: 1,
     borderColor: '#fecaca',
+    shadowColor: '#ef4444',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
   errorText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#dc2626',
-    fontWeight: '500',
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   stepContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 8,
   },
   stepHeader: {
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 8,
   },
   stepNumber: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
     color: '#4285f4',
-    backgroundColor: '#e3f2fd',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 8,
+    backgroundColor: '#e8f4fd',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginBottom: 12,
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   stepTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1f2937',
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#1e293b',
+    marginBottom: 6,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   stepDescription: {
-    fontSize: 16,
-    color: '#6b7280',
+    fontSize: 14,
+    color: '#64748b',
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 16,
+    lineHeight: 18,
+    paddingHorizontal: 12,
+    fontWeight: '500',
+  },
+  compactDescription: {
+    fontSize: 12,
+    lineHeight: 16,
+    paddingHorizontal: 8,
   },
   inputContainer: {
-    marginBottom: 16,
+    marginBottom: 4,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8faff',
-    borderRadius: 12,
-    marginBottom: 16,
+    backgroundColor: '#f8fafc',
+    borderRadius: 14,
+    marginBottom: 8,
     borderWidth: 2,
-    borderColor: '#e8f0fe',
+    borderColor: '#e2e8f0',
     paddingHorizontal: 16,
-    minHeight: 56,
+    minHeight: 52,
+    shadowColor: '#64748b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    transition: 'all 0.2s ease',
+  },
+  inputWrapperFocused: {
+    borderColor: '#4285f4',
+    backgroundColor: '#f0f9ff',
+    shadowColor: '#4285f4',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
   },
   inputIcon: {
-    fontSize: 20,
-    marginRight: 12,
+    fontSize: 22,
+    marginRight: 14,
+    opacity: 0.7,
   },
   input: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    color: '#1a1a1a',
-    fontWeight: '500',
+    color: '#1e293b',
+    fontWeight: '600',
   },
   codeInput: {
     textAlign: 'center',
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: 4,
+    fontSize: 28,
+    fontWeight: '800',
+    letterSpacing: 6,
+    color: '#4285f4',
   },
   eyeButton: {
-    padding: 8,
+    padding: 10,
+    borderRadius: 12,
+    backgroundColor: '#f1f5f9',
   },
   eyeIcon: {
-    fontSize: 18,
+    fontSize: 20,
+  },
+  requestNewCodeButton: {
+    alignSelf: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 8,
+  },
+  requestNewCodeText: {
+    fontSize: 14,
+    color: '#4285f4',
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   successContainer: {
     alignItems: 'center',
-    paddingVertical: 32,
+    paddingVertical: 24,
+    backgroundColor: '#f0fdf4',
+    marginHorizontal: 24,
+    marginVertical: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#dcfce7',
   },
   successIcon: {
-    fontSize: 64,
-    marginBottom: 16,
+    fontSize: 56,
+    marginBottom: 14,
   },
   successTitle: {
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
     color: '#059669',
-    marginBottom: 12,
+    marginBottom: 10,
     textAlign: 'center',
+    letterSpacing: 0.5,
   },
   successDescription: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#374151',
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 16,
+    lineHeight: 22,
+    paddingHorizontal: 20,
+    fontWeight: '500',
   },
   buttonContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingBottom: 32,
-    gap: 12,
+    paddingHorizontal: 24,
+    paddingBottom: 14,
+    paddingTop: 12,
+    gap: 14,
   },
   button: {
     flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 14,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 52,
+    minHeight: 50,
   },
   primaryButton: {
     backgroundColor: '#4285f4',
     shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 8,
   },
   secondaryButton: {
-    backgroundColor: '#f3f4f6',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
+    backgroundColor: '#f8fafc',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    shadowColor: '#64748b',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
   },
   disabledButton: {
-    backgroundColor: '#9ca3af',
+    backgroundColor: '#94a3b8',
     shadowOpacity: 0,
     elevation: 0,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
     color: '#ffffff',
+    letterSpacing: 0.3,
   },
   secondaryButtonText: {
-    color: '#6b7280',
+    color: '#475569',
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   loadingSpinner: {
-    marginRight: 8,
+    marginRight: 10,
   },
   loadingIcon: {
-    fontSize: 18,
+    fontSize: 20,
   },
 });
 
