@@ -500,7 +500,7 @@ const DragDropScreen = () => {
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
         errors: finalStats.errors,
-        activityType: 'Arrastra y suelta',
+        activityType: t.games.activityTypes.dragDrop,
         showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
         usedHelp: finalStats.usedHelp || false,
         tookTime: finalStats.completionTime > 60000,

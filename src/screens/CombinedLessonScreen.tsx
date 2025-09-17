@@ -327,17 +327,17 @@ const CombinedLessonScreen = () => {
   const getActivityAnimationType = (activityType: string): string => {
     const cleanType = extractActivityType(activityType);
     switch (cleanType) {
-      case 'Memoria visual':
+      case t.games.activityTypes.memoryGame:
         return 'memoryGame';
-      case 'Arrastra y suelta':
+      case t.games.activityTypes.dragDrop:
         return 'dragDrop';
-      case 'Asocia elementos':
+      case t.games.activityTypes.match:
         return 'match';
-      case 'Selecciona la opción correcta':
+      case t.games.activityTypes.selectOption:
         return 'selectOption';
-      case 'Ordena los pasos':
+      case t.games.activityTypes.orderSteps:
         return 'orderSteps';
-      case 'Reconocimiento de patrones':
+      case t.games.activityTypes.patternRecognition:
         return 'patternRecognition';
       default:
         return 'selectOption';
@@ -350,22 +350,22 @@ const CombinedLessonScreen = () => {
     console.log(`🚀 [CombinedLessonScreen] Navegando a actividad: "${activityType}" → "${cleanActivityType}"`);
     
     switch (cleanActivityType) {
-      case 'Memoria visual':
+      case t.games.activityTypes.memoryGame:
         navigation.replace('memoryGame', { step: convertedStep, lessonTitle });
         break;
-      case 'Arrastra y suelta':
+      case t.games.activityTypes.dragDrop:
         navigation.replace('dragDrop', { step: convertedStep, lessonTitle });
         break;
-      case 'Asocia elementos':
+      case t.games.activityTypes.match:
         navigation.replace('match', { step: convertedStep, lessonTitle });
         break;
-      case 'Selecciona la opción correcta':
+      case t.games.activityTypes.selectOption:
         navigation.replace('selectOption', { step: convertedStep, lessonTitle });
         break;
-      case 'Ordena los pasos':
+      case t.games.activityTypes.orderSteps:
         navigation.replace('orderSteps', { step: convertedStep, lessonTitle });
         break;
-      case 'Reconocimiento de patrones':
+      case t.games.activityTypes.patternRecognition:
         navigation.replace('patternRecognition', { step: convertedStep, lessonTitle });
         break;
       default:
@@ -429,8 +429,8 @@ const CombinedLessonScreen = () => {
         );
         
         if (hasOrderValues) {
-          activityType = 'Ordena los pasos';
-          convertedStep.activityType = 'Ordena los pasos';
+          activityType = t.games.activityTypes.orderSteps;
+          convertedStep.activityType = t.games.activityTypes.orderSteps;
         }
       }
 
@@ -445,12 +445,12 @@ const CombinedLessonScreen = () => {
   const getActivityTypeColor = (activityType: string) => {
     const cleanType = extractActivityType(activityType);
     const colorMap: { [key: string]: string } = {
-      'Selecciona la opción correcta': '#4CAF50',
-      'Ordena los pasos': '#2196F3',
-      'Arrastra y suelta': '#FF9800',
-      'Asocia elementos': '#9C27B0',
-      'Memoria visual': '#F44336',
-      'Reconocimiento de patrones': '#607D8B',
+      [t.games.activityTypes.selectOption]: '#4CAF50',
+      [t.games.activityTypes.orderSteps]: '#2196F3',
+      [t.games.activityTypes.dragDrop]: '#FF9800',
+      [t.games.activityTypes.match]: '#9C27B0',
+      [t.games.activityTypes.memoryGame]: '#F44336',
+      [t.games.activityTypes.patternRecognition]: '#607D8B',
     };
     return colorMap[cleanType] || '#4285f4';
   };
@@ -458,12 +458,12 @@ const CombinedLessonScreen = () => {
   const getActivityTypeIcon = (activityType: string) => {
     const cleanType = extractActivityType(activityType);
     const iconMap: { [key: string]: string } = {
-      'Selecciona la opción correcta': '✅',
-      'Ordena los pasos': '🔢',
-      'Arrastra y suelta': '👆',
-      'Asocia elementos': '🔗',
-      'Memoria visual': '🧠',
-      'Reconocimiento de patrones': '🧩',
+      [t.games.activityTypes.selectOption]: '✅',
+      [t.games.activityTypes.orderSteps]: '🔢',
+      [t.games.activityTypes.dragDrop]: '👆',
+      [t.games.activityTypes.match]: '🔗',
+      [t.games.activityTypes.memoryGame]: '🧠',
+      [t.games.activityTypes.patternRecognition]: '🧩',
     };
     return iconMap[cleanType] || '🎯';
   };

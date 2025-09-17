@@ -8,6 +8,7 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -114,13 +115,118 @@ const activityConfigs: { [key: string]: ActivityConfig } = {
 };
 
 const GameIntroAnimation: React.FC<GameIntroAnimationProps> = ({ activityType, onComplete }) => {
+  const { language, t } = useLanguage();
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const [currentStep, setCurrentStep] = useState(0);
   const [showSteps, setShowSteps] = useState(false);
 
-  const config = activityConfigs[activityType] || activityConfigs['selectOption'];
+  // Obtener configuración traducida
+  const getTranslatedConfig = (activityType: string) => {
+    const baseConfig = activityConfigs[activityType] || activityConfigs['selectOption'];
+    
+    // Traducir según el idioma
+    if (language === 'en') {
+      return {
+        ...baseConfig,
+        title: t.games.activityTypes[activityType as keyof typeof t.games.activityTypes] || baseConfig.title,
+        description: t.games.instructions[activityType as keyof typeof t.games.instructions] || baseConfig.description,
+        steps: getTranslatedSteps(activityType),
+        tip: getTranslatedTip(activityType),
+      };
+    }
+    
+    return baseConfig;
+  };
+
+  const getTranslatedSteps = (activityType: string) => {
+    const stepTranslations = {
+      orderSteps: language === 'en' ? [
+        '👀 Read the question carefully',
+        '🤔 Think about the correct order',
+        '👆 Tap the options in sequence',
+        '✅ Complete the sequence!'
+      ] : [
+        '👀 Lee la pregunta con atención',
+        '🤔 Piensa en el orden correcto',
+        '👆 Toca las opciones en secuencia',
+        '✅ ¡Completa la secuencia!'
+      ],
+      selectOption: language === 'en' ? [
+        '📖 Read the question carefully',
+        '🔍 Analyze all the options',
+        '🎯 Select the correct answer',
+        '🎉 Excellent choice!'
+      ] : [
+        '📖 Lee la pregunta cuidadosamente',
+        '🔍 Analiza todas las opciones',
+        '🎯 Selecciona la respuesta correcta',
+        '🎉 ¡Excelente elección!'
+      ],
+      dragDrop: language === 'en' ? [
+        '👀 Observe the available elements',
+        '👆 Hold to drag',
+        '🎯 Drop in the correct place',
+        '🌟 Perfect positioning!'
+      ] : [
+        '👀 Observa los elementos disponibles',
+        '👆 Mantén presionado para arrastrar',
+        '🎯 Suelta en el lugar correcto',
+        '🌟 ¡Perfecto posicionamiento!'
+      ],
+      match: language === 'en' ? [
+        '🔍 Examine all elements',
+        '🤔 Find the connections',
+        '🔗 Associate related elements',
+        '✨ Perfect connection!'
+      ] : [
+        '🔍 Examina todos los elementos',
+        '🤔 Encuentra las conexiones',
+        '🔗 Asocia los elementos relacionados',
+        '✨ ¡Conexión perfecta!'
+      ],
+      memoryGame: language === 'en' ? [
+        '👀 Look at the cards carefully',
+        '🧠 Remember their positions',
+        '👆 Tap to flip the cards',
+        '🎯 Find the matching pairs!'
+      ] : [
+        '👀 Mira las cartas con atención',
+        '🧠 Recuerda sus posiciones',
+        '👆 Toca para voltear las cartas',
+        '🎯 ¡Encuentra las parejas!'
+      ],
+      patternRecognition: language === 'en' ? [
+        '👀 Observe the pattern carefully',
+        '🤔 Identify the missing element',
+        '🎯 Select the correct option',
+        '✨ Perfect pattern recognition!'
+      ] : [
+        '👀 Observa el patrón con atención',
+        '🤔 Identifica el elemento faltante',
+        '🎯 Selecciona la opción correcta',
+        '✨ ¡Reconocimiento perfecto!'
+      ]
+    };
+    
+    return stepTranslations[activityType as keyof typeof stepTranslations] || stepTranslations.selectOption;
+  };
+
+  const getTranslatedTip = (activityType: string) => {
+    const tipTranslations = {
+      orderSteps: language === 'en' ? 'Order is very important!' : '¡El orden es muy importante!',
+      selectOption: language === 'en' ? 'Think before choosing!' : '¡Piensa antes de elegir!',
+      dragDrop: language === 'en' ? 'Drag carefully!' : '¡Arrastra con cuidado!',
+      match: language === 'en' ? 'Look for relationships!' : '¡Busca las relaciones!',
+      memoryGame: language === 'en' ? 'Memory is key!' : '¡La memoria es clave!',
+      patternRecognition: language === 'en' ? 'Look for patterns!' : '¡Busca patrones!'
+    };
+    
+    return tipTranslations[activityType as keyof typeof tipTranslations] || tipTranslations.selectOption;
+  };
+
+  const config = getTranslatedConfig(activityType);
 
   useEffect(() => {
     // Animación de entrada
@@ -231,7 +337,9 @@ const GameIntroAnimation: React.FC<GameIntroAnimationProps> = ({ activityType, o
         {/* Pasos de instrucciones */}
         {showSteps && (
           <View style={styles.stepsContainer}>
-            <Text style={styles.stepsTitle}>¿Cómo jugar?</Text>
+            <Text style={styles.stepsTitle}>
+              {language === 'es' ? '¿Cómo jugar?' : 'How to play?'}
+            </Text>
             {config.steps.map((step, index) => (
               <Animated.View
                 key={index}
@@ -300,7 +408,9 @@ const GameIntroAnimation: React.FC<GameIntroAnimationProps> = ({ activityType, o
               onPress={handleStart}
               activeOpacity={0.8}
             >
-              <Text style={styles.startButtonText}>🚀 ¡Comenzar a Jugar!</Text>
+              <Text style={styles.startButtonText}>
+                {language === 'es' ? '🚀 ¡Comenzar a Jugar!' : '🚀 Start Playing!'}
+              </Text>
             </TouchableOpacity>
           </Animated.View>
         )}

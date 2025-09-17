@@ -287,6 +287,26 @@ export interface Translations {
       orderSteps: string;
       patternRecognition: string;
     };
+
+    // Activity types
+    activityTypes: {
+      selectOption: string;
+      orderSteps: string;
+      dragDrop: string;
+      match: string;
+      memoryGame: string;
+      patternRecognition: string;
+    };
+
+    // Activity messages
+    messages: {
+      perfectMemory: string;
+      excellentMemory: string;
+      memoryExceptional: string;
+      progressSaved: string;
+      saving: string;
+      saved: string;
+    };
   };
 
   // Achievements
@@ -602,6 +622,24 @@ export const es: Translations = {
       orderSteps: 'Ordena los pasos correctamente',
       patternRecognition: 'Encuentra el patrón que falta',
     },
+
+    activityTypes: {
+      selectOption: 'Selecciona la opción correcta',
+      orderSteps: 'Ordena los pasos',
+      dragDrop: 'Arrastra y suelta',
+      match: 'Asocia elementos',
+      memoryGame: 'Memoria visual',
+      patternRecognition: 'Reconocimiento de patrones',
+    },
+
+    messages: {
+      perfectMemory: '¡Memoria perfecta! Increíble 🧠🏆',
+      excellentMemory: '¡Excelente memoria! Sin errores 🌟',
+      memoryExceptional: '🧠 ¡Memoria excepcional!',
+      progressSaved: 'Progreso guardado',
+      saving: 'Guardando...',
+      saved: 'Guardado ✅',
+    },
   },
 
   achievements: {
@@ -911,6 +949,24 @@ export const en: Translations = {
       selectOption: 'Choose the correct answer',
       orderSteps: 'Put the steps in order',
       patternRecognition: 'Find the missing pattern',
+    },
+
+    activityTypes: {
+      selectOption: 'Select the correct option',
+      orderSteps: 'Order the steps',
+      dragDrop: 'Drag and drop',
+      match: 'Match elements',
+      memoryGame: 'Visual memory',
+      patternRecognition: 'Pattern recognition',
+    },
+
+    messages: {
+      perfectMemory: 'Perfect memory! Incredible 🧠🏆',
+      excellentMemory: 'Excellent memory! No errors 🌟',
+      memoryExceptional: '🧠 Exceptional memory!',
+      progressSaved: 'Progress saved',
+      saving: 'Saving...',
+      saved: 'Saved ✅',
     },
   },
 

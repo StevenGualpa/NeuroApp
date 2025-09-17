@@ -18,6 +18,13 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ApiService, { Step, Option, Lesson } from '../services/ApiService';
 import GameIntroAnimation from '../components/GameIntroAnimation';
+import { useLanguage } from '../contexts/LanguageContext';
+import { 
+  getActivityTypeTranslation, 
+  getActivityTypeColor, 
+  getActivityTypeIcon, 
+  extractActivityType 
+} from '../utils/activityTranslations';
 
 const { width } = Dimensions.get('window');
 
@@ -27,6 +34,7 @@ const RealLessonScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RealLessonScreenRouteProp>();
   const { lesson } = route.params;
+  const { language, t } = useLanguage();
 
   // Estados
   const [steps, setSteps] = useState<Step[]>([]);
@@ -266,31 +274,9 @@ const RealLessonScreen = () => {
     }
   };
 
-  const getActivityTypeColor = (activityType: string) => {
-    const cleanType = extractActivityType(activityType);
-    const colorMap: { [key: string]: string } = {
-      'Selecciona la opción correcta': '#4CAF50',
-      'Ordena los pasos': '#2196F3',
-      'Arrastra y suelta': '#FF9800',
-      'Asocia elementos': '#9C27B0',
-      'Memoria visual': '#F44336',
-      'Reconocimiento de patrones': '#607D8B',
-    };
-    return colorMap[cleanType] || '#4285f4';
-  };
-
-  const getActivityTypeIcon = (activityType: string) => {
-    const cleanType = extractActivityType(activityType);
-    const iconMap: { [key: string]: string } = {
-      'Selecciona la opción correcta': '✅',
-      'Ordena los pasos': '🔢',
-      'Arrastra y suelta': '👆',
-      'Asocia elementos': '🔗',
-      'Memoria visual': '🧠',
-      'Reconocimiento de patrones': '🧩',
-    };
-    return iconMap[cleanType] || '🎯';
-  };
+  // Usar las funciones de traducción importadas
+  const getActivityTypeColorLocal = (activityType: string) => getActivityTypeColor(activityType);
+  const getActivityTypeIconLocal = (activityType: string) => getActivityTypeIcon(activityType);
 
   // Usar datos de la lección original o de la API
   const displayLesson = lessonData || lesson;
@@ -459,9 +445,10 @@ const RealLessonScreen = () => {
             renderEmptyState()
           ) : (
             steps.map((step, index) => {
-              const activityType = step.ActivityType?.name || 'Selecciona la opción correcta';
-              const activityColor = getActivityTypeColor(activityType);
-              const activityIcon = getActivityTypeIcon(activityType);
+              const rawActivityType = step.ActivityType?.name || 'Selecciona la opción correcta';
+              const activityType = getActivityTypeTranslation(rawActivityType, language);
+              const activityColor = getActivityTypeColorLocal(activityType);
+              const activityIcon = getActivityTypeIconLocal(activityType);
               
               return (
                 <TouchableOpacity

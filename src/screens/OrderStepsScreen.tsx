@@ -440,7 +440,7 @@ const OrderStepsScreen = () => {
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
         errors: finalStats.errors,
-        activityType: 'Ordena los pasos',
+        activityType: t.games.activityTypes.orderSteps,
         showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
         usedHelp: finalStats.usedHelp || false,
         tookTime: finalStats.completionTime > 60000,

@@ -9,6 +9,7 @@ import {
   Animated, 
   Dimensions 
 } from 'react-native';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
@@ -57,6 +58,7 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
   showEfficiency = false,
   bonusMessage,
 }) => {
+  const { language, t } = useLanguage();
   // Animaciones para hacer la experiencia más suave y amigable
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const starAnimations = useRef([
@@ -166,12 +168,12 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
   const getDefaultStats = useCallback((): DetailedStat[] => {
     const defaultStats: DetailedStat[] = [
       {
-        label: 'Tiempo',
+        label: language === 'es' ? 'Tiempo' : 'Time',
         value: Math.round(stats.completionTime / 1000),
         suffix: 's'
       },
       {
-        label: 'Precisión',
+        label: language === 'es' ? 'Precisión' : 'Accuracy',
         value: stats.totalAttempts > 0 
           ? Math.round(((stats.totalAttempts - stats.errors) / stats.totalAttempts) * 100)
           : 100,
@@ -182,42 +184,42 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
     // Agregar estadísticas específicas según el tipo de juego
     if (stats.audioPlays !== undefined) {
       defaultStats.push({
-        label: 'Reproducciones',
+        label: language === 'es' ? 'Reproducciones' : 'Plays',
         value: stats.audioPlays
       });
     }
 
     if (stats.flipCount !== undefined) {
       defaultStats.push({
-        label: 'Volteos totales',
+        label: language === 'es' ? 'Volteos totales' : 'Total flips',
         value: stats.flipCount
       });
     }
 
     if (stats.resets !== undefined) {
       defaultStats.push({
-        label: 'Reinicios',
+        label: language === 'es' ? 'Reinicios' : 'Resets',
         value: stats.resets
       });
     }
 
     if (stats.matchesFound !== undefined) {
       defaultStats.push({
-        label: 'Parejas encontradas',
+        label: language === 'es' ? 'Parejas encontradas' : 'Pairs found',
         value: stats.matchesFound
       });
     }
 
     if (showEfficiency && stats.efficiency !== undefined) {
       defaultStats.push({
-        label: 'Eficiencia',
+        label: language === 'es' ? 'Eficiencia' : 'Efficiency',
         value: stats.efficiency,
         suffix: '%'
       });
     }
 
     return defaultStats;
-  }, [stats, showEfficiency]);
+  }, [stats, showEfficiency, language]);
 
   const allStats = [...getDefaultStats(), ...customStats];
 
@@ -236,15 +238,21 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
   const getAutoBonusMessage = useCallback(() => {
     if (bonusMessage) return bonusMessage;
     
-    if (stats.firstTrySuccess) return '🎯 ¡Primera vez perfecto!';
-    if (stats.perfectRun && stats.resets === 0) return '🎯 ¡Secuencia perfecta!';
-    if (stats.perfectRun && stats.audioPlays <= 1) return '🏆 ¡Primera vez sin errores!';
+    if (stats.firstTrySuccess) {
+      return language === 'es' ? '🎯 ¡Primera vez perfecto!' : '🎯 Perfect first try!';
+    }
+    if (stats.perfectRun && stats.resets === 0) {
+      return language === 'es' ? '🎯 ¡Secuencia perfecta!' : '🎯 Perfect sequence!';
+    }
+    if (stats.perfectRun && stats.audioPlays <= 1) {
+      return language === 'es' ? '🏆 ¡Primera vez sin errores!' : '🏆 First try without errors!';
+    }
     if (stats.flipCount && stats.matchesFound && stats.flipCount <= stats.matchesFound * 2.4) {
-      return '🧠 ¡Memoria excepcional!';
+      return language === 'es' ? '🧠 ¡Memoria excepcional!' : '🧠 Exceptional memory!';
     }
     
-    return '🏆 ¡Excelente trabajo!';
-  }, [stats, bonusMessage]);
+    return language === 'es' ? '🏆 ¡Excelente trabajo!' : '🏆 Excellent work!';
+  }, [stats, bonusMessage, language]);
 
   if (!visible) return null;
 
@@ -267,13 +275,19 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
           {/* Título con emoji grande y amigable */}
           <View style={styles.headerContainer}>
             <Text style={styles.celebrationEmoji}>🎉</Text>
-            <Text style={styles.completionText}>¡Increíble!</Text>
-            <Text style={styles.completionSubtext}>Lo lograste</Text>
+            <Text style={styles.completionText}>
+              {language === 'es' ? '¡Increíble!' : 'Incredible!'}
+            </Text>
+            <Text style={styles.completionSubtext}>
+              {language === 'es' ? 'Lo lograste' : 'You did it!'}
+            </Text>
           </View>
           
           {/* Stars Display con animación */}
           <View style={styles.starsContainer}>
-            <Text style={styles.starsTitle}>Tu resultado:</Text>
+            <Text style={styles.starsTitle}>
+              {language === 'es' ? 'Tu resultado:' : 'Your result:'}
+            </Text>
             <View style={styles.starsRow}>
               {renderStars(stats.stars)}
             </View>
@@ -316,7 +330,9 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
               >
                 <View style={styles.buttonContent}>
                   <Text style={styles.buttonEmoji}>🔄</Text>
-                  <Text style={styles.resetButtonText}>Jugar otra vez</Text>
+                  <Text style={styles.resetButtonText}>
+                    {language === 'es' ? 'Jugar otra vez' : 'Play again'}
+                  </Text>
                 </View>
               </TouchableOpacity>
             </Animated.View>
@@ -329,7 +345,9 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
               >
                 <View style={styles.buttonContent}>
                   <Text style={styles.buttonEmoji}>➡️</Text>
-                  <Text style={styles.continueButtonText}>Siguiente</Text>
+                  <Text style={styles.continueButtonText}>
+                    {language === 'es' ? 'Siguiente' : 'Next'}
+                  </Text>
                 </View>
               </TouchableOpacity>
             </Animated.View>

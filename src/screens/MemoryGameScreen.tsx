@@ -518,7 +518,7 @@ const MemoryGameScreen = () => {
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
         errors: finalStats.errors,
-        activityType: 'Memoria visual',
+        activityType: t.games.activityTypes.memoryGame,
         showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
         usedHelp: finalStats.usedHelp || false,
         tookTime: finalStats.completionTime > 60000,
@@ -796,9 +796,9 @@ const MemoryGameScreen = () => {
     const minFlips = totalPairs * 2;
     
     if (perfectRun && stars === 3 && flipCount <= minFlips * 1.2) {
-      return "¡Memoria perfecta! Increíble 🧠🏆";
+      return t.games.messages.perfectMemory;
     } else if (perfectRun && stars === 3) {
-      return "¡Excelente memoria! Sin errores 🌟";
+      return t.games.messages.excellentMemory;
     } else if (stars === 3) {
       return "¡Muy bien hecho! 👏";
     } else if (stars === 2) {
@@ -1054,9 +1054,9 @@ const MemoryGameScreen = () => {
           { label: 'Volteos totales', value: gameStats.flipCount },
           { label: 'Parejas encontradas', value: `${gameStats.matchesFound}/${totalPairs}` },
           { label: 'Ayuda usada', value: gameStats.usedHelp ? 'Sí' : 'No' },
-          { label: 'Progreso guardado', value: progressLoading ? 'Guardando...' : 'Guardado ✅' },
+          { label: t.games.messages.progressSaved, value: progressLoading ? t.games.messages.saving : t.games.messages.saved },
         ]}
-        bonusMessage={gameStats.perfectRun && gameStats.flipCount <= totalPairs * 2.4 ? "🧠 ¡Memoria excepcional!" : undefined}
+        bonusMessage={gameStats.perfectRun && gameStats.flipCount <= totalPairs * 2.4 ? t.games.messages.memoryExceptional : undefined}
       />
 
       {/* Feedback Animation */}
