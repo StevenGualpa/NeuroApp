@@ -162,11 +162,6 @@ const MenuGrid = forwardRef<MenuGridRef, MenuGridProps>(({ menuOptions, onMenuPr
               
               <Text style={styles.menuIcon}>{option.icon}</Text>
               <Text style={styles.menuTitle}>{option.label}</Text>
-              
-              {/* Indicador de acción */}
-              <View style={styles.actionIndicator}>
-                <Text style={styles.actionArrow}>→</Text>
-              </View>
             </TouchableOpacity>
           </Animated.View>
         ))}
@@ -245,22 +240,6 @@ const styles = StyleSheet.create({
     textShadowRadius: 2,
     marginBottom: 8,
     lineHeight: 14,
-  },
-  actionIndicator: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionArrow: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '800',
   },
   footerSection: {
     alignItems: 'center',

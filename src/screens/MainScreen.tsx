@@ -189,9 +189,6 @@ const MainScreen = () => {
       >
         <Text style={styles.menuIcon}>{option.icon}</Text>
         <Text style={styles.menuLabel}>{option.label}</Text>
-        <View style={styles.menuArrow}>
-          <Text style={styles.arrowText}>→</Text>
-        </View>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -407,22 +404,6 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
     lineHeight: isSmallScreen ? 13 : 14,
-  },
-  menuArrow: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowText: {
-    fontSize: 12,
-    color: '#ffffff',
-    fontWeight: '800',
   },
   footer: {
     alignItems: 'center',
