@@ -213,7 +213,7 @@ const OrderStepsScreen = () => {
     console.log(`✅ [OrderStepsScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
     console.log('📋 [OrderStepsScreen] Pasos procesados:');
     newProcessedOptions.forEach((option, index) => {
-      console.log(`  ${index + 1}. "${option.label}" (Orden: ${option.order})`);
+      console.log(`  ${index + 1}. "${option.label}" (Orden: ${option.order_value || option.order})`);
     });
   }, [rawStep, language]);
 
@@ -242,7 +242,7 @@ const OrderStepsScreen = () => {
         if (helpStepIndex === -1) {
           // Inactivity help - find next correct step
           const nextStepOrder = selectedOrder.length + 1;
-          const nextCorrectStep = shuffledOptions.findIndex(option => option.order === nextStepOrder);
+          const nextCorrectStep = shuffledOptions.findIndex(option => (option.order_value || option.order) === nextStepOrder);
           if (nextCorrectStep !== -1) {
             triggerHelpForStep(nextCorrectStep);
           }
@@ -277,10 +277,15 @@ const OrderStepsScreen = () => {
   }, [step, selectedOrder, shuffledOptions, language]);
 
   useEffect(() => {
+    console.log(`🎯 [OrderStepsScreen] Inicializando estado para ${shuffledOptions.length} opciones`);
     const initStatus: any = {};
-    shuffledOptions.forEach(opt => initStatus[opt.label] = 'idle');
+    shuffledOptions.forEach((opt, index) => {
+      initStatus[opt.label] = 'idle';
+      console.log(`  ${index + 1}. "${opt.label}" -> idle`);
+    });
     setStatus(initStatus);
-  }, []);
+    console.log(`✅ [OrderStepsScreen] Estado inicializado:`, initStatus);
+  }, [shuffledOptions]);
 
   // Helper function to trigger help for a specific step
   const triggerHelpForStep = useCallback((stepIndex: number) => {
@@ -556,9 +561,16 @@ const OrderStepsScreen = () => {
   }, [animationType, score, totalSteps, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation, showCelebration]);
 
   const handleSelect = useCallback((option: any) => {
-    if (disabled || selectedOrder.some(item => item.label === option.label)) return;
+    console.log(`🎯 [OrderStepsScreen] handleSelect llamado para: "${option.label}"`);
+    console.log(`   Disabled: ${disabled}`);
+    console.log(`   Ya seleccionado: ${selectedOrder.some(item => item.label === option.label)}`);
+    
+    if (disabled || selectedOrder.some(item => item.label === option.label)) {
+      console.log(`❌ [OrderStepsScreen] Opción bloqueada: disabled=${disabled}, ya seleccionado=${selectedOrder.some(item => item.label === option.label)}`);
+      return;
+    }
 
-    console.log(`🎯 [OrderStepsScreen] Usuario seleccionó: "${option.label}" con orden ${option.order}`);
+    console.log(`🎯 [OrderStepsScreen] Usuario seleccionó: "${option.label}" con orden ${option.order_value || option.order}`);
     console.log(`📊 [OrderStepsScreen] Estado actual: ${selectedOrder.length} pasos seleccionados`);
 
     const newOrder = [...selectedOrder, option];
@@ -567,18 +579,19 @@ const OrderStepsScreen = () => {
 
     // Find what step should be next based on order
     const expectedStep = newOrder.length;
-    const isCorrect = option.order === expectedStep;
+    const optionOrder = option.order_value || option.order; // Usar order_value del backend o order como fallback
+    const isCorrect = optionOrder === expectedStep;
 
     console.log(`🔍 [OrderStepsScreen] Verificación de orden:`);
     console.log(`   Paso esperado: ${expectedStep}`);
-    console.log(`   Orden del paso seleccionado: ${option.order}`);
+    console.log(`   Orden del paso seleccionado: ${optionOrder} (order_value: ${option.order_value}, order: ${option.order})`);
     console.log(`   ¿Es correcto?: ${isCorrect ? 'SÍ' : 'NO'}`);
     console.log(`   Total de pasos: ${shuffledOptions.length}`);
     console.log(`   Pasos completados: ${newOrder.length}`);
 
     // Record action in adaptive reinforcement service
     const nextStepOrder = newOrder.length + 1;
-    const nextCorrectStepIndex = shuffledOptions.findIndex(opt => opt.order === nextStepOrder);
+    const nextCorrectStepIndex = shuffledOptions.findIndex(opt => (opt.order_value || opt.order) === nextStepOrder);
     adaptiveService.current.recordAction(isCorrect, nextCorrectStepIndex, step.activityType);
 
     // Clear any active help
@@ -727,6 +740,11 @@ const OrderStepsScreen = () => {
     const isSelected = selectedOrder.some(selected => selected.label === item.label);
     const stepNumber = selectedOrder.findIndex(selected => selected.label === item.label) + 1;
     const isBlinking = isHelpActive && blinkingStepIndex === index;
+    
+    // Debug logs
+    console.log(`🎯 [OrderStepsScreen] Renderizando opción ${index + 1}: "${item.label}"`);
+    console.log(`   Status: ${itemStatus}, Disabled: ${disabled}, IsSelected: ${isSelected}`);
+    console.log(`   TouchableOpacity disabled: ${disabled || itemStatus !== 'idle'}`);
 
     return (
       <Animated.View 
@@ -736,15 +754,16 @@ const OrderStepsScreen = () => {
         ]}
       >
         <TouchableOpacity
-          disabled={disabled || itemStatus !== 'idle'}
+          disabled={disabled || (itemStatus && itemStatus !== 'idle')}
           style={[
             styles.optionCard,
             itemStatus === 'correct' && styles.optionCardCorrect,
             itemStatus === 'wrong' && styles.optionCardWrong,
-            itemStatus === 'idle' && styles.optionCardIdle,
+            (!itemStatus || itemStatus === 'idle') && styles.optionCardIdle,
             isBlinking && styles.optionCardHelp,
           ]}
           onPress={() => {
+            console.log(`🎯 [OrderStepsScreen] Click en opción: "${item.label}"`);
             // Record user interaction for inactivity tracking
             adaptiveService.current.recordInactivity();
             handleSelect(item);
@@ -817,7 +836,13 @@ const OrderStepsScreen = () => {
       text: step.text,
       optionsCount: step.options?.length || 0,
     });
-  }, [step]);
+    console.log('🎯 [OrderStepsScreen] Estado inicial:', {
+      disabled,
+      selectedOrderLength: selectedOrder.length,
+      statusKeys: Object.keys(status),
+      shuffledOptionsLength: shuffledOptions.length,
+    });
+  }, [step, disabled, selectedOrder.length, status, shuffledOptions.length]);
 
   // Log state changes for debugging
   useEffect(() => {

@@ -77,3 +77,6 @@ echo - Tiempo de ayuda personalizable
 echo - Voz Amiga configurable
 echo.
 pause
+
+
+
