@@ -21,6 +21,7 @@ import AchievementCelebration from '../components/AchievementCelebration';
 import { GameStatsDisplay } from '../components/GameStatsDisplay';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
+import { MessageCarousel } from '../components/MessageCarousel';
 import { AchievementService, Achievement } from '../services/AchievementService';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
@@ -77,7 +78,7 @@ interface ServerAchievement {
 const DragDropScreen = () => {
   const route = useRoute<DragDropRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { step, lessonTitle } = route.params;
+  const { step, lessonTitle: _lessonTitle } = route.params;
   const { t, language } = useLanguage();
 
   // Real progress hook
@@ -129,50 +130,21 @@ const DragDropScreen = () => {
   const zones = useMemo(() => Array.from(new Set(processedOptions.map(o => o.correctZone) || [])), [processedOptions]);
   const totalItems = useMemo(() => processedOptions.length || 0, [processedOptions]);
 
-  // Process step content when language changes
-  useEffect(() => {
-    console.log(`🌍 [DragDropScreen] Procesando contenido para idioma: ${language}`);
-    processStepForLanguage();
-  }, [language]);
-
   // Process step content for current language
   const processStepForLanguage = useCallback(() => {
-    console.log(`🌍 [DragDropScreen] NUEVO PROCESAMIENTO - Contenido para idioma: ${language}`);
-    console.log(`🔧 [DragDropScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
-    
-    // Process step text
     const originalText = rawStep.text || '';
     const originalHelpMessage = rawStep.helpMessage || '';
-    
-    console.log(`🧪 [DragDropScreen] ANTES del procesamiento:`);
-    console.log(`   Original text: "${originalText}"`);
-    console.log(`   Original helpMessage: "${originalHelpMessage}"`);
-    console.log(`   Tiene colon en text: ${originalText.includes(':')}`);
-    console.log(`   Tiene colon en helpMessage: ${originalHelpMessage.includes(':')}`);
     
     const processedText = BilingualTextProcessor.extractText(originalText, language);
     const processedHelpMessage = BilingualTextProcessor.extractText(originalHelpMessage, language);
     
     // Process options (draggable items)
-    const newProcessedOptions = rawStep.options?.map((option, index) => {
+    const newProcessedOptions = rawStep.options?.map((option: any, _index: number) => {
       const originalLabel = option.label || '';
       const originalCorrectZone = option.correctZone || '';
       
-      console.log(`🧪 [DragDropScreen] ANTES del procesamiento elemento ${index + 1}:`);
-      console.log(`   Original label: "${originalLabel}"`);
-      console.log(`   Original correctZone: "${originalCorrectZone}"`);
-      console.log(`   Icon: "${option.icon}"`);
-      console.log(`   Tiene colon en label: ${originalLabel.includes(':')}`);
-      console.log(`   Tiene colon en correctZone: ${originalCorrectZone.includes(':')}`);
-      
       const processedLabel = BilingualTextProcessor.extractText(originalLabel, language);
       const processedCorrectZone = BilingualTextProcessor.extractText(originalCorrectZone, language);
-      
-      console.log(`🎯 [DragDropScreen] DESPUÉS del procesamiento elemento ${index + 1}:`);
-      console.log(`   Processed label: "${processedLabel}"`);
-      console.log(`   Processed correctZone: "${processedCorrectZone}"`);
-      console.log(`   Label cambió: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
-      console.log(`   CorrectZone cambió: ${originalCorrectZone !== processedCorrectZone ? 'SÍ' : 'NO'}`);
       
       return {
         ...option,
@@ -183,13 +155,6 @@ const DragDropScreen = () => {
     
     // Process zones
     const newProcessedZones = Array.from(new Set(newProcessedOptions.map(o => o.correctZone).filter(Boolean)));
-    
-    console.log(`🎯 [DragDropScreen] DESPUÉS del procesamiento principal:`);
-    console.log(`   Processed text: "${processedText}"`);
-    console.log(`   Processed helpMessage: "${processedHelpMessage}"`);
-    console.log(`   Language usado: ${language}`);
-    console.log(`   Text cambió: ${originalText !== processedText ? 'SÍ' : 'NO'}`);
-    console.log(`   HelpMessage cambió: ${originalHelpMessage !== processedHelpMessage ? 'SÍ' : 'NO'}`);
     
     // Update processed step and options
     const newProcessedStep = {
@@ -202,14 +167,13 @@ const DragDropScreen = () => {
     setProcessedStep(newProcessedStep);
     setProcessedOptions(newProcessedOptions);
     setProcessedZones(newProcessedZones);
-    
-    console.log(`✅ [DragDropScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
-    console.log('🎯 [DragDropScreen] Elementos procesados:');
-    newProcessedOptions.forEach((option, index) => {
-      console.log(`  ${index + 1}. "${option.icon}" - "${option.label}" → "${option.correctZone}"`);
-    });
-    console.log('📦 [DragDropScreen] Zonas procesadas:', newProcessedZones);
   }, [rawStep, language]);
+
+  // Process step content when language changes
+  useEffect(() => {
+    processStepForLanguage();
+  }, [language]);
+
 
   // Adaptive reinforcement states
   const [isHelpActive, setIsHelpActive] = useState(false);
@@ -236,7 +200,6 @@ const DragDropScreen = () => {
 
   // Handle image error for specific option
   const handleImageError = useCallback((optionIndex: number) => {
-    console.log(`❌ [DragDropScreen] Error loading image for option ${optionIndex + 1}`);
     setImageErrors(prev => {
       const newErrors = [...prev];
       newErrors[optionIndex] = true;
@@ -253,11 +216,9 @@ const DragDropScreen = () => {
   useEffect(() => {
     const initAchievements = async () => {
       try {
-        console.log('🏆 [DragDropScreen] Inicializando servicio de logros...');
         await AchievementService.initializeAchievements();
-        console.log('✅ [DragDropScreen] Servicio de logros inicializado');
       } catch (error) {
-        console.error('❌ [DragDropScreen] Error inicializando logros:', error);
+        // Error inicializando logros
       }
     };
     initAchievements();
@@ -279,28 +240,25 @@ const DragDropScreen = () => {
           triggerHelpForDragDrop();
         }
       },
-      (message, activityType) => {
+      (message, _activityType) => {
         // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
         if (step.helpMessage) {
           helpMessage = step.helpMessage;
-          console.log(`🔊 Using custom lesson help: ${helpMessage}`);
         } else {
           helpMessage = message;
-          console.log(`🔊 Using default help for ${activityType}: ${helpMessage}`);
         }
-        
-        console.log(`🔊 About to play TTS: ${helpMessage}`);
         audioService.current.playTextToSpeech(helpMessage, true); // true indica que es mensaje de ayuda
       },
       step.activityType // Pass the activity type to the service
     );
 
     return () => {
-      console.log(`🔊 DragDropScreen: Cleaning up services`);
-      adaptiveService.current.cleanup();
-      audioService.current.cleanup();
+      const currentAdaptiveService = adaptiveService.current;
+      const currentAudioService = audioService.current;
+      currentAdaptiveService.cleanup();
+      currentAudioService.cleanup();
     };
   }, [step, language]);
 
@@ -315,7 +273,6 @@ const DragDropScreen = () => {
           width, 
           height 
         };
-        console.log(`Zone ${zone} bounds updated:`, { x: pageX, y: pageY, width, height });
       });
     }
   }, []);
@@ -433,8 +390,6 @@ const DragDropScreen = () => {
   // Save progress to backend
   const saveProgressToBackend = useCallback(async (finalStats: GameStats) => {
     try {
-      console.log('💾 [DragDropScreen] Guardando progreso en backend...');
-      
       const progressData = {
         lessonId: (step as any).lesson_id || 1,
         stepId: (step as any).ID || step.id || 1,
@@ -446,28 +401,13 @@ const DragDropScreen = () => {
         helpActivations: finalStats.helpActivations || 0,
         perfectRun: finalStats.perfectRun,
       };
-
-      console.log('📊 [DragDropScreen] ===== DATOS ENVIADOS AL SERVIDOR =====');
-      console.log('🎯 Lección ID:', progressData.lessonId);
-      console.log('📝 Paso ID:', progressData.stepId);
-      console.log('⭐ Estrellas ganadas:', progressData.stars);
-      console.log('🔄 Intentos totales:', progressData.attempts);
-      console.log('❌ Errores cometidos:', progressData.errors);
-      console.log('⏱️ Tiempo gastado (segundos):', progressData.timeSpent);
-      console.log('🤝 Usó ayuda:', progressData.usedHelp);
-      console.log('💡 Activaciones de ayuda:', progressData.helpActivations);
-      console.log('🏆 Ejecución perfecta:', progressData.perfectRun);
-      console.log('================================================');
       
       const success = await completeStep(progressData);
 
       if (success) {
-        console.log('✅ [DragDropScreen] ¡PROGRESO GUARDADO EXITOSAMENTE EN EL SERVIDOR!');
-        console.log('📊 [DragDropScreen] Todos los datos fueron enviados y procesados correctamente');
+        // Progreso guardado exitosamente
       } else {
-        console.warn('⚠️ [DragDropScreen] No se pudo guardar el progreso en backend');
         if (progressError) {
-          console.error('❌ [DragDropScreen] Error específico:', progressError);
           Alert.alert(
             language === 'es' ? 'Error de Conexión' : 'Connection Error',
             language === 'es' 
@@ -478,7 +418,6 @@ const DragDropScreen = () => {
         }
       }
     } catch (error) {
-      console.error('❌ [DragDropScreen] Error guardando progreso:', error);
       Alert.alert(
         language === 'es' ? 'Error' : 'Error',
         language === 'es' 
@@ -492,13 +431,11 @@ const DragDropScreen = () => {
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
-      console.log('🎮 [DragDropScreen] Registrando finalización del juego...');
-
       // 1. Save progress to backend first
       await saveProgressToBackend(finalStats);
 
       // 2. Use the enhanced achievement service that syncs with server
-      const gameData = {
+      const _gameData = {
         stars: finalStats.stars,
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
@@ -511,17 +448,10 @@ const DragDropScreen = () => {
         stepId: (step as any).ID || step.id,
       };
 
-      console.log('🏆 [DragDropScreen] Verificando logros con datos:', gameData);
-
       // Use the local achievement service (temporarily disabled server sync)
       const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
       if (newlyUnlocked.length > 0) {
-        console.log(`🎉 [DragDropScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
-        newlyUnlocked.forEach((achievement, index) => {
-          console.log(`   ${index + 1}. 🏆 ${achievement.title} - ${achievement.description}`);
-        });
-        
         // Convert to server achievement format for celebration
         const serverAchievements: ServerAchievement[] = newlyUnlocked.map(achievement => ({
           ID: achievement.ID || 0,
@@ -539,13 +469,8 @@ const DragDropScreen = () => {
         setTimeout(() => {
           setShowCelebration(true);
         }, 1500);
-        
-      } else {
-        console.log('📊 [DragDropScreen] No se desbloquearon nuevos logros esta vez');
-        console.log('💡 [DragDropScreen] Esto puede ser normal si ya tienes logros desbloqueados');
       }
     } catch (error) {
-      console.error('❌ [DragDropScreen] Error registrando finalización:', error);
       Alert.alert(
         language === 'es' ? 'Error' : 'Error',
         language === 'es' 
@@ -554,21 +479,16 @@ const DragDropScreen = () => {
         [{ text: 'OK' }]
       );
     }
-  }, [saveProgressToBackend, step, language]);
+  }, [saveProgressToBackend, step, language, t.games.activityTypes.dragDrop]);
 
   // FUNCIÓN CORREGIDA: handleAnimationFinish - Alineada con otras actividades
   const handleAnimationFinish = useCallback(() => {
-    console.log(`🎬 [DragDropScreen] Animación terminada: ${animationType}, score: ${score}, totalItems: ${totalItems}, gameCompleted: ${gameCompleted}`);
     setShowAnimation(false);
     
     // CONDICIÓN CORREGIDA: Verificar que se completaron TODOS los elementos
     if (animationType === 'success' && score === totalItems && !gameCompleted) {
-      console.log('🎯 [DragDropScreen] ¡TODOS LOS ELEMENTOS COLOCADOS! Iniciando secuencia de finalización...');
-      console.log(`📊 [DragDropScreen] Verificación: score=${score}, totalItems=${totalItems}, todos completados=${score === totalItems}`);
-      
       // IMPORTANTE: Limpiar toda la ayuda activa inmediatamente
       if (isHelpActive) {
-        console.log('🛑 [DragDropScreen] Limpiando ayuda activa...');
         setIsHelpActive(false);
         setBlinkingItemIndex(null);
         setBlinkingZone(null);
@@ -591,33 +511,16 @@ const DragDropScreen = () => {
         stars: calculateStars(gameStats.errors, totalItems, completionTime, gameStats.dragCount),
       };
       setGameStats(finalStats);
-
-      console.log('📈 [DragDropScreen] Estadísticas finales calculadas:', {
-        totalAttempts: finalStats.totalAttempts,
-        errors: finalStats.errors,
-        stars: finalStats.stars,
-        completionTime: finalStats.completionTime,
-        perfectRun: finalStats.perfectRun,
-        dragCount: finalStats.dragCount,
-        efficiency: finalStats.efficiency,
-        usedHelp: finalStats.usedHelp,
-        helpActivations: finalStats.helpActivations,
-      });
       
       // Record game completion (includes backend save and achievement check)
       recordGameCompletion(finalStats);
       
       // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
       setTimeout(() => {
-        console.log('🏆 [DragDropScreen] Mostrando modal de finalización directamente...');
         setShowStars(true);
-        console.log('⭐ [DragDropScreen] Modal debería aparecer ahora');
-        console.log(`🎯 [DragDropScreen] Estados para modal: score=${score}, gameCompleted=true, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
       }, 800);
-    } else if (animationType === 'success' && score !== totalItems) {
-      console.log(`⚠️ [DragDropScreen] Animación success pero no todos los elementos completados: score=${score}, totalItems=${totalItems}`);
     }
-  }, [animationType, score, totalItems, gameCompleted, startTime, gameStats, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation, showCelebration]);
+  }, [animationType, score, totalItems, gameCompleted, startTime, gameStats, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation]);
 
   const handleCorrectDrop = useCallback((zone: string, option: Option, index: number) => {
     // Record action in adaptive reinforcement service
@@ -669,12 +572,7 @@ const DragDropScreen = () => {
   }, [showFeedbackAnimation, step.activityType]);
 
   const checkCollision = useCallback((gestureX: number, gestureY: number): string | null => {
-    console.log('Checking collision at:', { gestureX, gestureY });
-    console.log('Available zones:', Object.keys(zoneBounds.current));
-    
     for (const [zone, bounds] of Object.entries(zoneBounds.current)) {
-      console.log(`Checking zone ${zone}:`, bounds);
-      
       // Add some tolerance for easier dropping
       const tolerance = 20;
       if (
@@ -683,11 +581,9 @@ const DragDropScreen = () => {
         gestureY >= bounds.y - tolerance &&
         gestureY <= bounds.y + bounds.height + tolerance
       ) {
-        console.log(`Collision detected with zone: ${zone}`);
         return zone;
       }
     }
-    console.log('No collision detected');
     return null;
   }, []);
 
@@ -855,35 +751,41 @@ const DragDropScreen = () => {
     processAchievementQueue();
   }, [processAchievementQueue]);
 
-  // Log component mount
-  useEffect(() => {
-    console.log('🎮 [DragDropScreen] Componente montado');
-    console.log('📝 [DragDropScreen] Datos del paso:', {
-      stepId: (step as any).ID || step.id,
-      lessonId: (step as any).lesson_id,
-      text: step.text,
-      optionsCount: step.options?.length || 0,
-    });
-  }, [step]);
 
   const isGameComplete = score === totalItems;
 
+  // Función para calcular el ancho de las zonas basado en la cantidad
+  const getZoneWidth = useCallback(() => {
+    const totalZones = zones.length;
+    if (totalZones <= 2) {
+      return (width - 40) / 2; // 2 zonas por fila
+    } else if (totalZones <= 3) {
+      return (width - 60) / 3; // 3 zonas por fila
+    } else if (totalZones <= 4) {
+      return (width - 60) / 2; // 2x2 grid
+    } else {
+      return (width - 80) / 3; // 3 zonas por fila para más de 4
+    }
+  }, [zones.length]);
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header simplificado */}
+      {/* Header moderno mejorado */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={handleBackPress}
         >
+          <Text style={[styles.backButtonText, { fontSize: 14 }]}>←</Text>
           <Text style={styles.backButtonText}>
-            ← {language === 'es' ? 'Volver' : 'Back'}
+            {language === 'es' ? 'Volver' : 'Back'}
           </Text>
         </TouchableOpacity>
         
-        {/* Progress indicator */}
+        {/* Progress indicator mejorado */}
         {progressLoading && (
           <View style={styles.progressIndicator}>
+            <Text style={[styles.progressText, { fontSize: 11, marginRight: 3 }]}>💾</Text>
             <Text style={styles.progressText}>
               {language === 'es' ? 'Guardando...' : 'Saving...'}
             </Text>
@@ -908,14 +810,7 @@ const DragDropScreen = () => {
         }}
       >
 
-        {/* Progreso del juego */}
-        <ProgressSection 
-          score={score}
-          totalItems={totalItems}
-          gameStats={gameStats}
-        />
-
-        {/* Pregunta */}
+        {/* 1. CONTEXTO - Pregunta */}
         <View style={styles.questionContainer}>
           <Text style={styles.sectionTitle}>
             {language === 'es' ? 'Pregunta:' : 'Question:'}
@@ -923,7 +818,7 @@ const DragDropScreen = () => {
           <Text style={styles.questionText}>{processedStep.text}</Text>
         </View>
 
-        {/* Zonas de Destino - Altura Fija */}
+        {/* 2. ACCIÓN - Zonas y elementos para arrastrar */}
         <View style={styles.zonesContainer}>
           <Text style={styles.sectionTitle}>
             {language === 'es' ? 'Zonas de destino:' : 'Target zones:'}
@@ -944,7 +839,10 @@ const DragDropScreen = () => {
                     styles.zone,
                     isDragging && styles.zoneHighlighted,
                     isBlinkingZone && styles.zoneHelp,
-                    { opacity: isBlinkingZone ? helpBlinkAnimation : 1 }
+                    { 
+                      opacity: isBlinkingZone ? helpBlinkAnimation : 1,
+                      width: getZoneWidth()
+                    }
                   ]}
                   onLayout={() => zone && handleZoneLayout(zone)}
                 >
@@ -964,7 +862,7 @@ const DragDropScreen = () => {
                               style={styles.placedItemImage}
                               resizeMode="contain"
                               onError={() => handleImageError(placedItem.index)}
-                              onLoad={() => console.log(`✅ [DragDropScreen] Image loaded for placed item: ${placedItem.option.icon}`)}
+                              onLoad={() => {}}
                             />
                           ) : (
                             <Text style={styles.placedIcon}>
@@ -1026,7 +924,7 @@ const DragDropScreen = () => {
                           style={styles.draggableImage}
                           resizeMode="contain"
                           onError={() => handleImageError(idx)}
-                          onLoad={() => console.log(`✅ [DragDropScreen] Image loaded for draggable ${idx + 1}: ${option.icon}`)}
+                          onLoad={() => {}}
                         />
                       ) : (
                         <Text style={[styles.optionIcon, isPlaced && styles.placedIconStyle]}>
@@ -1052,30 +950,22 @@ const DragDropScreen = () => {
           </View>
         </View>
 
-        {/* Footer motivacional como en otras actividades */}
-        <View style={styles.footer}>
-          <View style={styles.motivationContainer}>
-            <Text style={styles.motivationIcon}>⭐</Text>
-            <Text style={styles.footerText}>
-              {score === 0 
-                ? (language === 'es' ? '¡Tú puedes hacerlo! Empieza arrastrando' : 'You can do it! Start dragging')
-                : score === totalItems 
-                  ? (language === 'es' ? '¡Increíble! Lo lograste' : 'Amazing! You did it')
-                  : (language === 'es' ? '¡Excelente! Sigue así, casi terminas' : 'Excellent! Keep going, almost done')
-              }
-            </Text>
-            <Text style={styles.motivationIcon}>⭐</Text>
-          </View>
-          
-          {/* Mensaje adicional de ánimo */}
-          <View style={styles.encouragementFooter}>
-            <Text style={styles.encouragementFooterText}>
-              {language === 'es' 
-                ? '🌟 Cada intento te hace más inteligente 🧠'
-                : '🌟 Every attempt makes you smarter 🧠'
-              }
-            </Text>
-          </View>
+        {/* 3. PROGRESO/MOTIVACIÓN - Progreso del juego */}
+        <View style={{ marginTop: 4 }}>
+          <ProgressSection 
+            score={score}
+            totalItems={totalItems}
+            gameStats={gameStats}
+          />
+        </View>
+
+        {/* Carrusel de mensajes motivacionales */}
+        <View style={{ marginTop: 2 }}>
+          <MessageCarousel 
+            score={score}
+            totalItems={totalItems}
+            language={language}
+          />
         </View>
 
         <View style={styles.bottomSpacing} />
@@ -1143,104 +1033,133 @@ const DragDropScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8faff',
+    backgroundColor: '#f0f4ff',
   },
   header: {
-    backgroundColor: '#f8faff',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingTop: 6,
     paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#4285f4',
   },
   backButton: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: '#4285f4',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 12,
     shadowColor: '#4285f4',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#e8f0fe',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   backButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4285f4',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginLeft: 2,
+    letterSpacing: 0.1,
   },
   progressIndicator: {
-    backgroundColor: '#4285f4',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
+    shadowColor: '#ff9800',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   progressText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
     color: '#ffffff',
+    letterSpacing: 0.1,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 4,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 12,
+    color: '#4285f4',
+    marginBottom: 10,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   questionContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-    borderLeftWidth: 3,
-    borderLeftColor: '#ff9800',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 8,
+    marginHorizontal: 4,
+    shadowColor: '#ff9800',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    borderTopWidth: 3,
+    borderTopColor: '#ff9800',
   },
   questionText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
     color: '#1a1a1a',
-    lineHeight: 22,
+    lineHeight: 20,
+    letterSpacing: 0.2,
   },
   zonesContainer: {
-    marginBottom: 16,
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
   zonesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
   },
   zone: {
     backgroundColor: '#ffffff',
-    width: (width - 44) / 2,
-    // Altura fija para evitar expansión
-    height: 120,
-    borderRadius: 16,
-    padding: 12,
+    height: 100,
+    borderRadius: 14,
+    padding: 8,
     borderWidth: 2,
     borderColor: '#e8f0fe',
     borderStyle: 'dashed',
     shadowColor: '#4285f4',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
     elevation: 3,
+    borderTopWidth: 3,
+    borderTopColor: '#4285f4',
+    marginBottom: 4,
   },
   zoneHighlighted: {
     borderColor: '#4285f4',
@@ -1258,11 +1177,12 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   zoneTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '700',
     textAlign: 'center',
-    color: '#1a1a1a',
-    marginBottom: 8,
+    color: '#4285f4',
+    marginBottom: 6,
+    letterSpacing: 0.2,
   },
   zoneContent: {
     flex: 1,
@@ -1305,36 +1225,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
+    minWidth: 45,
+    minHeight: 45,
   },
   draggableImage: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
   },
   optionsContainer: {
-    marginBottom: 16,
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 12,
+    gap: 10,
+    paddingHorizontal: 4,
   },
   draggable: {
-    width: 70,
-    height: 70,
+    width: 75,
+    height: 75,
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.12,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 5,
     borderWidth: 2,
     borderColor: '#e8f0fe',
     position: 'relative',
+    borderTopWidth: 3,
+    borderTopColor: '#4285f4',
+    marginBottom: 4,
   },
   draggablePlaced: {
     opacity: 0.6,
@@ -1352,14 +1279,15 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   optionIcon: {
-    fontSize: 24,
+    fontSize: 28,
     marginBottom: 2,
   },
   optionLabel: {
-    fontSize: 10,
+    fontSize: 8,
     textAlign: 'center',
     color: '#1a1a1a',
     fontWeight: '600',
+    letterSpacing: 0.1,
   },
   placedIconStyle: {
     opacity: 0.7,
@@ -1388,53 +1316,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
   },
-  // Estilos para footer motivacional
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-  },
-  motivationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    marginBottom: 12,
-  },
-  motivationIcon: {
-    fontSize: 18,
-    marginHorizontal: 6,
-  },
-  footerText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    flex: 1,
-  },
-  encouragementFooter: {
-    backgroundColor: '#f0f9ff',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  encouragementFooterText: {
-    fontSize: 12,
-    color: '#1e40af',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
   bottomSpacing: {
-    height: 20,
+    height: 4,
   },
 });
 
