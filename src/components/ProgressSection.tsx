@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  Animated,
 } from 'react-native';
 
 interface GameStats {
@@ -25,52 +26,62 @@ export const ProgressSection: React.FC<ProgressSectionProps> = ({
   totalItems,
   gameStats,
 }) => {
-  const getEncouragementMessage = () => {
-    if (gameStats.errors === 0 && score > 0) return '🌟 ¡Perfecto!';
-    if (gameStats.errors <= 2) return '💪 ¡Muy bien!';
-    return '🎯 ¡Sigue intentando!';
-  };
-
-  const getProgressMessage = () => {
-    if (score === 0) return '¡Empecemos!';
-    if (score === totalItems) return '¡Completado! 🎉';
-    return `¡Genial! ${score} de ${totalItems} listos`;
+  // Calcular el porcentaje de progreso
+  const progressPercentage = totalItems > 0 ? (score / totalItems) * 100 : 0;
+  
+  // Determinar el color de la barra según el progreso
+  const getProgressColor = () => {
+    if (progressPercentage === 100) return '#4caf50'; // Verde para completado
+    if (progressPercentage >= 50) return '#2196f3'; // Azul para medio progreso
+    if (progressPercentage > 0) return '#ff9800'; // Naranja para poco progreso
+    return '#e0e0e0'; // Gris para sin progreso
   };
 
   return (
     <View style={styles.progressSection}>
       <View style={styles.progressHeader}>
         <Text style={styles.progressTitle}>📊 Tu Progreso</Text>
-      </View>
-      
-      <View style={styles.visualProgress}>
-        <View style={styles.progressItems}>
-          {Array.from({ length: totalItems }, (_, index) => (
-            <View 
-              key={index}
-              style={[
-                styles.progressDot,
-                index < score ? styles.progressDotCompleted : styles.progressDotPending
-              ]}
-            >
-              <Text style={styles.progressDotText}>
-                {index < score ? '✓' : (index + 1)}
-              </Text>
-            </View>
-          ))}
-        </View>
-        <Text style={styles.progressLabel}>
-          {getProgressMessage()}
+        <Text style={styles.progressPercentage}>
+          {Math.round(progressPercentage)}%
         </Text>
       </View>
       
-      {gameStats.totalAttempts > 0 && (
-        <View style={styles.encouragementBadge}>
-          <Text style={styles.encouragementText}>
-            {getEncouragementMessage()}
-          </Text>
+      <View style={styles.visualProgress}>
+        {/* Barra de progreso */}
+        <View style={styles.progressBarContainer}>
+          <View style={styles.progressBarBackground}>
+            <View 
+              style={[
+                styles.progressBarFill,
+                { 
+                  width: `${progressPercentage}%`,
+                  backgroundColor: getProgressColor()
+                }
+              ]}
+            />
+          </View>
+          
+          {/* Indicadores de pasos */}
+          <View style={styles.progressSteps}>
+            {Array.from({ length: totalItems }, (_, index) => (
+              <View 
+                key={index}
+                style={[
+                  styles.progressStep,
+                  index < score ? styles.progressStepCompleted : styles.progressStepPending
+                ]}
+              >
+                <Text style={[
+                  styles.progressStepText,
+                  index < score ? styles.progressStepTextCompleted : styles.progressStepTextPending
+                ]}>
+                  {index < score ? '✓' : (index + 1)}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
-      )}
+      </View>
     </View>
   );
 };
@@ -78,80 +89,98 @@ export const ProgressSection: React.FC<ProgressSectionProps> = ({
 const styles = StyleSheet.create({
   progressSection: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 14,
-    marginHorizontal: 4,
-    shadowColor: '#4285f4',
+    borderRadius: 14,
+    padding: 8,
+    marginBottom: 4,
+    marginHorizontal: 8,
+    shadowColor: '#4caf50',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 3,
-    borderLeftWidth: 3,
-    borderLeftColor: '#4caf50',
+    borderTopWidth: 2,
+    borderTopColor: '#4caf50',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8f5e8',
   },
   progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 6,
   },
   progressTitle: {
     fontSize: 14,
     fontWeight: '700',
     color: '#4285f4',
-    marginBottom: 6,
+    letterSpacing: 0.3,
+  },
+  progressPercentage: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#4caf50',
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
   visualProgress: {
     alignItems: 'center',
   },
-  progressItems: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+  progressBarContainer: {
+    width: '100%',
     marginBottom: 6,
-    flexWrap: 'wrap',
-    gap: 6,
   },
-  progressDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  progressBarBackground: {
+    height: 7,
+    backgroundColor: '#e8f5e8',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#d1e7dd',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+    minWidth: 3,
+  },
+  progressSteps: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  progressStep: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
+    shadowColor: '#4caf50',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  progressDotCompleted: {
+  progressStepCompleted: {
     backgroundColor: '#e8f5e8',
     borderColor: '#4caf50',
+    borderWidth: 3,
   },
-  progressDotPending: {
-    backgroundColor: '#ffffff',
+  progressStepPending: {
+    backgroundColor: '#f8faff',
     borderColor: '#d1d5db',
   },
-  progressDotText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#1a1a1a',
+  progressStepText: {
+    fontSize: 9,
+    fontWeight: '800',
   },
-  progressLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#4285f4',
-    textAlign: 'center',
-    marginTop: 3,
+  progressStepTextCompleted: {
+    color: '#2e7d32',
   },
-  encouragementBadge: {
-    backgroundColor: '#fff3cd',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    marginTop: 6,
-    alignSelf: 'center',
-    borderWidth: 1,
-    borderColor: '#ffc107',
-  },
-  encouragementText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#856404',
+  progressStepTextPending: {
+    color: '#6b7280',
   },
 });

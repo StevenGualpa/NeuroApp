@@ -59,15 +59,13 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
   bonusMessage,
 }) => {
   const { language, t } = useLanguage();
-  // Animaciones para hacer la experiencia más suave y amigable
+  // Animaciones simplificadas
   const scaleAnim = useRef(new Animated.Value(0)).current;
   const starAnimations = useRef([
     new Animated.Value(0),
     new Animated.Value(0),
     new Animated.Value(0)
   ]).current;
-  const celebrationAnim = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // Animación de entrada suave
   useEffect(() => {
@@ -84,72 +82,30 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
       const starAnimationSequence = starAnimations.map((anim, index) =>
         Animated.timing(anim, {
           toValue: 1,
-          duration: 400,
-          delay: index * 200,
+          duration: 300,
+          delay: index * 150,
           useNativeDriver: true,
         })
       );
 
       Animated.sequence([
-        Animated.delay(300),
-        Animated.stagger(200, starAnimationSequence),
+        Animated.delay(200),
+        Animated.stagger(150, starAnimationSequence),
       ]).start();
-
-      // Animación de celebración continua
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(celebrationAnim, {
-            toValue: 1,
-            duration: 2000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(celebrationAnim, {
-            toValue: 0,
-            duration: 2000,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-
-      // Pulso suave para botones
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.05,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 1500,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
     } else {
       // Reset animaciones cuando se cierra
       scaleAnim.setValue(0);
       starAnimations.forEach(anim => anim.setValue(0));
-      celebrationAnim.setValue(0);
-      pulseAnim.setValue(1);
     }
   }, [visible]);
 
   const renderStars = useCallback((count: number) => {
     return Array.from({ length: 3 }, (_, i) => {
-      const rotation = celebrationAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: ['0deg', '360deg'],
-      });
-
       return (
         <Animated.View
           key={i}
           style={{
-            transform: [
-              { scale: starAnimations[i] },
-              { rotate: i < count ? rotation : '0deg' }
-            ],
+            transform: [{ scale: starAnimations[i] }],
           }}
         >
           <Text
@@ -158,12 +114,12 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
               i < count ? styles.starFilled : styles.starEmpty,
             ]}
           >
-            {i < count ? '⭐' : '☆'}
+            {i < count ? '★' : '☆'}
           </Text>
         </Animated.View>
       );
     });
-  }, [starAnimations, celebrationAnim]);
+  }, [starAnimations]);
 
   const getDefaultStats = useCallback((): DetailedStat[] => {
     const defaultStats: DetailedStat[] = [
@@ -239,19 +195,19 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
     if (bonusMessage) return bonusMessage;
     
     if (stats.firstTrySuccess) {
-      return language === 'es' ? '🎯 ¡Primera vez perfecto!' : '🎯 Perfect first try!';
+      return language === 'es' ? '¡Primera vez perfecto!' : 'Perfect first try!';
     }
     if (stats.perfectRun && stats.resets === 0) {
-      return language === 'es' ? '🎯 ¡Secuencia perfecta!' : '🎯 Perfect sequence!';
+      return language === 'es' ? '¡Secuencia perfecta!' : 'Perfect sequence!';
     }
     if (stats.perfectRun && stats.audioPlays <= 1) {
-      return language === 'es' ? '🏆 ¡Primera vez sin errores!' : '🏆 First try without errors!';
+      return language === 'es' ? '¡Primera vez sin errores!' : 'First try without errors!';
     }
     if (stats.flipCount && stats.matchesFound && stats.flipCount <= stats.matchesFound * 2.4) {
-      return language === 'es' ? '🧠 ¡Memoria excepcional!' : '🧠 Exceptional memory!';
+      return language === 'es' ? '¡Memoria excepcional!' : 'Exceptional memory!';
     }
     
-    return language === 'es' ? '🏆 ¡Excelente trabajo!' : '🏆 Excellent work!';
+    return language === 'es' ? '¡Excelente trabajo!' : 'Excellent work!';
   }, [stats, bonusMessage, language]);
 
   if (!visible) return null;
@@ -272,9 +228,8 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
             }
           ]}
         >
-          {/* Título con emoji grande y amigable */}
+          {/* Título simple y claro */}
           <View style={styles.headerContainer}>
-            <Text style={styles.celebrationEmoji}>🎉</Text>
             <Text style={styles.completionText}>
               {language === 'es' ? '¡Increíble!' : 'Incredible!'}
             </Text>
@@ -314,7 +269,7 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
             {shouldShowBonus() && (
               <View style={styles.bonusRow}>
                 <Text style={styles.bonusText}>
-                  🏆 {getAutoBonusMessage()}
+                  {getAutoBonusMessage()}
                 </Text>
               </View>
             )}
@@ -322,35 +277,25 @@ export const GameCompletionModal: React.FC<GameCompletionModalProps> = ({
 
           {/* Botones grandes y claros con animación */}
           <View style={styles.completionButtons}>
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity 
-                style={styles.resetButton} 
-                onPress={onReset}
-                activeOpacity={0.7}
-              >
-                <View style={styles.buttonContent}>
-                  <Text style={styles.buttonEmoji}>🔄</Text>
-                  <Text style={styles.resetButtonText}>
-                    {language === 'es' ? 'Jugar otra vez' : 'Play again'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
+            <TouchableOpacity 
+              style={styles.resetButton} 
+              onPress={onReset}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.resetButtonText}>
+                {language === 'es' ? 'Jugar otra vez' : 'Play again'}
+              </Text>
+            </TouchableOpacity>
             
-            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
-              <TouchableOpacity 
-                style={styles.continueButton} 
-                onPress={onContinue}
-                activeOpacity={0.7}
-              >
-                <View style={styles.buttonContent}>
-                  <Text style={styles.buttonEmoji}>➡️</Text>
-                  <Text style={styles.continueButtonText}>
-                    {language === 'es' ? 'Siguiente' : 'Next'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
+            <TouchableOpacity 
+              style={styles.continueButton} 
+              onPress={onContinue}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.continueButtonText}>
+                {language === 'es' ? 'Siguiente' : 'Next'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       </View>
@@ -368,27 +313,22 @@ const styles = StyleSheet.create({
   },
   completionContent: {
     backgroundColor: '#ffffff',
-    borderRadius: 25,
-    padding: 20,
+    borderRadius: 20,
+    padding: 16,
     alignItems: 'center',
-    maxWidth: 320,
-    width: '90%',
-    maxHeight: '85%', // Limitar altura máxima
+    maxWidth: 300,
+    width: '85%',
     shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
-    elevation: 15,
-    borderWidth: 2,
-    borderColor: '#E8F5E8', // Borde verde muy suave
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: '#E8F5E8',
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: 15,
-  },
-  celebrationEmoji: {
-    fontSize: 40,
-    marginBottom: 5,
+    marginBottom: 12,
   },
   completionText: {
     fontSize: 24,
@@ -406,10 +346,10 @@ const styles = StyleSheet.create({
   },
   starsContainer: {
     alignItems: 'center',
-    marginBottom: 15,
-    backgroundColor: '#F1F8E9', // Fondo verde muy claro
-    borderRadius: 15,
-    padding: 15,
+    marginBottom: 12,
+    backgroundColor: '#F1F8E9',
+    borderRadius: 12,
+    padding: 12,
     width: '100%',
   },
   starsTitle: {
@@ -426,14 +366,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   star: {
-    fontSize: 35, // Estrellas más pequeñas
-    marginHorizontal: 5,
+    fontSize: 32,
+    marginHorizontal: 4,
   },
   starFilled: {
-    opacity: 1,
+    color: '#FFD700',
   },
   starEmpty: {
-    opacity: 0.25,
+    color: '#E0E0E0',
   },
   messageContainer: {
     backgroundColor: '#E8F5E8',
@@ -448,11 +388,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   detailedStats: {
-    backgroundColor: '#F1F8E9', // Verde muy claro
+    backgroundColor: '#F1F8E9',
     borderRadius: 12,
-    padding: 12,
+    padding: 10,
     width: '100%',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   statsGrid: {
     flexDirection: 'row',
@@ -460,11 +400,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   statItem: {
-    width: '48%', // Dos columnas
+    width: '48%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 8,
-    marginBottom: 6,
+    borderRadius: 6,
+    padding: 6,
+    marginBottom: 4,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -473,13 +413,13 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#2E7D32',
     fontWeight: '800',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#424242',
     fontWeight: '600',
     textAlign: 'center',
@@ -492,68 +432,64 @@ const styles = StyleSheet.create({
     borderTopColor: '#E8F5E8',
   },
   bonusText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#F57C00', // Naranja cálido
+    color: '#F57C00',
     textAlign: 'center',
     backgroundColor: '#FFF3E0',
-    borderRadius: 8,
-    padding: 6,
+    borderRadius: 6,
+    padding: 5,
   },
   completionButtons: {
-    flexDirection: 'row', // Volver a fila para ahorrar espacio
-    gap: 10,
-    width: '100%',
-  },
-  buttonContent: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonEmoji: {
-    fontSize: 16,
-    marginRight: 6,
+    gap: 8,
+    width: '100%',
+    marginTop: 4,
   },
   resetButton: {
     flex: 1,
-    backgroundColor: '#81C784', // Verde suave en lugar de gris
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderRadius: 15,
+    backgroundColor: '#81C784',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
     borderWidth: 1,
     borderColor: '#A5D6A7',
-    minHeight: 45, // Altura reducida pero accesible
+    minHeight: 40,
   },
   resetButtonText: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   continueButton: {
     flex: 1,
-    backgroundColor: '#42A5F5', // Azul más suave
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-    borderRadius: 15,
+    backgroundColor: '#42A5F5',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#2196F3',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
     borderWidth: 1,
     borderColor: '#90CAF9',
-    minHeight: 45, // Altura reducida pero accesible
+    minHeight: 40,
   },
   continueButtonText: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '700',
+    textAlign: 'center',
   },
 });

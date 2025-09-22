@@ -20,6 +20,7 @@ import AchievementNotification from '../components/AchievementNotification';
 import AchievementCelebration from '../components/AchievementCelebration';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
+import { MessageCarousel } from '../components/MessageCarousel';
 import { AchievementService, Achievement } from '../services/AchievementService';
 // import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
@@ -58,7 +59,7 @@ interface ServerAchievement {
 const OrderStepsScreen = () => {
   const route = useRoute<RouteProp<RootStackParamList, 'orderSteps'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { step, lessonTitle } = route.params;
+  const { step, lessonTitle: _lessonTitle } = route.params;
   const { t, language } = useLanguage();
 
   // Real progress hook
@@ -129,7 +130,6 @@ const OrderStepsScreen = () => {
 
   // Handle image error for specific option
   const handleImageError = useCallback((optionIndex: number) => {
-    console.log(`❌ [OrderStepsScreen] Error loading image for option ${optionIndex + 1}`);
     setImageErrors(prev => {
       const newErrors = [...prev];
       newErrors[optionIndex] = true;
@@ -148,43 +148,23 @@ const OrderStepsScreen = () => {
   const totalSteps = useMemo(() => shuffledOptions.length, [shuffledOptions]);
   const totalItems = totalSteps; // Para compatibilidad con ProgressSection
 
-  // Process step content when language changes
-  useEffect(() => {
-    console.log(`🌍 [OrderStepsScreen] Procesando contenido para idioma: ${language}`);
-    processStepForLanguage();
-  }, [language]);
-
   // Process step content for current language
   const processStepForLanguage = useCallback(() => {
-    console.log(`🌍 [OrderStepsScreen] NUEVO PROCESAMIENTO - Contenido para idioma: ${language}`);
-    console.log(`🔧 [OrderStepsScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
-    
     // Process step text
     const originalText = rawStep.text || '';
     const originalHelpMessage = rawStep.helpMessage || '';
     
-    console.log(`🧪 [OrderStepsScreen] ANTES del procesamiento:`);
-    console.log(`   Original text: "${originalText}"`);
-    console.log(`   Original helpMessage: "${originalHelpMessage}"`);
-    console.log(`   Tiene colon en text: ${originalText.includes(':')}`);
-    console.log(`   Tiene colon en helpMessage: ${originalHelpMessage.includes(':')}`);
     
     const processedText = BilingualTextProcessor.extractText(originalText, language);
     const processedHelpMessage = BilingualTextProcessor.extractText(originalHelpMessage, language);
     
     // Process options
-    const newProcessedOptions = rawStep.options?.map((option, index) => {
+    const newProcessedOptions = rawStep.options?.map((option: any, _index: number) => {
       const originalLabel = option.label || '';
       
-      console.log(`🧪 [OrderStepsScreen] ANTES del procesamiento paso ${index + 1}:`);
-      console.log(`   Original label: "${originalLabel}"`);
-      console.log(`   Tiene colon: ${originalLabel.includes(':')}`);
       
       const processedLabel = BilingualTextProcessor.extractText(originalLabel, language);
       
-      console.log(`🎯 [OrderStepsScreen] DESPUÉS del procesamiento paso ${index + 1}:`);
-      console.log(`   Processed label: "${processedLabel}"`);
-      console.log(`   Cambi��: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
       
       return {
         ...option,
@@ -192,12 +172,6 @@ const OrderStepsScreen = () => {
       };
     }) || [];
     
-    console.log(`🎯 [OrderStepsScreen] DESPUÉS del procesamiento principal:`);
-    console.log(`   Processed text: "${processedText}"`);
-    console.log(`   Processed helpMessage: "${processedHelpMessage}"`);
-    console.log(`   Language usado: ${language}`);
-    console.log(`   Text cambió: ${originalText !== processedText ? 'SÍ' : 'NO'}`);
-    console.log(`   HelpMessage cambió: ${originalHelpMessage !== processedHelpMessage ? 'SÍ' : 'NO'}`);
     
     // Update processed step and options
     const newProcessedStep = {
@@ -210,22 +184,20 @@ const OrderStepsScreen = () => {
     setProcessedStep(newProcessedStep);
     setProcessedOptions(newProcessedOptions);
     
-    console.log(`✅ [OrderStepsScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
-    console.log('📋 [OrderStepsScreen] Pasos procesados:');
-    newProcessedOptions.forEach((option, index) => {
-      console.log(`  ${index + 1}. "${option.label}" (Orden: ${option.order_value || option.order})`);
-    });
   }, [rawStep, language]);
+
+  // Process step content when language changes
+  useEffect(() => {
+    processStepForLanguage();
+  }, [language]);
 
   // Initialize achievements service
   useEffect(() => {
     const initAchievements = async () => {
       try {
-        console.log('🏆 [OrderStepsScreen] Inicializando servicio de logros mejorado...');
         await AchievementService.initializeAchievements();
-        console.log('✅ [OrderStepsScreen] Servicio de logros inicializado');
       } catch (error) {
-        console.error('❌ [OrderStepsScreen] Error inicializando logros:', error);
+        // Error inicializando logros
       }
     };
     initAchievements();
@@ -251,40 +223,35 @@ const OrderStepsScreen = () => {
           triggerHelpForStep(helpStepIndex);
         }
       },
-      (message, activityType) => {
+      (message, _activityType) => {
         // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
         if (step.helpMessage) {
           helpMessage = step.helpMessage;
-          console.log(`🔊 Using custom lesson help: ${helpMessage}`);
         } else {
           helpMessage = message;
-          console.log(`🔊 Using default help for ${activityType}: ${helpMessage}`);
         }
         
-        console.log(`🔊 About to play TTS: ${helpMessage}`);
         audioService.current.playTextToSpeech(helpMessage, true); // true indica que es mensaje de ayuda
       },
       step.activityType // Pass the activity type to the service
     );
 
     return () => {
-      console.log(`🔊 OrderStepsScreen: Cleaning up services`);
-      adaptiveService.current.cleanup();
-      audioService.current.cleanup();
+      const currentAdaptiveService = adaptiveService.current;
+      const currentAudioService = audioService.current;
+      currentAdaptiveService.cleanup();
+      currentAudioService.cleanup();
     };
   }, [step, selectedOrder, shuffledOptions, language]);
 
   useEffect(() => {
-    console.log(`🎯 [OrderStepsScreen] Inicializando estado para ${shuffledOptions.length} opciones`);
     const initStatus: any = {};
-    shuffledOptions.forEach((opt, index) => {
+    shuffledOptions.forEach((opt, _index) => {
       initStatus[opt.label] = 'idle';
-      console.log(`  ${index + 1}. "${opt.label}" -> idle`);
     });
     setStatus(initStatus);
-    console.log(`✅ [OrderStepsScreen] Estado inicializado:`, initStatus);
   }, [shuffledOptions]);
 
   // Helper function to trigger help for a specific step
@@ -330,8 +297,8 @@ const OrderStepsScreen = () => {
   }, [helpBlinkAnimation, isHelpActive]);
 
   // Calculate stars based on performance
-  const calculateStars = useCallback((errors: number, resets: number, completionTime: number, totalSteps: number): number => {
-    const maxTime = totalSteps * 10000; // 10 seconds per step as baseline
+  const calculateStars = useCallback((errors: number, resets: number, completionTime: number, stepCount: number): number => {
+    const maxTime = stepCount * 10000; // 10 seconds per step as baseline
     const timeBonus = completionTime < maxTime * 0.5 ? 1 : 0;
     const resetPenalty = resets > 0 ? 1 : 0;
 
@@ -382,7 +349,6 @@ const OrderStepsScreen = () => {
   // Save progress to backend
   const saveProgressToBackend = useCallback(async (finalStats: GameStats) => {
     try {
-      console.log('💾 [OrderStepsScreen] Guardando progreso en backend...');
       
       const progressData = {
         lessonId: (step as any).lesson_id || 1,
@@ -396,27 +362,12 @@ const OrderStepsScreen = () => {
         perfectRun: finalStats.perfectRun,
       };
 
-      console.log('📊 [OrderStepsScreen] ===== DATOS ENVIADOS AL SERVIDOR =====');
-      console.log('🎯 Lección ID:', progressData.lessonId);
-      console.log('📝 Paso ID:', progressData.stepId);
-      console.log('⭐ Estrellas ganadas:', progressData.stars);
-      console.log('🔄 Intentos totales:', progressData.attempts);
-      console.log('❌ Errores cometidos:', progressData.errors);
-      console.log('⏱️ Tiempo gastado (segundos):', progressData.timeSpent);
-      console.log('🤝 Usó ayuda:', progressData.usedHelp);
-      console.log('💡 Activaciones de ayuda:', progressData.helpActivations);
-      console.log('🏆 Ejecución perfecta:', progressData.perfectRun);
-      console.log('================================================');
       
       const success = await completeStep(progressData);
 
       if (success) {
-        console.log('✅ [OrderStepsScreen] ¡PROGRESO GUARDADO EXITOSAMENTE EN EL SERVIDOR!');
-        console.log('📊 [OrderStepsScreen] Todos los datos fueron enviados y procesados correctamente');
       } else {
-        console.warn('⚠️ [OrderStepsScreen] No se pudo guardar el progreso en backend');
         if (progressError) {
-          console.error('❌ [OrderStepsScreen] Error específico:', progressError);
           Alert.alert(
             'Error de Conexión',
             `No se pudo guardar tu progreso: ${progressError}. Tu progreso local se ha guardado.`,
@@ -425,7 +376,6 @@ const OrderStepsScreen = () => {
         }
       }
     } catch (error) {
-      console.error('❌ [OrderStepsScreen] Error guardando progreso:', error);
       Alert.alert(
         'Error',
         'Hubo un problema guardando tu progreso. Tu progreso local se ha guardado.',
@@ -437,13 +387,12 @@ const OrderStepsScreen = () => {
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
-      console.log('🎮 [OrderStepsScreen] Registrando finalización del juego...');
 
       // 1. Save progress to backend first
       await saveProgressToBackend(finalStats);
 
       // 2. Use the enhanced achievement service that syncs with server
-      const gameData = {
+      const _gameData = {
         stars: finalStats.stars,
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
@@ -456,16 +405,11 @@ const OrderStepsScreen = () => {
         stepId: (step as any).ID || step.id,
       };
 
-      console.log('🏆 [OrderStepsScreen] Verificando logros con datos:', gameData);
 
       // const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
       const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
       if (newlyUnlocked.length > 0) {
-        console.log(`🎉 [OrderStepsScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
-        newlyUnlocked.forEach((achievement, index) => {
-          console.log(`   ${index + 1}. 🏆 ${achievement.title} - ${achievement.description}`);
-        });
         
         // Convert to server achievement format for celebration
         const serverAchievements: ServerAchievement[] = newlyUnlocked.map(achievement => ({
@@ -486,11 +430,8 @@ const OrderStepsScreen = () => {
         }, 1500);
         
       } else {
-        console.log('📊 [OrderStepsScreen] No se desbloquearon nuevos logros esta vez');
-        console.log('💡 [OrderStepsScreen] Esto puede ser normal si ya tienes logros desbloqueados');
       }
     } catch (error) {
-      console.error('❌ [OrderStepsScreen] Error registrando finalización:', error);
       Alert.alert(
         'Error',
         'No se pudieron verificar los logros. Tu progreso se ha guardado.',
@@ -501,17 +442,13 @@ const OrderStepsScreen = () => {
 
   // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
-    console.log(`🎬 [OrderStepsScreen] Animación terminada: ${animationType}, score: ${score}, totalSteps: ${totalSteps}, gameCompleted: ${gameCompleted}`);
     setShowAnimation(false);
     
     // CONDICIÓN CORREGIDA: Solo completar el juego si se ordenaron TODOS los pasos
     if (animationType === 'winner' && score === totalSteps && !gameCompleted) {
-      console.log('🎯 [OrderStepsScreen] ¡TODOS LOS PASOS COMPLETADOS! Iniciando secuencia de finalización...');
-      console.log(`📊 [OrderStepsScreen] Verificación: score=${score}, totalSteps=${totalSteps}, todos completados=${score === totalSteps}`);
       
       // IMPORTANTE: Limpiar toda la ayuda activa inmediatamente
       if (isHelpActive) {
-        console.log('🛑 [OrderStepsScreen] Limpiando ayuda activa...');
         setIsHelpActive(false);
         setBlinkingStepIndex(null);
         helpBlinkAnimation.setValue(1);
@@ -534,44 +471,23 @@ const OrderStepsScreen = () => {
       };
       setGameStats(finalStats);
 
-      console.log('📈 [OrderStepsScreen] Estadísticas finales calculadas:', {
-        totalAttempts: finalStats.totalAttempts,
-        errors: finalStats.errors,
-        stars: finalStats.stars,
-        completionTime: finalStats.completionTime,
-        perfectRun: finalStats.perfectRun,
-        resets: finalStats.resets,
-        usedHelp: finalStats.usedHelp,
-        helpActivations: finalStats.helpActivations,
-      });
       
       // Record game completion (includes backend save and achievement check)
       recordGameCompletion(finalStats);
       
       // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
       setTimeout(() => {
-        console.log('🏆 [OrderStepsScreen] Mostrando modal de finalización directamente...');
         setShowStars(true);
-        console.log('⭐ [OrderStepsScreen] Modal debería aparecer ahora');
-        console.log(`🎯 [OrderStepsScreen] Estados para modal: score=${score}, gameCompleted=true, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
       }, 800);
     } else if (animationType === 'winner' && score !== totalSteps) {
-      console.log(`⚠️ [OrderStepsScreen] Animación winner pero no todos los pasos completados: score=${score}, totalSteps=${totalSteps}`);
     }
-  }, [animationType, score, totalSteps, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation, showCelebration]);
+  }, [animationType, score, totalSteps, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation]);
 
   const handleSelect = useCallback((option: any) => {
-    console.log(`🎯 [OrderStepsScreen] handleSelect llamado para: "${option.label}"`);
-    console.log(`   Disabled: ${disabled}`);
-    console.log(`   Ya seleccionado: ${selectedOrder.some(item => item.label === option.label)}`);
-    
     if (disabled || selectedOrder.some(item => item.label === option.label)) {
-      console.log(`❌ [OrderStepsScreen] Opción bloqueada: disabled=${disabled}, ya seleccionado=${selectedOrder.some(item => item.label === option.label)}`);
       return;
     }
 
-    console.log(`🎯 [OrderStepsScreen] Usuario seleccionó: "${option.label}" con orden ${option.order_value || option.order}`);
-    console.log(`📊 [OrderStepsScreen] Estado actual: ${selectedOrder.length} pasos seleccionados`);
 
     const newOrder = [...selectedOrder, option];
     setSelectedOrder(newOrder);
@@ -582,12 +498,6 @@ const OrderStepsScreen = () => {
     const optionOrder = option.order_value || option.order; // Usar order_value del backend o order como fallback
     const isCorrect = optionOrder === expectedStep;
 
-    console.log(`🔍 [OrderStepsScreen] Verificación de orden:`);
-    console.log(`   Paso esperado: ${expectedStep}`);
-    console.log(`   Orden del paso seleccionado: ${optionOrder} (order_value: ${option.order_value}, order: ${option.order})`);
-    console.log(`   ¿Es correcto?: ${isCorrect ? 'SÍ' : 'NO'}`);
-    console.log(`   Total de pasos: ${shuffledOptions.length}`);
-    console.log(`   Pasos completados: ${newOrder.length}`);
 
     // Record action in adaptive reinforcement service
     const nextStepOrder = newOrder.length + 1;
@@ -614,7 +524,6 @@ const OrderStepsScreen = () => {
 
     if (!isCorrect) {
       // PASO INCORRECTO - Error y reiniciar
-      console.log('❌ [OrderStepsScreen] PASO INCORRECTO - Mostrando error y reiniciando');
       
       // Update error stats
       setGameStats(prev => ({
@@ -643,17 +552,12 @@ const OrderStepsScreen = () => {
       }, 800);
     } else if (newOrder.length === shuffledOptions.length) {
       // TODOS LOS PASOS COMPLETADOS CORRECTAMENTE
-      console.log('🎉 [OrderStepsScreen] ¡TODOS LOS PASOS ORDENADOS CORRECTAMENTE!');
-      console.log(`📊 [OrderStepsScreen] Secuencia completa: ${newOrder.length}/${shuffledOptions.length} pasos`);
-      console.log('🏆 [OrderStepsScreen] Mostrando animación WINNER');
       
       setTimeout(() => {
         showFeedbackAnimation('winner');
       }, 500);
     } else {
       // PASO CORRECTO PERO AÚN FALTAN MÁS
-      console.log(`✅ [OrderStepsScreen] Paso correcto, pero faltan más. Progreso: ${newOrder.length}/${shuffledOptions.length}`);
-      console.log('👍 [OrderStepsScreen] Mostrando animación SUCCESS');
       
       showFeedbackAnimation('success');
       // Play encouragement audio
@@ -742,9 +646,6 @@ const OrderStepsScreen = () => {
     const isBlinking = isHelpActive && blinkingStepIndex === index;
     
     // Debug logs
-    console.log(`🎯 [OrderStepsScreen] Renderizando opción ${index + 1}: "${item.label}"`);
-    console.log(`   Status: ${itemStatus}, Disabled: ${disabled}, IsSelected: ${isSelected}`);
-    console.log(`   TouchableOpacity disabled: ${disabled || itemStatus !== 'idle'}`);
 
     return (
       <Animated.View 
@@ -763,7 +664,6 @@ const OrderStepsScreen = () => {
             isBlinking && styles.optionCardHelp,
           ]}
           onPress={() => {
-            console.log(`🎯 [OrderStepsScreen] Click en opción: "${item.label}"`);
             // Record user interaction for inactivity tracking
             adaptiveService.current.recordInactivity();
             handleSelect(item);
@@ -782,7 +682,7 @@ const OrderStepsScreen = () => {
                   ]}
                   resizeMode="contain"
                   onError={() => handleImageError(index)}
-                  onLoad={() => console.log(`✅ [OrderStepsScreen] Image loaded for step ${index + 1}: ${item.icon}`)}
+                  onLoad={() => {}}
                 />
               ) : (
                 <Text style={[
@@ -820,64 +720,31 @@ const OrderStepsScreen = () => {
         </TouchableOpacity>
       </Animated.View>
     );
-  }, [status, selectedOrder, disabled, handleSelect, isHelpActive, blinkingStepIndex, helpBlinkAnimation]);
+  }, [status, selectedOrder, disabled, handleSelect, isHelpActive, blinkingStepIndex, helpBlinkAnimation, handleImageError, imageErrors, isImageUrl]);
 
   // Process achievement queue when it changes
   useEffect(() => {
     processAchievementQueue();
   }, [processAchievementQueue]);
 
-  // Log component mount
-  useEffect(() => {
-    console.log('🎮 [OrderStepsScreen] Componente montado');
-    console.log('📝 [OrderStepsScreen] Datos del paso:', {
-      stepId: (step as any).ID || step.id,
-      lessonId: (step as any).lesson_id,
-      text: step.text,
-      optionsCount: step.options?.length || 0,
-    });
-    console.log('🎯 [OrderStepsScreen] Estado inicial:', {
-      disabled,
-      selectedOrderLength: selectedOrder.length,
-      statusKeys: Object.keys(status),
-      shuffledOptionsLength: shuffledOptions.length,
-    });
-  }, [step, disabled, selectedOrder.length, status, shuffledOptions.length]);
-
-  // Log state changes for debugging
-  useEffect(() => {
-    console.log(`🎯 [OrderStepsScreen] Estado del modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}, showCelebration=${showCelebration}`);
-    
-    // Log modal visibility condition
-    const modalShouldBeVisible = gameCompleted && !showAnimation && showStars && !showCelebration;
-    console.log(`🎯 [OrderStepsScreen] ¿Modal debería ser visible? ${modalShouldBeVisible ? 'SÍ' : 'NO'}`);
-    
-    if (gameCompleted && showStars && !showCelebration) {
-      console.log(`🎯 [OrderStepsScreen] ✅ Condiciones principales cumplidas para mostrar modal`);
-      if (showAnimation) {
-        console.log(`🎯 [OrderStepsScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
-      } else {
-        console.log(`🎯 [OrderStepsScreen] ✅ Modal debería estar visible ahora!`);
-      }
-    }
-  }, [score, gameCompleted, showAnimation, showStars, showCelebration]);
-
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header simplificado */}
+      {/* Header moderno mejorado */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={handleBackPress}
         >
+          <Text style={[styles.backButtonText, { fontSize: 14 }]}>←</Text>
           <Text style={styles.backButtonText}>
-            ← {language === 'es' ? 'Volver' : 'Back'}
+            {language === 'es' ? 'Volver' : 'Back'}
           </Text>
         </TouchableOpacity>
         
-        {/* Progress indicator */}
+        {/* Progress indicator mejorado */}
         {progressLoading && (
           <View style={styles.progressIndicator}>
+            <Text style={[styles.progressText, { fontSize: 11, marginRight: 3 }]}>💾</Text>
             <Text style={styles.progressText}>
               {language === 'es' ? 'Guardando...' : 'Saving...'}
             </Text>
@@ -901,14 +768,7 @@ const OrderStepsScreen = () => {
         }}
       >
 
-        {/* Progreso del juego */}
-        <ProgressSection 
-          score={score}
-          totalItems={totalItems}
-          gameStats={gameStats}
-        />
-
-        {/* Pregunta */}
+        {/* 1. CONTEXTO - Pregunta */}
         <View style={styles.questionContainer}>
           <Text style={styles.sectionTitle}>
             {language === 'es' ? 'Pregunta:' : 'Question:'}
@@ -916,7 +776,7 @@ const OrderStepsScreen = () => {
           <Text style={styles.questionText}>{processedStep.text}</Text>
         </View>
 
-        {/* Opciones para ordenar */}
+        {/* 2. ACCIÓN - Opciones para ordenar */}
         <View style={styles.optionsContainer}>
           <Text style={styles.sectionTitle}>
             {language === 'es' ? 'Pasos para ordenar:' : 'Steps to order:'}
@@ -943,30 +803,22 @@ const OrderStepsScreen = () => {
           </View>
         )}
 
-        {/* Footer motivacional como en otras actividades */}
-        <View style={styles.footer}>
-          <View style={styles.motivationContainer}>
-            <Text style={styles.motivationIcon}>⭐</Text>
-            <Text style={styles.footerText}>
-              {score === 0 
-                ? (language === 'es' ? '¡Piensa en el orden correcto!' : 'Think about the correct order!')
-                : score === totalItems 
-                  ? (language === 'es' ? '¡Increíble! Lo lograste' : 'Amazing! You did it!')
-                  : (language === 'es' ? '¡Excelente! Sigue así, casi terminas' : 'Excellent! Keep going, almost done!')
-              }
-            </Text>
-            <Text style={styles.motivationIcon}>⭐</Text>
-          </View>
-          
-          {/* Mensaje adicional de ánimo */}
-          <View style={styles.encouragementFooter}>
-            <Text style={styles.encouragementFooterText}>
-              {language === 'es' 
-                ? '🧠 Cada paso te hace más organizado ✨'
-                : '🧠 Every step makes you more organized ✨'
-              }
-            </Text>
-          </View>
+        {/* 3. PROGRESO/MOTIVACIÓN - Progreso del juego */}
+        <View style={{ marginTop: 4 }}>
+          <ProgressSection 
+            score={score}
+            totalItems={totalItems}
+            gameStats={gameStats}
+          />
+        </View>
+
+        {/* Carrusel de mensajes motivacionales */}
+        <View style={{ marginTop: 2 }}>
+          <MessageCarousel 
+            score={score}
+            totalItems={totalItems}
+            language={language}
+          />
         </View>
 
         <View style={styles.bottomSpacing} />
@@ -1020,45 +872,68 @@ const OrderStepsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8faff',
+    backgroundColor: '#f0f4ff',
   },
   header: {
-    backgroundColor: '#f8faff',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingTop: 6,
     paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#4285f4',
   },
   backButton: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: '#4285f4',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 12,
     shadowColor: '#4285f4',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#e8f0fe',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   backButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4285f4',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginLeft: 2,
+    letterSpacing: 0.1,
   },
   progressIndicator: {
-    backgroundColor: '#4285f4',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
+    shadowColor: '#ff9800',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   progressText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
     color: '#ffffff',
+    letterSpacing: 0.1,
   },
   scrollView: {
     flex: 1,
@@ -1069,85 +944,107 @@ const styles = StyleSheet.create({
   },
   questionContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-    borderLeftWidth: 3,
-    borderLeftColor: '#ff9800',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 8,
+    marginHorizontal: 4,
+    shadowColor: '#ff9800',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    borderTopWidth: 3,
+    borderTopColor: '#ff9800',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f4ff',
   },
   questionText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
     color: '#1a1a1a',
-    lineHeight: 22,
+    lineHeight: 20,
+    letterSpacing: 0.3,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1a1a1a',
+    color: '#4285f4',
     marginBottom: 12,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   optionsContainer: {
-    marginBottom: 16,
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
   grid: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   optionWrapper: {
-    width: (width - 44) / 2,
+    width: (width - 40) / 2,
     marginHorizontal: 2,
-    marginVertical: 8,
+    marginVertical: 6,
   },
   optionCard: {
     borderRadius: 16,
-    padding: 16,
+    padding: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 120,
-    shadowColor: '#000',
+    minHeight: 130,
+    shadowColor: '#4285f4',
     shadowOffset: {
       width: 0,
       height: 4,
     },
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 6,
-    borderWidth: 2,
+    borderWidth: 0,
     position: 'relative',
   },
   optionCardIdle: {
     backgroundColor: '#ffffff',
-    borderColor: '#e8f0fe',
     shadowColor: '#4285f4',
+    shadowOpacity: 0.15,
   },
   optionCardCorrect: {
-    backgroundColor: '#e8f5e8',
-    borderColor: '#4caf50',
+    backgroundColor: '#e8f8f5',
     shadowColor: '#4caf50',
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.4,
+    borderTopWidth: 4,
+    borderTopColor: '#4caf50',
+    borderLeftWidth: 2,
+    borderLeftColor: '#4caf50',
+    borderRightWidth: 2,
+    borderRightColor: '#4caf50',
   },
   optionCardWrong: {
-    backgroundColor: '#ffeaea',
-    borderColor: '#f44336',
+    backgroundColor: '#fef2f2',
     shadowColor: '#f44336',
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.4,
+    borderTopWidth: 4,
+    borderTopColor: '#f44336',
+    borderLeftWidth: 2,
+    borderLeftColor: '#f44336',
+    borderRightWidth: 2,
+    borderRightColor: '#f44336',
   },
   optionCardHelp: {
-    backgroundColor: '#fff3cd',
-    borderColor: '#ffc107',
-    borderWidth: 3,
+    backgroundColor: '#fffbeb',
     shadowColor: '#ffc107',
-    shadowOpacity: 0.4,
+    shadowOpacity: 0.5,
     shadowRadius: 12,
-    elevation: 8,
+    elevation: 10,
+    borderTopWidth: 4,
+    borderTopColor: '#ffc107',
+    borderBottomWidth: 4,
+    borderBottomColor: '#ffc107',
+    borderLeftWidth: 3,
+    borderLeftColor: '#ffc107',
+    borderRightWidth: 3,
+    borderRightColor: '#ffc107',
   },
   optionContent: {
     alignItems: 'center',
@@ -1157,149 +1054,123 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
-  },
-  optionIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
-  optionImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  optionIconCorrect: {
-    opacity: 0.9,
-  },
-  optionIconWrong: {
-    opacity: 0.7,
-  },
-  optionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    textAlign: 'center',
-    color: '#1a1a1a',
-    lineHeight: 16,
-  },
-  optionLabelCorrect: {
-    color: '#2e7d32',
-    fontWeight: '700',
-  },
-  optionLabelWrong: {
-    color: '#c62828',
-    fontWeight: '700',
-  },
-  stepNumber: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 24,
-    height: 24,
-    backgroundColor: '#4caf50',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#4caf50',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  stepNumberText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  wrongIndicator: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 24,
-    height: 24,
-    backgroundColor: '#f44336',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#f44336',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  wrongIndicatorText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  resetContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  resetButton: {
-    backgroundColor: '#6b7280',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-    shadowColor: '#6b7280',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  resetText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-  },
-  motivationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
+    backgroundColor: 'rgba(66, 133, 244, 0.1)',
+    borderRadius: 16,
+    padding: 8,
+    minWidth: 80,
+    minHeight: 80,
     shadowColor: '#4285f4',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: 4,
     elevation: 3,
-    marginBottom: 12,
   },
-  motivationIcon: {
-    fontSize: 18,
-    marginHorizontal: 6,
+  optionIcon: {
+    fontSize: 50,
+    marginBottom: 0,
   },
-  footerText: {
-    fontSize: 14,
-    fontWeight: '600',
+  optionImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    marginBottom: 0,
+  },
+  optionIconCorrect: {
+    opacity: 1,
+  },
+  optionIconWrong: {
+    opacity: 0.8,
+  },
+  optionLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    textAlign: 'center',
     color: '#1a1a1a',
-    textAlign: 'center',
-    flex: 1,
+    lineHeight: 14,
+    letterSpacing: 0.2,
   },
-  encouragementFooter: {
-    backgroundColor: '#f0f9ff',
+  optionLabelCorrect: {
+    color: '#2e7d32',
+    fontWeight: '800',
+  },
+  optionLabelWrong: {
+    color: '#c62828',
+    fontWeight: '800',
+  },
+  stepNumber: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    width: 36,
+    height: 36,
+    backgroundColor: '#4caf50',
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#4caf50',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 10,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+  },
+  stepNumberText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '900',
+  },
+  wrongIndicator: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    width: 36,
+    height: 36,
+    backgroundColor: '#f44336',
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#f44336',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 10,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+  },
+  wrongIndicatorText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  resetContainer: {
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  resetButton: {
+    backgroundColor: '#ff6b6b',
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 16,
+    shadowColor: '#ff6b6b',
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 4,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: '#ffffff',
   },
-  encouragementFooterText: {
+  resetText: {
+    color: '#ffffff',
     fontSize: 12,
-    color: '#1e40af',
-    fontWeight: '600',
-    textAlign: 'center',
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   bottomSpacing: {
-    height: 20,
+    height: 4,
   },
 });
 
