@@ -1074,6 +1074,7 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 12,
     marginBottom: 0,
+    borderWidth: 0,
   },
   optionIconCorrect: {
     opacity: 1,

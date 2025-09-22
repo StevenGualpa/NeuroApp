@@ -1220,6 +1220,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 4,
+    borderWidth: 0,
   },
   iconContainer: {
     alignItems: 'center',
@@ -1232,6 +1233,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 8,
+    borderWidth: 0,
   },
   optionsContainer: {
     marginBottom: 10,

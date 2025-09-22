@@ -20,8 +20,8 @@ import AchievementNotification from '../components/AchievementNotification';
 import AchievementCelebration from '../components/AchievementCelebration';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
+import { MessageCarousel } from '../components/MessageCarousel';
 import { AchievementService, Achievement } from '../services/AchievementService';
-// import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
@@ -70,7 +70,7 @@ const CARD_SIZE = (width - 60) / 4; // Reduced for better fit
 const MemoryGameScreen = () => {
   const route = useRoute<MemoryGameRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { step, lessonTitle } = route.params;
+  const { step, lessonTitle: _lessonTitle } = route.params;
   const { t, language } = useLanguage();
 
   // Real progress hook
@@ -138,7 +138,6 @@ const MemoryGameScreen = () => {
 
   // Handle image error for specific option
   const handleImageError = useCallback((optionIndex: number) => {
-    console.log(`❌ [MemoryGameScreen] Error loading image for option ${optionIndex + 1}`);
     setImageErrors(prev => {
       const newErrors = [...prev];
       newErrors[optionIndex] = true;
@@ -157,57 +156,25 @@ const MemoryGameScreen = () => {
   const totalPairs = useMemo(() => processedOptions.length || 0, [processedOptions]);
   const totalItems = totalPairs; // Para compatibilidad con ProgressSection
 
-  // Process step content when language changes
-  useEffect(() => {
-    console.log(`🌍 [MemoryGameScreen] Procesando contenido para idioma: ${language}`);
-    processStepForLanguage();
-  }, [language]);
-
   // Process step content for current language
   const processStepForLanguage = useCallback(() => {
-    console.log(`🌍 [MemoryGameScreen] NUEVO PROCESAMIENTO - Contenido para idioma: ${language}`);
-    console.log(`🔧 [MemoryGameScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
-    
-    // Process step text
     const originalText = rawStep.text || '';
     const originalHelpMessage = rawStep.helpMessage || '';
-    
-    console.log(`🧪 [MemoryGameScreen] ANTES del procesamiento:`);
-    console.log(`   Original text: "${originalText}"`);
-    console.log(`   Original helpMessage: "${originalHelpMessage}"`);
-    console.log(`   Tiene colon en text: ${originalText.includes(':')}`);
-    console.log(`   Tiene colon en helpMessage: ${originalHelpMessage.includes(':')}`);
     
     const processedText = BilingualTextProcessor.extractText(originalText, language);
     const processedHelpMessage = BilingualTextProcessor.extractText(originalHelpMessage, language);
     
     // Process options (memory cards)
-    const newProcessedOptions = rawStep.options?.map((option, index) => {
+    const newProcessedOptions = rawStep.options?.map((option: any, _index: number) => {
       const originalLabel = option.label || '';
       
-      console.log(`🧪 [MemoryGameScreen] ANTES del procesamiento carta ${index + 1}:`);
-      console.log(`   Original label: "${originalLabel}"`);
-      console.log(`   Icon: "${option.icon}"`);
-      console.log(`   Tiene colon: ${originalLabel.includes(':')}`);
-      
       const processedLabel = BilingualTextProcessor.extractText(originalLabel, language);
-      
-      console.log(`��� [MemoryGameScreen] DESPUÉS del procesamiento carta ${index + 1}:`);
-      console.log(`   Processed label: "${processedLabel}"`);
-      console.log(`   Cambió: ${originalLabel !== processedLabel ? 'SÍ' : 'NO'}`);
       
       return {
         ...option,
         label: processedLabel,
       };
     }) || [];
-    
-    console.log(`🎯 [MemoryGameScreen] DESPUÉS del procesamiento principal:`);
-    console.log(`   Processed text: "${processedText}"`);
-    console.log(`   Processed helpMessage: "${processedHelpMessage}"`);
-    console.log(`   Language usado: ${language}`);
-    console.log(`   Text cambió: ${originalText !== processedText ? 'SÍ' : 'NO'}`);
-    console.log(`   HelpMessage cambió: ${originalHelpMessage !== processedHelpMessage ? 'SÍ' : 'NO'}`);
     
     // Update processed step and options
     const newProcessedStep = {
@@ -219,23 +186,20 @@ const MemoryGameScreen = () => {
     
     setProcessedStep(newProcessedStep);
     setProcessedOptions(newProcessedOptions);
-    
-    console.log(`✅ [MemoryGameScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
-    console.log('🃏 [MemoryGameScreen] Cartas procesadas:');
-    newProcessedOptions.forEach((option, index) => {
-      console.log(`  ${index + 1}. "${option.icon}" - "${option.label}"`);
-    });
   }, [rawStep, language]);
+
+  // Process step content when language changes
+  useEffect(() => {
+    processStepForLanguage();
+  }, [language]);
 
   // Initialize achievements service
   useEffect(() => {
     const initAchievements = async () => {
       try {
-        console.log('🏆 [MemoryGameScreen] Inicializando servicio de logros mejorado...');
         await AchievementService.initializeAchievements();
-        console.log('✅ [MemoryGameScreen] Servicio de logros inicializado');
       } catch (error) {
-        console.error('❌ [MemoryGameScreen] Error inicializando logros:', error);
+        // Error inicializando logros
       }
     };
     initAchievements();
@@ -257,28 +221,26 @@ const MemoryGameScreen = () => {
           triggerHelpForMemoryGame();
         }
       },
-      (message, activityType) => {
+      (message, _activityType) => {
         // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
         if (step.helpMessage) {
           helpMessage = step.helpMessage;
-          console.log(`🔊 Using custom lesson help: ${helpMessage}`);
         } else {
           helpMessage = message;
-          console.log(`🔊 Using default help for ${activityType}: ${helpMessage}`);
         }
         
-        console.log(`🔊 About to play TTS: ${helpMessage}`);
         audioService.current.playTextToSpeech(helpMessage, true); // true indica que es mensaje de ayuda
       },
       step.activityType // Pass the activity type to the service
     );
 
     return () => {
-      console.log(`🔊 MemoryGameScreen: Cleaning up services`);
-      adaptiveService.current.cleanup();
-      audioService.current.cleanup();
+      const currentAdaptiveService = adaptiveService.current;
+      const currentAudioService = audioService.current;
+      currentAdaptiveService.cleanup();
+      currentAudioService.cleanup();
     };
   }, [step, language]);
 
@@ -455,8 +417,6 @@ const MemoryGameScreen = () => {
   // Save progress to backend
   const saveProgressToBackend = useCallback(async (finalStats: GameStats) => {
     try {
-      console.log('💾 [MemoryGameScreen] Guardando progreso en backend...');
-      
       const progressData = {
         lessonId: (step as any).lesson_id || 1,
         stepId: (step as any).ID || step.id || 1,
@@ -468,55 +428,41 @@ const MemoryGameScreen = () => {
         helpActivations: finalStats.helpActivations || 0,
         perfectRun: finalStats.perfectRun,
       };
-
-      console.log('📊 [MemoryGameScreen] ===== DATOS ENVIADOS AL SERVIDOR =====');
-      console.log('🎯 Lección ID:', progressData.lessonId);
-      console.log('📝 Paso ID:', progressData.stepId);
-      console.log('⭐ Estrellas ganadas:', progressData.stars);
-      console.log('🔄 Intentos totales:', progressData.attempts);
-      console.log('❌ Errores cometidos:', progressData.errors);
-      console.log('⏱️ Tiempo gastado (segundos):', progressData.timeSpent);
-      console.log('🤝 Usó ayuda:', progressData.usedHelp);
-      console.log('💡 Activaciones de ayuda:', progressData.helpActivations);
-      console.log('🏆 Ejecución perfecta:', progressData.perfectRun);
-      console.log('================================================');
       
       const success = await completeStep(progressData);
 
       if (success) {
-        console.log('✅ [MemoryGameScreen] ¡PROGRESO GUARDADO EXITOSAMENTE EN EL SERVIDOR!');
-        console.log('📊 [MemoryGameScreen] Todos los datos fueron enviados y procesados correctamente');
+        // Progreso guardado exitosamente
       } else {
-        console.warn('⚠️ [MemoryGameScreen] No se pudo guardar el progreso en backend');
         if (progressError) {
-          console.error('❌ [MemoryGameScreen] Error específico:', progressError);
           Alert.alert(
-            'Error de Conexión',
-            `No se pudo guardar tu progreso: ${progressError}. Tu progreso local se ha guardado.`,
+            language === 'es' ? 'Error de Conexión' : 'Connection Error',
+            language === 'es' 
+              ? `No se pudo guardar tu progreso: ${progressError}. Tu progreso local se ha guardado.`
+              : `Could not save your progress: ${progressError}. Your local progress has been saved.`,
             [{ text: 'OK' }]
           );
         }
       }
     } catch (error) {
-      console.error('❌ [MemoryGameScreen] Error guardando progreso:', error);
       Alert.alert(
-        'Error',
-        'Hubo un problema guardando tu progreso. Tu progreso local se ha guardado.',
+        language === 'es' ? 'Error' : 'Error',
+        language === 'es' 
+          ? 'Hubo un problema guardando tu progreso. Tu progreso local se ha guardado.'
+          : 'There was a problem saving your progress. Your local progress has been saved.',
         [{ text: 'OK' }]
       );
     }
-  }, [completeStep, step, progressError]);
+  }, [completeStep, step, progressError, language]);
 
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
-      console.log('🎮 [MemoryGameScreen] Registrando finalización del juego...');
-
       // 1. Save progress to backend first
       await saveProgressToBackend(finalStats);
 
       // 2. Use the enhanced achievement service that syncs with server
-      const gameData = {
+      const _gameData = {
         stars: finalStats.stars,
         isPerfect: finalStats.perfectRun,
         completionTime: finalStats.completionTime,
@@ -529,17 +475,10 @@ const MemoryGameScreen = () => {
         stepId: (step as any).ID || step.id,
       };
 
-      console.log('🏆 [MemoryGameScreen] Verificando logros con datos:', gameData);
-
-      // const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
+      // Use the local achievement service (temporarily disabled server sync)
       const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
       if (newlyUnlocked.length > 0) {
-        console.log(`🎉 [MemoryGameScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
-        newlyUnlocked.forEach((achievement, index) => {
-          console.log(`   ${index + 1}. 🏆 ${achievement.title} - ${achievement.description}`);
-        });
-        
         // Convert to server achievement format for celebration
         const serverAchievements: ServerAchievement[] = newlyUnlocked.map(achievement => ({
           ID: achievement.ID || 0,
@@ -557,34 +496,26 @@ const MemoryGameScreen = () => {
         setTimeout(() => {
           setShowCelebration(true);
         }, 1500);
-        
-      } else {
-        console.log('📊 [MemoryGameScreen] No se desbloquearon nuevos logros esta vez');
-        console.log('💡 [MemoryGameScreen] Esto puede ser normal si ya tienes logros desbloqueados');
       }
     } catch (error) {
-      console.error('❌ [MemoryGameScreen] Error registrando finalización:', error);
       Alert.alert(
-        'Error',
-        'No se pudieron verificar los logros. Tu progreso se ha guardado.',
+        language === 'es' ? 'Error' : 'Error',
+        language === 'es' 
+          ? 'No se pudieron verificar los logros. Tu progreso se ha guardado.'
+          : 'Could not verify achievements. Your progress has been saved.',
         [{ text: 'OK' }]
       );
     }
-  }, [saveProgressToBackend, step]);
+  }, [saveProgressToBackend, step, language, t.games.activityTypes.memoryGame]);
 
   // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
-    console.log(`🎬 [MemoryGameScreen] Animación terminada: ${animationType}, matchedCount: ${matchedCount}, totalPairs: ${totalPairs}, gameCompleted: ${gameCompleted}`);
     setShowAnimation(false);
     
     // CONDICIÓN CORREGIDA: Solo completar el juego si se encontraron TODAS las parejas
     if (animationType === 'winner' && matchedCount === totalPairs && totalPairs > 0 && !gameCompleted) {
-      console.log('🎯 [MemoryGameScreen] ¡TODAS LAS PAREJAS ENCONTRADAS! Iniciando secuencia de finalización...');
-      console.log(`📊 [MemoryGameScreen] Verificación: matchedCount=${matchedCount}, totalPairs=${totalPairs}, todas encontradas=${matchedCount === totalPairs}`);
-      
       // IMPORTANTE: Limpiar toda la ayuda activa inmediatamente
       if (isHelpActive) {
-        console.log('🛑 [MemoryGameScreen] Limpiando ayuda activa...');
         setIsHelpActive(false);
         setBlinkingCardIds([]);
         helpBlinkAnimation.setValue(1);
@@ -606,34 +537,16 @@ const MemoryGameScreen = () => {
         stars: calculateStars(gameStats.errors, gameStats.flipCount, completionTime, totalPairs),
       };
       setGameStats(finalStats);
-
-      console.log('📈 [MemoryGameScreen] Estadísticas finales calculadas:', {
-        totalAttempts: finalStats.totalAttempts,
-        errors: finalStats.errors,
-        stars: finalStats.stars,
-        completionTime: finalStats.completionTime,
-        perfectRun: finalStats.perfectRun,
-        matchesFound: finalStats.matchesFound,
-        flipCount: finalStats.flipCount,
-        efficiency: finalStats.efficiency,
-        usedHelp: finalStats.usedHelp,
-        helpActivations: finalStats.helpActivations,
-      });
       
       // Record game completion (includes backend save and achievement check)
       recordGameCompletion(finalStats);
       
       // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
       setTimeout(() => {
-        console.log('🏆 [MemoryGameScreen] Mostrando modal de finalización directamente...');
         setShowStars(true);
-        console.log('⭐ [MemoryGameScreen] Modal debería aparecer ahora');
-        console.log(`🎯 [MemoryGameScreen] Estados para modal: matchedCount=${matchedCount}, gameCompleted=true, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
       }, 800);
-    } else if (animationType === 'winner' && matchedCount !== totalPairs) {
-      console.log(`⚠️ [MemoryGameScreen] Animación winner pero no todas las parejas encontradas: matchedCount=${matchedCount}, totalPairs=${totalPairs}`);
     }
-  }, [animationType, matchedCount, totalPairs, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation, showCelebration]);
+  }, [animationType, matchedCount, totalPairs, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation]);
 
   useEffect(() => {
     // Update score for ProgressSection
@@ -641,9 +554,6 @@ const MemoryGameScreen = () => {
 
     // Check if game is complete
     if (matchedCount === totalPairs && totalPairs > 0 && !gameCompleted) {
-      console.log('🎉 [MemoryGameScreen] ¡TODAS LAS PAREJAS ENCONTRADAS! Preparando animación winner...');
-      console.log(`📊 [MemoryGameScreen] Parejas encontradas: ${matchedCount}/${totalPairs}`);
-      
       const timer = setTimeout(() => {
         showFeedbackAnimation('winner');
       }, 1000);
@@ -653,8 +563,6 @@ const MemoryGameScreen = () => {
 
   const flipCard = useCallback((card: Card) => {
     if (card.flipped || card.matched || selected.length === 2 || !gameStarted) return;
-
-    console.log(`🃏 [MemoryGameScreen] Usuario volteó carta: ID=${card.id}, icon="${card.icon}"`);
 
     // Record user interaction for inactivity tracking
     adaptiveService.current.recordInactivity();
@@ -692,8 +600,6 @@ const MemoryGameScreen = () => {
     if (newSelected.length === 2) {
       const [first, second] = newSelected;
       
-      console.log(`🔍 [MemoryGameScreen] Comparando cartas: "${first.icon}" vs "${second.icon}"`);
-      
       // Update total attempts
       setGameStats(prev => ({
         ...prev,
@@ -702,14 +608,11 @@ const MemoryGameScreen = () => {
 
       const isMatch = first.icon === second.icon;
 
-      console.log(`🎯 [MemoryGameScreen] ¿Es pareja?: ${isMatch ? 'SÍ' : 'NO'}`);
-
       // Record action in adaptive reinforcement service
       adaptiveService.current.recordAction(isMatch, -1, step.activityType);
 
       if (isMatch) {
         // Match found
-        console.log('✅ [MemoryGameScreen] ¡PAREJA ENCONTRADA!');
         setTimeout(() => {
           setCards((prev) =>
             prev.map((c) =>
@@ -718,7 +621,6 @@ const MemoryGameScreen = () => {
           );
           setMatchedCount((prev) => {
             const newCount = prev + 1;
-            console.log(`🎊 [MemoryGameScreen] Parejas encontradas: ${newCount}/${totalPairs}`);
             return newCount;
           });
           setGameStats(prev => ({
@@ -731,7 +633,6 @@ const MemoryGameScreen = () => {
         }, 500);
       } else {
         // No match
-        console.log('❌ [MemoryGameScreen] No es pareja, volteando cartas de vuelta');
         setGameStats(prev => ({
           ...prev,
           errors: prev.errors + 1,
@@ -809,22 +710,24 @@ const MemoryGameScreen = () => {
     } else {
       return "¡Completado! Tu memoria mejorará 📈";
     }
-  }, []);
+  }, [t.games.messages]);
 
   const handleBackPress = useCallback(() => {
     if (gameStats.totalAttempts > 0 && !gameCompleted) {
       Alert.alert(
-        'Salir del juego',
-        '¿Estás seguro de que quieres salir? Perderás tu progreso actual.',
+        language === 'es' ? 'Salir del juego' : 'Exit game',
+        language === 'es' 
+          ? '¿Estás seguro de que quieres salir? Perderás tu progreso actual.'
+          : 'Are you sure you want to exit? You will lose your current progress.',
         [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Salir', style: 'destructive', onPress: () => navigation.goBack() }
+          { text: language === 'es' ? 'Cancelar' : 'Cancel', style: 'cancel' },
+          { text: language === 'es' ? 'Salir' : 'Exit', style: 'destructive', onPress: () => navigation.goBack() }
         ]
       );
     } else {
       navigation.goBack();
     }
-  }, [gameStats.totalAttempts, gameCompleted, navigation]);
+  }, [gameStats.totalAttempts, gameCompleted, navigation, language]);
 
   const handleCelebrationClose = useCallback(() => {
     setShowCelebration(false);
@@ -887,7 +790,7 @@ const MemoryGameScreen = () => {
                   style={styles.cardImage}
                   resizeMode="contain"
                   onError={() => handleImageError(originalOptionIndex)}
-                  onLoad={() => console.log(`✅ [MemoryGameScreen] Image loaded for card: ${card.icon}`)}
+                  onLoad={() => {}}
                 />
               ) : (
                 <Text style={styles.cardIcon}>
@@ -909,51 +812,26 @@ const MemoryGameScreen = () => {
     processAchievementQueue();
   }, [processAchievementQueue]);
 
-  // Log component mount
-  useEffect(() => {
-    console.log('🎮 [MemoryGameScreen] Componente montado');
-    console.log('📝 [MemoryGameScreen] Datos del paso:', {
-      stepId: (step as any).ID || step.id,
-      lessonId: (step as any).lesson_id,
-      text: step.text,
-      optionsCount: step.options?.length || 0,
-    });
-  }, [step]);
-
-  // Log state changes for debugging
-  useEffect(() => {
-    console.log(`🎯 [MemoryGameScreen] Estado del modal: matchedCount=${matchedCount}, totalPairs=${totalPairs}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}, showCelebration=${showCelebration}`);
-    
-    // Log modal visibility condition
-    const modalShouldBeVisible = gameCompleted && !showAnimation && showStars && !showCelebration;
-    console.log(`🎯 [MemoryGameScreen] ¿Modal debería ser visible? ${modalShouldBeVisible ? 'SÍ' : 'NO'}`);
-    
-    if (gameCompleted && showStars && !showCelebration) {
-      console.log(`🎯 [MemoryGameScreen] ✅ Condiciones principales cumplidas para mostrar modal`);
-      if (showAnimation) {
-        console.log(`🎯 [MemoryGameScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
-      } else {
-        console.log(`🎯 [MemoryGameScreen] ✅ Modal debería estar visible ahora!`);
-      }
-    }
-  }, [matchedCount, totalPairs, gameCompleted, showAnimation, showStars, showCelebration]);
+  const isGameComplete = matchedCount === totalPairs;
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header simplificado */}
+      {/* Header moderno mejorado */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={handleBackPress}
         >
+          <Text style={[styles.backButtonText, { fontSize: 14 }]}>←</Text>
           <Text style={styles.backButtonText}>
-            ← {language === 'es' ? 'Volver' : 'Back'}
+            {language === 'es' ? 'Volver' : 'Back'}
           </Text>
         </TouchableOpacity>
         
-        {/* Progress indicator */}
+        {/* Progress indicator mejorado */}
         {progressLoading && (
           <View style={styles.progressIndicator}>
+            <Text style={[styles.progressText, { fontSize: 11, marginRight: 3 }]}>💾</Text>
             <Text style={styles.progressText}>
               {language === 'es' ? 'Guardando...' : 'Saving...'}
             </Text>
@@ -977,14 +855,7 @@ const MemoryGameScreen = () => {
         }}
       >
 
-        {/* Progreso del juego */}
-        <ProgressSection 
-          score={score}
-          totalItems={totalItems}
-          gameStats={gameStats}
-        />
-
-        {/* Estado del juego */}
+        {/* 1. CONTEXTO - Estado del juego */}
         <View style={styles.gameStateContainer}>
           <Text style={styles.sectionTitle}>
             {showingCards 
@@ -1006,39 +877,29 @@ const MemoryGameScreen = () => {
           </Text>
         </View>
 
-        {/* Grid de cartas */}
+        {/* 2. ACCIÓN - Grid de cartas */}
         <View style={styles.gameContainer}>
           <View style={styles.grid}>
             {cards.map(renderCard)}
           </View>
         </View>
 
-        {/* Footer motivacional como en otras actividades */}
-        <View style={styles.footer}>
-          <View style={styles.motivationContainer}>
-            <Text style={styles.motivationIcon}>⭐</Text>
-            <Text style={styles.footerText}>
-              {showingCards 
-                ? (language === 'es' ? '¡Observa con atención!' : 'Watch carefully!')
-                : score === 0 
-                  ? (language === 'es' ? '¡Usa tu memoria!' : 'Use your memory!')
-                  : score === totalItems 
-                    ? (language === 'es' ? '¡Increíble! Lo lograste' : 'Amazing! You did it')
-                    : (language === 'es' ? '¡Excelente! Sigue así, casi terminas' : 'Excellent! Keep going, almost done')
-              }
-            </Text>
-            <Text style={styles.motivationIcon}>⭐</Text>
-          </View>
-          
-          {/* Mensaje adicional de ánimo */}
-          <View style={styles.encouragementFooter}>
-            <Text style={styles.encouragementFooterText}>
-              {language === 'es' 
-                ? '🧠 Cada juego fortalece tu memoria ✨'
-                : '🧠 Every game strengthens your memory ✨'
-              }
-            </Text>
-          </View>
+        {/* 3. PROGRESO/MOTIVACIÓN - Progreso del juego */}
+        <View style={{ marginTop: 4 }}>
+          <ProgressSection 
+            score={score}
+            totalItems={totalItems}
+            gameStats={gameStats}
+          />
+        </View>
+
+        {/* Carrusel de mensajes motivacionales */}
+        <View style={{ marginTop: 2 }}>
+          <MessageCarousel 
+            score={score}
+            totalItems={totalItems}
+            language={language}
+          />
         </View>
 
         <View style={styles.bottomSpacing} />
@@ -1054,12 +915,26 @@ const MemoryGameScreen = () => {
         gameType="memory"
         showEfficiency={true}
         customStats={[
-          { label: 'Volteos totales', value: gameStats.flipCount },
-          { label: 'Parejas encontradas', value: `${gameStats.matchesFound}/${totalPairs}` },
-          { label: 'Ayuda usada', value: gameStats.usedHelp ? 'Sí' : 'No' },
-          { label: t.games.messages.progressSaved, value: progressLoading ? t.games.messages.saving : t.games.messages.saved },
+          { 
+            label: language === 'es' ? 'Volteos totales' : 'Total flips', 
+            value: gameStats.flipCount 
+          },
+          { 
+            label: language === 'es' ? 'Parejas encontradas' : 'Pairs found', 
+            value: `${gameStats.matchesFound}/${totalPairs}` 
+          },
+          { 
+            label: language === 'es' ? 'Ayuda usada' : 'Help used', 
+            value: gameStats.usedHelp ? (language === 'es' ? 'Sí' : 'Yes') : (language === 'es' ? 'No' : 'No')
+          },
+          { 
+            label: language === 'es' ? 'Progreso guardado' : 'Progress saved', 
+            value: progressLoading 
+              ? (language === 'es' ? 'Guardando...' : 'Saving...') 
+              : (language === 'es' ? 'Guardado ✅' : 'Saved ✅')
+          },
         ]}
-        bonusMessage={gameStats.perfectRun && gameStats.flipCount <= totalPairs * 2.4 ? t.games.messages.memoryExceptional : undefined}
+        bonusMessage={gameStats.perfectRun && gameStats.flipCount <= totalPairs * 2.4 ? (language === 'es' ? '🧠 ¡Memoria excepcional!' : '🧠 Exceptional memory!') : undefined}
       />
 
       {/* Feedback Animation */}
@@ -1089,70 +964,92 @@ const MemoryGameScreen = () => {
   );
 };
 
-export default MemoryGameScreen;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8faff',
+    backgroundColor: '#f0f4ff',
   },
   header: {
-    backgroundColor: '#f8faff',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingTop: 6,
     paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#4285f4',
   },
   backButton: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: '#4285f4',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 12,
     shadowColor: '#4285f4',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#e8f0fe',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   backButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4285f4',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginLeft: 2,
+    letterSpacing: 0.1,
   },
   progressIndicator: {
-    backgroundColor: '#4285f4',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
+    shadowColor: '#ff9800',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   progressText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
     color: '#ffffff',
+    letterSpacing: 0.1,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 4,
   },
   gameStateContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-    borderLeftWidth: 3,
-    borderLeftColor: '#ff9800',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 8,
+    marginHorizontal: 4,
+    shadowColor: '#ff9800',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    borderTopWidth: 3,
+    borderTopColor: '#ff9800',
   },
   gameStateText: {
     fontSize: 14,
@@ -1162,15 +1059,17 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
+    color: '#4285f4',
+    marginBottom: 10,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   gameContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
   grid: {
     flexDirection: 'row',
@@ -1187,13 +1086,13 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_SIZE,
     height: CARD_SIZE,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
+    shadowColor: '#4285f4',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.12,
-    shadowRadius: 6,
+    shadowRadius: 8,
     elevation: 4,
   },
   front: {
@@ -1205,6 +1104,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderWidth: 2,
     borderColor: '#e8f0fe',
+    borderTopWidth: 3,
+    borderTopColor: '#4285f4',
   },
   matchedCard: {
     backgroundColor: '#e8f5e8',
@@ -1237,9 +1138,10 @@ const styles = StyleSheet.create({
     fontSize: 28,
   },
   cardImage: {
-    width: CARD_SIZE * 0.6,
-    height: CARD_SIZE * 0.6,
+    width: CARD_SIZE - 8,
+    height: CARD_SIZE - 8,
     borderRadius: 8,
+    borderWidth: 0,
   },
   cardFace: {
     backfaceVisibility: 'hidden',
@@ -1250,51 +1152,9 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
   },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-  },
-  motivationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    marginBottom: 12,
-  },
-  motivationIcon: {
-    fontSize: 18,
-    marginHorizontal: 6,
-  },
-  footerText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    flex: 1,
-  },
-  encouragementFooter: {
-    backgroundColor: '#f0f9ff',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  encouragementFooterText: {
-    fontSize: 12,
-    color: '#1e40af',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
   bottomSpacing: {
-    height: 20,
+    height: 4,
   },
 });
+
+export default MemoryGameScreen;

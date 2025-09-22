@@ -1329,6 +1329,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 6,
+    borderWidth: 0,
   },
   missingText: {
     fontSize: 24,
@@ -1419,6 +1420,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 8,
+    borderWidth: 0,
   },
   optionLabel: {
     fontSize: 12,
