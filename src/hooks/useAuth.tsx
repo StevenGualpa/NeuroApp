@@ -104,6 +104,28 @@ export const useAuth = () => {
         console.warn('⚠️ [Auth] Error inicializando configuraciones (continuando login):', settingsError);
         // Don't fail login if settings initialization fails
       }
+
+      // Initialize achievements from server after successful login
+      try {
+        console.log('🏆 [Auth] Inicializando logros del servidor para usuario:', authUser.id);
+        const { default: RealAchievementService } = await import('../services/RealAchievementService');
+        
+        // Verificar estado antes de inicializar
+        const statusBefore = RealAchievementService.getServiceStatus();
+        console.log('🔍 [Auth] Estado antes de inicializar:', statusBefore);
+        
+        await RealAchievementService.initialize(authUser.id);
+        
+        // Verificar estado después de inicializar
+        const statusAfter = RealAchievementService.getServiceStatus();
+        console.log('🔍 [Auth] Estado después de inicializar:', statusAfter);
+        
+        console.log('✅ [Auth] Logros del servidor inicializados correctamente');
+      } catch (achievementError) {
+        console.error('❌ [Auth] Error inicializando logros:', achievementError);
+        console.error('❌ [Auth] Stack trace:', achievementError.stack);
+        // Don't fail login if achievement initialization fails, but log the error
+      }
       
       console.log('✅ [Auth] Login completado exitosamente');
       return authUser;
@@ -140,6 +162,18 @@ export const useAuth = () => {
       } catch (settingsError) {
         console.warn('⚠️ [Auth] Error inicializando configuraciones (continuando registro):', settingsError);
         // Don't fail registration if settings initialization fails
+      }
+
+      // Initialize achievements from server after successful registration
+      try {
+        console.log('🏆 [Auth] Inicializando logros del servidor para nuevo usuario...');
+        const { default: RealAchievementService } = await import('../services/RealAchievementService');
+        await RealAchievementService.initialize(authUser.id);
+        console.log('✅ [Auth] Logros del servidor inicializados para nuevo usuario');
+      } catch (achievementError) {
+        console.error('❌ [Auth] Error inicializando logros para nuevo usuario:', achievementError);
+        console.error('❌ [Auth] Stack trace:', achievementError.stack);
+        // Don't fail registration if achievement initialization fails, but log the error
       }
       
       console.log('✅ [Auth] Registro completado exitosamente');

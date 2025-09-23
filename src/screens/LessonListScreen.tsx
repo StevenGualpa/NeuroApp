@@ -50,7 +50,6 @@ const LessonListScreen = () => {
   // Procesar lecciones cuando cambie el idioma
   useEffect(() => {
     if (rawLessons.length > 0) {
-      console.log(`🌍 [LessonListScreen] Procesando ${rawLessons.length} lecciones para idioma: ${language}`);
       processLessonsForLanguage();
     }
   }, [language, rawLessons]);
@@ -85,14 +84,12 @@ const LessonListScreen = () => {
 
   const loadCategories = async () => {
     try {
-      console.log('📂 [LessonListScreen] Cargando categorías...');
       const categoriesData = await ApiService.getCategories();
       setCategories(categoriesData);
       
       // Encontrar la categoría seleccionada por nombre
       const foundCategory = categoriesData.find(cat => cat.name === category);
       setSelectedCategory(foundCategory || null);
-      console.log(`✅ [LessonListScreen] Categoría encontrada: ${foundCategory?.name || 'No encontrada'}`);
     } catch (error) {
       console.error('❌ [LessonListScreen] Error loading categories:', error);
     }
@@ -101,19 +98,15 @@ const LessonListScreen = () => {
   const loadLessons = async () => {
     try {
       setLoading(true);
-      console.log(`📚 [LessonListScreen] Cargando lecciones para categoría: ${category}`);
       
       // Primero obtener todas las categorías para encontrar el ID
       const categoriesData = await ApiService.getCategories();
       const foundCategory = categoriesData.find(cat => cat.name === category);
       
       if (foundCategory) {
-        console.log(`✅ [LessonListScreen] Categoría encontrada: ID ${foundCategory.ID}`);
         // Cargar lecciones por categoría
         const lessonsData = await ApiService.getLessonsByCategory(foundCategory.ID);
-        console.log(`📋 [LessonListScreen] ${lessonsData.length} lecciones cargadas`);
         
-        console.log('📋 [LessonListScreen] Datos originales del servidor:');
         lessonsData.forEach((lesson, index) => {
           console.log(`  ${index + 1}. ID: ${lesson.ID}`);
           console.log(`     Title: "${lesson.title}"`);
@@ -126,7 +119,6 @@ const LessonListScreen = () => {
         // Filtrar por activityType si está presente
         let filteredLessons = lessonsData;
         if (activityType) {
-          console.log(`🎯 [LessonListScreen] Filtrando por tipo de actividad: ${activityType}`);
           // Aquí podrías implementar filtrado por tipo de actividad
           // Por ahora mostramos todas las lecciones de la categoría
           filteredLessons = lessonsData;

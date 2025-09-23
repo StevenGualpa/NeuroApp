@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,11 +12,22 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/AppNavigator';
-import { AchievementService, Achievement, AchievementCategory } from '../services/AchievementService';
+import RealAchievementService from '../services/RealAchievementService';
+import { Achievement, UserAchievement } from '../services/ApiService';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuthContext } from '../hooks/useAuth';
+
+// Extended interface for achievements with user progress
+interface ProcessedAchievement extends Achievement {
+  isUnlocked: boolean;
+  currentProgress: number;
+  max_progress: number;
+  unlockedAt?: string;
+  encouragementMessage?: string;
+}
 
 const { width } = Dimensions.get('window');
 
@@ -25,8 +36,11 @@ type AchievementsNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 const AchievementsScreen = () => {
   const navigation = useNavigation<AchievementsNavigationProp>();
   const { t, language } = useLanguage();
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<AchievementCategory>('all');
+  const { user } = useAuthContext();
+  const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
+  const [userAchievements, setUserAchievements] = useState<UserAchievement[]>([]);
+  const [achievements, setAchievements] = useState<ProcessedAchievement[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [stats, setStats] = useState({
@@ -42,31 +56,31 @@ const AchievementsScreen = () => {
 
   const categories = [
     { 
-      key: 'all' as AchievementCategory, 
+      key: 'all', 
       label: language === 'es' ? 'Todos' : 'All', 
       icon: '🏆', 
       color: '#4285f4' 
     },
     { 
-      key: 'primeros_pasos' as AchievementCategory, 
-      label: language === 'es' ? 'Primeros Pasos' : 'First Steps', 
+      key: 'completion', 
+      label: language === 'es' ? 'Finalización' : 'Completion', 
       icon: '🌟', 
       color: '#FF6B6B' 
     },
     { 
-      key: 'progreso' as AchievementCategory, 
-      label: language === 'es' ? 'Progreso' : 'Progress', 
+      key: 'perfection', 
+      label: language === 'es' ? 'Perfección' : 'Perfection', 
       icon: '📈', 
       color: '#4CAF50' 
     },
     { 
-      key: 'esfuerzo' as AchievementCategory, 
-      label: language === 'es' ? 'Esfuerzo' : 'Effort', 
+      key: 'speed', 
+      label: language === 'es' ? 'Velocidad' : 'Speed', 
       icon: '💪', 
       color: '#FFA726' 
     },
     { 
-      key: 'especial' as AchievementCategory, 
+      key: 'special', 
       label: language === 'es' ? 'Especiales' : 'Special', 
       icon: '💎', 
       color: '#9C27B0' 
@@ -100,13 +114,25 @@ const AchievementsScreen = () => {
     }
   }, [language]);
 
+  // Refresh achievements when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.id && !isLoading) {
+        console.log('🔄 [AchievementsScreen] Pantalla en foco, refrescando datos...');
+        refreshAchievements();
+      }
+    }, [user?.id, isLoading])
+  );
+
   const initializeAchievements = async () => {
+    if (!user?.id) return;
+    
     setIsLoading(true);
     try {
-      console.log('🏆 [AchievementsScreen] Initializing achievements...');
+      console.log('🏆 [AchievementsScreen] Initializing server achievements...');
       
-      // Initialize achievement service
-      await AchievementService.initializeAchievements();
+      // Initialize real achievement service
+      await RealAchievementService.initialize(user.id);
       
       // Load achievements
       await loadAchievements();
@@ -116,8 +142,8 @@ const AchievementsScreen = () => {
       Alert.alert(
         'Error de conexión',
         language === 'es' 
-          ? 'No se pudieron cargar los logros.'
-          : 'Could not load achievements.',
+          ? 'No se pudieron cargar los logros del servidor.'
+          : 'Could not load achievements from server.',
         [
           { text: 'Reintentar', onPress: initializeAchievements },
           { text: 'Volver', onPress: () => navigation.goBack() }
@@ -128,51 +154,89 @@ const AchievementsScreen = () => {
     }
   };
 
+  const refreshAchievements = useCallback(async () => {
+    if (!user?.id || isLoading || isRefreshing) return;
+    
+    setIsRefreshing(true);
+    try {
+      console.log('🔄 [AchievementsScreen] Refrescando logros...');
+      
+      // Refresh user data from server first
+      await RealAchievementService.refreshUserData();
+      
+      // Then reload achievements
+      await loadAchievements();
+    } catch (error) {
+      console.error('❌ [AchievementsScreen] Error refrescando logros:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [user?.id, isLoading, isRefreshing]);
+
   const loadAchievements = async () => {
     try {
-      console.log(`📥 [AchievementsScreen] Fetching achievements in ${language}...`);
+      console.log(`📥 [AchievementsScreen] Fetching server achievements...`);
       
-      // Get all achievements with bilingual processing
-      const allAchievements = await AchievementService.getAllAchievements(language);
-      console.log(`✅ [AchievementsScreen] Loaded ${allAchievements.length} achievements`);
+      // Get all achievements and user progress from server (always fresh data)
+      const [serverAchievements, serverUserAchievements] = await Promise.all([
+        RealAchievementService.getAllAchievements(),
+        RealAchievementService.getUserAchievements()
+      ]);
+      
+      console.log(`✅ [AchievementsScreen] Loaded ${serverAchievements.length} achievements from server`);
+      console.log(`👤 [AchievementsScreen] Loaded ${serverUserAchievements.length} user achievements`);
+      
+      // Merge achievements with user progress
+      const processedAchievements: ProcessedAchievement[] = serverAchievements.map(achievement => {
+        const userAchievement = serverUserAchievements.find(ua => ua.achievement_id === achievement.ID);
+        
+        // Ensure name is properly set (fallback to title if name is empty)
+        const achievementName = achievement.name || achievement.title || `Logro ${achievement.ID}`;
+        
+        return {
+          ...achievement,
+          name: achievementName, // Garantizar que name siempre tenga valor
+          isUnlocked: userAchievement?.is_unlocked || false,
+          currentProgress: userAchievement?.progress || 0,
+          max_progress: achievement.condition_value || 1, // Use condition_value as max_progress
+          unlockedAt: userAchievement?.unlocked_at,
+          encouragementMessage: '', // Add default value
+        };
+      });
       
       // Log sample for debugging
-      if (allAchievements.length > 0) {
-        console.log('📋 [AchievementsScreen] Sample achievement:', {
-          id: allAchievements[0].id,
-          title: allAchievements[0].title,
-          description: allAchievements[0].description,
-          isUnlocked: allAchievements[0].isUnlocked,
-          currentProgress: allAchievements[0].currentProgress,
-          maxProgress: allAchievements[0].maxProgress,
+      if (processedAchievements.length > 0) {
+        console.log('📋 [AchievementsScreen] Sample processed achievement:', {
+          id: processedAchievements[0].ID,
+          name: processedAchievements[0].name,
+          isUnlocked: processedAchievements[0].isUnlocked,
+          currentProgress: processedAchievements[0].currentProgress,
+          maxProgress: processedAchievements[0].max_progress,
         });
-        
-        // Test bilingual processing
-        console.log('🌍 [AchievementsScreen] Bilingual test:');
-        console.log('  Original title might be: "¡Bienvenido!:Welcome!"');
-        console.log(`  Processed for ${language}:`, allAchievements[0].title);
       }
       
-      // Get total points
-      const totalPoints = await AchievementService.getTotalPoints(language);
-      
       // Calculate stats
-      const unlockedAchievements = allAchievements.filter(a => a.isUnlocked);
-      const completionPercentage = allAchievements.length > 0 
-        ? Math.round((unlockedAchievements.length / allAchievements.length) * 100)
+      const unlockedAchievements = processedAchievements.filter(a => a.isUnlocked);
+      const completionPercentage = processedAchievements.length > 0 
+        ? Math.round((unlockedAchievements.length / processedAchievements.length) * 100)
         : 0;
       
-      setAchievements(allAchievements);
+      // Calculate total points
+      const totalPoints = unlockedAchievements.reduce((sum, achievement) => sum + (achievement.points || 0), 0);
+      
+      setAllAchievements(serverAchievements);
+      setUserAchievements(serverUserAchievements);
+      setAchievements(processedAchievements);
       setStats({
         totalUnlocked: unlockedAchievements.length,
-        totalAchievements: allAchievements.length,
+        totalAchievements: processedAchievements.length,
         completionPercentage,
         totalPoints,
       });
       
       console.log('📊 [AchievementsScreen] Stats:', {
         unlocked: unlockedAchievements.length,
-        total: allAchievements.length,
+        total: processedAchievements.length,
         completion: completionPercentage,
         points: totalPoints
       });
@@ -183,23 +247,7 @@ const AchievementsScreen = () => {
     }
   };
 
-  const onRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      console.log('🔄 [AchievementsScreen] Refreshing achievements...');
-      await loadAchievements();
-    } catch (error) {
-      console.error('❌ [AchievementsScreen] Error refreshing achievements:', error);
-      Alert.alert(
-        'Error de carga', 
-        language === 'es' 
-          ? 'No se pudieron actualizar los logros'
-          : 'Could not update achievements'
-      );
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
+  const onRefresh = refreshAchievements;
 
   const getFilteredAchievements = () => {
     if (selectedCategory === 'all') {
@@ -228,14 +276,14 @@ const AchievementsScreen = () => {
     }
   };
 
-  const renderAchievementCard = (achievement: Achievement, index: number) => {
-    const progressPercentage = achievement.maxProgress > 0 
-      ? Math.min((achievement.currentProgress / achievement.maxProgress) * 100, 100)
+  const renderAchievementCard = (achievement: ProcessedAchievement, index: number) => {
+    const progressPercentage = achievement.max_progress > 0 
+      ? Math.min((achievement.currentProgress / achievement.max_progress) * 100, 100)
       : achievement.isUnlocked ? 100 : 0;
 
     return (
       <Animated.View
-        key={achievement.id}
+        key={achievement.ID}
         style={[
           styles.achievementCardContainer,
           {
@@ -279,7 +327,7 @@ const AchievementsScreen = () => {
                 styles.achievementTitle,
                 achievement.isUnlocked && styles.achievementTitleUnlocked
               ]}>
-                {achievement.title}
+                {achievement.name}
               </Text>
               <Text style={[
                 styles.achievementDescription,
@@ -300,7 +348,7 @@ const AchievementsScreen = () => {
           </View>
 
           {/* Progress Bar */}
-          {achievement.maxProgress > 0 && (
+          {achievement.max_progress > 0 && (
             <View style={styles.progressSection}>
               <View style={styles.progressBar}>
                 <View
@@ -314,7 +362,7 @@ const AchievementsScreen = () => {
                 />
               </View>
               <Text style={styles.progressText}>
-                {achievement.currentProgress}/{achievement.maxProgress}
+                {achievement.currentProgress}/{achievement.max_progress}
               </Text>
             </View>
           )}

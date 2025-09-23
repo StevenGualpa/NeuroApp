@@ -15,16 +15,15 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
-import AchievementNotification from '../components/AchievementNotification';
 import AchievementCelebration from '../components/AchievementCelebration';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { MessageCarousel } from '../components/MessageCarousel';
-import { AchievementService, Achievement } from '../services/AchievementService';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAchievementContext } from '../contexts/AchievementContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 import { Image } from 'react-native';
 
@@ -63,6 +62,9 @@ const SelectOptionScreen = () => {
 
   // Real progress hook
   const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
+  
+  // Achievement system hook
+  const { recordGameCompletion: recordAchievementCompletion, recordHelpUsed } = useAchievementContext();
 
   // Bilingual states
   const [processedStep, setProcessedStep] = useState(step);
@@ -78,10 +80,7 @@ const SelectOptionScreen = () => {
   const [showAnimation, setShowAnimation] = useState(false);
   const [animationType, setAnimationType] = useState<'success' | 'error' | 'winner' | 'loser'>('success');
 
-  // Achievement states
-  const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
-  const [showAchievementNotification, setShowAchievementNotification] = useState(false);
-  const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
+  // Legacy achievement states (removed - now using AchievementContext)
   
   // New celebration states
   const [unlockedAchievements, setUnlockedAchievements] = useState<ServerAchievement[]>([]);
@@ -204,16 +203,7 @@ const SelectOptionScreen = () => {
   }, []);
 
   // Initialize achievements service
-  useEffect(() => {
-    const initAchievements = async () => {
-      try {
-        await AchievementService.initializeAchievements();
-      } catch (error) {
-        // Error inicializando logros
-      }
-    };
-    initAchievements();
-  }, []);
+  // Achievement initialization is now handled by AchievementContext
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, completionTime: number, firstTry: boolean): number => {
@@ -248,6 +238,16 @@ const SelectOptionScreen = () => {
       helpActivations: (prev.helpActivations || 0) + 1,
     }));
     
+    // Record help usage for achievements
+    try {
+      const lessonId = (step as any).lesson_id;
+      const stepId = (step as any).ID || step.id;
+      recordHelpUsed(lessonId, stepId);
+      console.log('📝 [SelectOptionScreen] Uso de ayuda registrado para achievements');
+    } catch (error) {
+      console.error('❌ [SelectOptionScreen] Error registrando uso de ayuda:', error);
+    }
+    
     // Start blinking animation
     const blinkAnimation = () => {
       Animated.sequence([
@@ -278,7 +278,7 @@ const SelectOptionScreen = () => {
       setBlinkingOptionIndex(null);
       helpBlinkAnimation.setValue(1);
     }, 5000);
-  }, [helpBlinkAnimation, isHelpActive, gameCompleted, score]);
+  }, [helpBlinkAnimation, isHelpActive, gameCompleted, score, recordHelpUsed, step]);
 
   // Initialize adaptive reinforcement service
   useEffect(() => {
@@ -343,25 +343,7 @@ const SelectOptionScreen = () => {
   }, []);
 
   // Handle achievement notifications queue
-  const processAchievementQueue = useCallback(() => {
-    if (achievementQueue.length > 0 && !showAchievementNotification) {
-      const nextAchievement = achievementQueue[0];
-      setNewAchievement(nextAchievement);
-      setShowAchievementNotification(true);
-      setAchievementQueue(prev => prev.slice(1));
-    }
-  }, [achievementQueue, showAchievementNotification]);
-
-  const handleAchievementNotificationHide = useCallback(() => {
-    setShowAchievementNotification(false);
-    setNewAchievement(null);
-    
-    setTimeout(() => {
-      if (!isMountedRef.current) return;
-      
-      processAchievementQueue();
-    }, 1000);
-  }, [processAchievementQueue]);
+  // Legacy achievement functions removed - now handled by AchievementContext
 
   // Save progress to backend
   const saveProgressToBackend = useCallback(async (finalStats: GameStats) => {
@@ -407,57 +389,33 @@ const SelectOptionScreen = () => {
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
+      console.log('🎮 [SelectOptionScreen] Registrando finalización de juego:', finalStats);
+      
       // 1. Save progress to backend first
       await saveProgressToBackend(finalStats);
 
-      // 2. Use the enhanced achievement service that syncs with server
-      const _gameData = {
-        stars: finalStats.stars,
-        isPerfect: finalStats.perfectRun,
-        completionTime: finalStats.completionTime,
-        errors: finalStats.errors,
-        activityType: t.games.activityTypes.selectOption,
-        showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
-        usedHelp: finalStats.usedHelp || false,
-        tookTime: finalStats.completionTime > 60000,
+      // 2. Use the new achievement system
+      const gameData = {
         lessonId: (step as any).lesson_id,
         stepId: (step as any).ID || step.id,
+        stars: finalStats.stars,
+        completionTime: Math.round(finalStats.completionTime / 1000), // Convertir a segundos
+        errors: finalStats.errors,
+        usedHelp: finalStats.usedHelp || false,
+        perfectRun: finalStats.perfectRun,
+        activityType: 'completion', // Categoría para el sistema de logros
       };
 
-      // Use the local achievement service (temporarily disabled server sync)
-      const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
+      // Record achievement completion (notifications handled automatically by AchievementContext)
+      await recordAchievementCompletion(gameData);
       
-      if (newlyUnlocked.length > 0) {
-        // Convert to server achievement format for celebration
-        const serverAchievements: ServerAchievement[] = newlyUnlocked.map(achievement => ({
-          ID: achievement.ID || 0,
-          name: achievement.name || achievement.title,
-          description: achievement.description,
-          icon: achievement.icon,
-          rarity: achievement.rarity || 'common',
-          points: achievement.points || 0,
-          category: achievement.category || 'general',
-        }));
-        
-        setUnlockedAchievements(serverAchievements);
-        
-        // Show celebration after a short delay
-        setTimeout(() => {
-          if (!isMountedRef.current) return;
-          
-          setShowCelebration(true);
-        }, 1500);
-      }
+      console.log('✅ [SelectOptionScreen] Finalización registrada exitosamente');
     } catch (error) {
-      Alert.alert(
-        language === 'es' ? 'Error' : 'Error',
-        language === 'es' 
-          ? 'No se pudieron verificar los logros. Tu progreso se ha guardado.'
-          : 'Could not verify achievements. Your progress has been saved.',
-        [{ text: 'OK' }]
-      );
+      console.error('❌ [SelectOptionScreen] Error registrando finalización:', error);
+      // No mostrar alert para achievements - el usuario no necesita saber si fallan
+      // El progreso ya se guardó exitosamente
     }
-  }, [saveProgressToBackend, step, language, t.games.activityTypes.selectOption]);
+  }, [saveProgressToBackend, recordAchievementCompletion, step]);
 
   // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
@@ -612,10 +570,7 @@ const SelectOptionScreen = () => {
     setUnlockedAchievements([]);
   }, []);
 
-  // Process achievement queue when it changes
-  useEffect(() => {
-    processAchievementQueue();
-  }, [processAchievementQueue]);
+  // Achievement queue processing is now handled by AchievementContext
 
   const isGameComplete = score === 1;
 
@@ -812,14 +767,7 @@ const SelectOptionScreen = () => {
         onClose={handleCelebrationClose}
       />
 
-      {/* Achievement Notification */}
-      {newAchievement && (
-        <AchievementNotification
-          achievement={newAchievement}
-          visible={showAchievementNotification}
-          onHide={handleAchievementNotificationHide}
-        />
-      )}
+      {/* Achievement notifications are now handled globally by AchievementContext */}
     </SafeAreaView>
   );
 };

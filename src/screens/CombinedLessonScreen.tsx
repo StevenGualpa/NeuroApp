@@ -73,7 +73,6 @@ const CombinedLessonScreen = () => {
   // Procesar lecciones cuando cambie el idioma
   useEffect(() => {
     if (rawLessons.length > 0) {
-      console.log(`🌍 [CombinedLessonScreen] Procesando ${rawLessons.length} lecciones para idioma: ${language}`);
       processLessonsForLanguage();
     }
   }, [language, rawLessons]);
@@ -108,14 +107,12 @@ const CombinedLessonScreen = () => {
 
   const loadCategories = async () => {
     try {
-      console.log('📂 [CombinedLessonScreen] Cargando categorías...');
       const categoriesData = await ApiService.getCategories();
       setCategories(categoriesData);
       
       // Encontrar la categoría seleccionada por nombre
       const foundCategory = categoriesData.find(cat => cat.name === category);
       setSelectedCategory(foundCategory || null);
-      console.log(`✅ [CombinedLessonScreen] Categoría encontrada: ${foundCategory?.name || 'No encontrada'}`);
     } catch (error) {
       console.error('❌ [CombinedLessonScreen] Error loading categories:', error);
     }
@@ -124,17 +121,14 @@ const CombinedLessonScreen = () => {
   const loadLessons = async () => {
     try {
       setLoading(true);
-      console.log(`📚 [CombinedLessonScreen] Cargando lecciones para categoría: ${category}`);
       
       // Primero obtener todas las categorías para encontrar el ID
       const categoriesData = await ApiService.getCategories();
       const foundCategory = categoriesData.find(cat => cat.name === category);
       
       if (foundCategory) {
-        console.log(`✅ [CombinedLessonScreen] Categoría encontrada: ID ${foundCategory.ID}`);
         // Cargar lecciones por categoría
         const lessonsData = await ApiService.getLessonsByCategory(foundCategory.ID);
-        console.log(`📋 [CombinedLessonScreen] ${lessonsData.length} lecciones cargadas`);
         
         // Filtrar por activityType si está presente
         let filteredLessons = lessonsData;
@@ -157,7 +151,6 @@ const CombinedLessonScreen = () => {
         // Procesar inmediatamente para el idioma actual
         processLessonsForLanguage(sortedLessons);
         
-        console.log(`✅ [CombinedLessonScreen] ${sortedLessons.length} lecciones cargadas desde servidor`);
       } else {
         console.log('❌ [CombinedLessonScreen] Categoría no encontrada');
         setLessons([]);
@@ -211,7 +204,6 @@ const CombinedLessonScreen = () => {
         let filteredSteps = stepsData;
         if (activityTypeId) {
           filteredSteps = stepsData.filter(step => step.activity_type_id === activityTypeId);
-          console.log(`🔍 [CombinedLessonScreen] Lección "${lesson.title}": ${stepsData.length} pasos → ${filteredSteps.length} filtrados`);
         }
         
         // Si no hay pasos que coincidan con el filtro, retornar array vacío
@@ -255,13 +247,11 @@ const CombinedLessonScreen = () => {
       return a.sort_order - b.sort_order;
     });
     
-    console.log(`✅ [CombinedLessonScreen] ${sortedSteps.length} pasos cargados y procesados${activityType ? ` para actividad "${activityType}"` : ''}`);
     setAllSteps(sortedSteps);
   };
 
   const loadStepsForLesson = async (lessonId: number) => {
     try {
-      console.log(`📝 [CombinedLessonScreen] Cargando pasos para lección ID: ${lessonId}`);
       
       // Cargar pasos por lección con opciones
       const stepsData = await ApiService.getStepsByLessonWithOptions(lessonId);
@@ -269,7 +259,6 @@ const CombinedLessonScreen = () => {
       // Ordenar por sort_order
       const sortedSteps = stepsData.sort((a, b) => a.sort_order - b.sort_order);
       
-      console.log(`✅ [CombinedLessonScreen] ${sortedSteps.length} pasos cargados para lección ${lessonId}`);
       
       return sortedSteps;
     } catch (error) {
@@ -347,7 +336,6 @@ const CombinedLessonScreen = () => {
   const navigateToActivity = (activityType: string, convertedStep: any, lessonTitle: string) => {
     const cleanActivityType = extractActivityType(activityType);
     
-    console.log(`🚀 [CombinedLessonScreen] Navegando a actividad: "${activityType}" → "${cleanActivityType}"`);
     
     switch (cleanActivityType) {
       case t.games.activityTypes.memoryGame:

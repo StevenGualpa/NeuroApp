@@ -1,8 +1,9 @@
 // src/hooks/useRealAchievements.ts
 import { useState, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
-import { AchievementService } from '../services/AchievementService';
+import RealAchievementService from '../services/RealAchievementService';
 import { Achievement } from '../services/ApiService';
+import { useAuthContext } from './useAuth';
 
 interface GameCompletionData {
   stars: number;
@@ -36,14 +37,17 @@ export const useRealAchievements = (): UseRealAchievementsReturn => {
   const [showAchievementNotification, setShowAchievementNotification] = useState(false);
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
   const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Get current user
+  const { user } = useAuthContext();
 
   // Initialize achievements service
   const initializeAchievements = useCallback(async () => {
-    if (isInitialized) return;
+    if (isInitialized || !user?.id) return;
     
     try {
       console.log('🏆 Initializing Real Achievement Service...');
-      await AchievementService.initializeAchievements();
+      await RealAchievementService.initialize(user.id);
       setIsInitialized(true);
       console.log('✅ Real Achievement Service initialized');
     } catch (error) {
@@ -51,7 +55,7 @@ export const useRealAchievements = (): UseRealAchievementsReturn => {
       // Continue without achievements if there's an error
       setIsInitialized(true);
     }
-  }, [isInitialized]);
+  }, [isInitialized, user?.id]);
 
   // Process achievement queue
   const processAchievementQueue = useCallback(() => {
@@ -84,11 +88,10 @@ export const useRealAchievements = (): UseRealAchievementsReturn => {
       console.log('🎮 Recording game completion with Real Achievement Service...');
       console.log('📊 Game data:', gameData);
 
-      // const newlyUnlocked = await RealAchievementService.recordGameCompletion(gameData);
-      const newlyUnlocked: Achievement[] = []; // Temporalmente deshabilitado
+      const newlyUnlocked = await RealAchievementService.recordGameCompletion(gameData);
       
       if (newlyUnlocked.length > 0) {
-        console.log(`🏆 Unlocked ${newlyUnlocked.length} new achievements:`, newlyUnlocked.map(a => a.name));
+        console.log(`🏆 Unlocked ${newlyUnlocked.length} new achievements:`, newlyUnlocked.map(a => a.title));
         setAchievementQueue(prev => [...prev, ...newlyUnlocked]);
         
         if (!showAchievementNotification) {
@@ -109,15 +112,29 @@ export const useRealAchievements = (): UseRealAchievementsReturn => {
     }
   }, [isInitialized, showAchievementNotification, processAchievementQueue]);
 
-  // Initialize on mount
+  // Initialize on mount and when user changes
   useEffect(() => {
-    initializeAchievements();
-  }, [initializeAchievements]);
+    if (user?.id) {
+      setIsInitialized(false); // Reset initialization when user changes
+      initializeAchievements();
+    }
+  }, [user?.id, initializeAchievements]);
 
   // Process achievement queue when it changes
   useEffect(() => {
     processAchievementQueue();
   }, [processAchievementQueue]);
+  
+  // Clear achievements when user logs out
+  useEffect(() => {
+    if (!user) {
+      setIsInitialized(false);
+      setAchievementQueue([]);
+      setNewAchievement(null);
+      setShowAchievementNotification(false);
+      RealAchievementService.clearCache();
+    }
+  }, [user]);
 
   return {
     // States

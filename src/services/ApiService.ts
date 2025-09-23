@@ -138,6 +138,7 @@ export interface Achievement {
   UpdatedAt: string;
   DeletedAt: string | null;
   name: string;
+  title?: string; // Fallback compatibility
   description: string;
   icon: string;
   category: string;
@@ -498,7 +499,18 @@ class ApiService {
 
   // Achievements endpoints
   async getAchievements(): Promise<Achievement[]> {
-    return this.makeRequest<Achievement[]>(API_ENDPOINTS.ACHIEVEMENTS);
+    console.log('📡 [ApiService] Llamando a getAchievements()...');
+    console.log('📡 [ApiService] Endpoint:', API_ENDPOINTS.ACHIEVEMENTS);
+    
+    try {
+      const result = await this.makeRequest<Achievement[]>(API_ENDPOINTS.ACHIEVEMENTS);
+      console.log('✅ [ApiService] getAchievements() exitoso:', result.length, 'achievements');
+      console.log('📋 [ApiService] Sample achievement:', result[0]);
+      return result;
+    } catch (error) {
+      console.error('❌ [ApiService] Error en getAchievements():', error);
+      throw error;
+    }
   }
 
   async getAchievementById(id: number): Promise<Achievement> {
@@ -524,15 +536,28 @@ class ApiService {
     );
   }
 
-  async updateAchievementProgress(userId: number, achievementId: number, progress: number): Promise<{ message: string; achievement: UserAchievement }> {
+  async updateAchievementProgress(
+    userId: number, 
+    achievementId: number, 
+    progress: number, 
+    isUnlocked?: boolean
+  ): Promise<{ message: string; achievement: UserAchievement }> {
+    const body: any = { progress };
+    
+    if (isUnlocked !== undefined) {
+      body.is_unlocked = isUnlocked;
+      body.unlocked_at = isUnlocked ? new Date().toISOString() : null;
+    }
+    
     return this.makeRequest<{ message: string; achievement: UserAchievement }>(
       API_ENDPOINTS.UPDATE_ACHIEVEMENT_PROGRESS(userId, achievementId),
       {
         method: 'PUT',
-        body: JSON.stringify({ progress }),
+        body: JSON.stringify(body),
       }
     );
   }
+
 
   // Sessions endpoints
   async startSession(sessionData: Partial<GameSession>): Promise<{ message: string; session: GameSession }> {

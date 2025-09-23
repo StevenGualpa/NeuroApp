@@ -56,7 +56,6 @@ const ActivityMenuScreen = () => {
   // Procesar actividades cuando cambie el idioma
   useEffect(() => {
     if (rawActivities.length > 0) {
-      console.log(`🌍 [ActivityMenuScreen] Procesando ${rawActivities.length} actividades para idioma: ${language}`);
       processActivitiesForLanguage();
     }
   }, [language, rawActivities]);
@@ -87,20 +86,9 @@ const ActivityMenuScreen = () => {
   const loadActivities = async () => {
     try {
       setLoading(true);
-      console.log('🎮 [ActivityMenuScreen] Cargando actividades desde API...');
       const activitiesData = await ApiService.getActivities();
       
-      console.log('📋 [ActivityMenuScreen] Datos originales del servidor:');
-      activitiesData.forEach((activity, index) => {
-        console.log(`  ${index + 1}. ID: ${activity.ID}`);
-        console.log(`     Name: "${activity.name}"`);
-        console.log(`     Description: "${activity.description}"`);
-        console.log(`     🖼️ Icon URL: "${activity.icon}"`);
-        console.log(`     📁 Imagen: "${activity.imagen}"`);
-        console.log(`     Has colon in name: ${activity.name?.includes(':') || false}`);
-        console.log(`     Has colon in description: ${activity.description?.includes(':') || false}`);
-        console.log(`     Is active: ${activity.is_active}`);
-      });
+     
       
       // Guardar datos originales
       setRawActivities(activitiesData);
@@ -108,7 +96,6 @@ const ActivityMenuScreen = () => {
       // Procesar inmediatamente para el idioma actual
       processActivitiesForLanguage(activitiesData);
       
-      console.log(`✅ [ActivityMenuScreen] ${activitiesData.length} actividades cargadas desde servidor`);
       
       // Initialize scale animations for each activity
       scaleValues.length = 0;
@@ -136,8 +123,6 @@ const ActivityMenuScreen = () => {
   const processActivitiesForLanguage = (activitiesToProcess?: Activity[]) => {
     const sourceActivities = activitiesToProcess || rawActivities;
     
-    console.log(`🌍 [ActivityMenuScreen] NUEVO PROCESAMIENTO - ${sourceActivities.length} actividades para idioma: ${language}`);
-    console.log(`🔧 [ActivityMenuScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
     
     if (sourceActivities.length === 0) {
       console.log('⚠️ [ActivityMenuScreen] No hay actividades para procesar');
@@ -148,18 +133,12 @@ const ActivityMenuScreen = () => {
     const processedActivities = sourceActivities.map((activity, index) => {
       const originalName = activity.name || '';
       const originalDescription = activity.description || '';
-      
-      console.log(`🧪 [ActivityMenuScreen] ANTES del procesamiento ${index + 1}:`);
-      console.log(`   Original name: "${originalName}"`);
-      console.log(`   Tiene colon: ${originalName.includes(':')}`);
+ 
       
       const processedName = BilingualTextProcessor.extractText(originalName, language);
       const processedDescription = BilingualTextProcessor.extractText(originalDescription, language);
       
-      console.log(`🎯 [ActivityMenuScreen] DESPUÉS del procesamiento ${index + 1}:`);
-      console.log(`   Processed name: "${processedName}"`);
-      console.log(`   Language usado: ${language}`);
-      console.log(`   Cambió: ${originalName !== processedName ? 'SÍ' : 'NO'}`);
+  
       
       return {
         ...activity,
@@ -167,12 +146,7 @@ const ActivityMenuScreen = () => {
         description: processedDescription,
       };
     });
-    
-    console.log(`✅ [ActivityMenuScreen] RESULTADO FINAL - Actividades procesadas para idioma: ${language}`);
-    console.log('📋 [ActivityMenuScreen] Lista completa procesada:');
-    processedActivities.forEach((activity, index) => {
-      console.log(`  ${index + 1}. "${activity.name}"`);
-    });
+  
     
     setActivities(processedActivities);
   };

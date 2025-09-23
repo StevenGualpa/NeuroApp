@@ -65,7 +65,6 @@ const CategoryMenuScreen = () => {
   // Procesar categorías cuando cambie el idioma
   useEffect(() => {
     if (rawCategories.length > 0) {
-      console.log(`🌍 [CategoryMenuScreen] Procesando ${rawCategories.length} categorías para idioma: ${language}`);
       processCategoriesForLanguage();
     }
   }, [language, rawCategories]);
@@ -96,20 +95,9 @@ const CategoryMenuScreen = () => {
   const loadCategories = async () => {
     try {
       setLoading(true);
-      console.log('📂 [CategoryMenuScreen] Cargando categorías desde API...');
       const categoriesData = await ApiService.getCategories();
       
-      console.log('📋 [CategoryMenuScreen] Datos originales del servidor:');
-      categoriesData.forEach((category, index) => {
-        console.log(`  ${index + 1}. ID: ${category.ID}`);
-        console.log(`     Name: "${category.name}"`);
-        console.log(`     Description: "${category.description}"`);
-        console.log(`     🖼️ Icon URL: "${category.icon}"`);
-        console.log(`     Has colon in name: ${category.name?.includes(':') || false}`);
-        console.log(`     Has colon in description: ${category.description?.includes(':') || false}`);
-        console.log(`     Is active: ${category.is_active}`);
-      });
-      
+
       let filteredCategories = categoriesData;
       
       // Si hay un tipo de actividad específico, filtrar categorías
@@ -178,7 +166,6 @@ const CategoryMenuScreen = () => {
       // Procesar inmediatamente para el idioma actual
       processCategoriesForLanguage(sortedCategories);
       
-      console.log(`✅ [CategoryMenuScreen] ${sortedCategories.length} categorías cargadas desde servidor`);
       
       // Initialize scale animations for each category
       scaleValues.length = 0;
@@ -204,8 +191,6 @@ const CategoryMenuScreen = () => {
   const processCategoriesForLanguage = (categoriesToProcess?: Category[]) => {
     const sourceCategories = categoriesToProcess || rawCategories;
     
-    console.log(`🌍 [CategoryMenuScreen] NUEVO PROCESAMIENTO - ${sourceCategories.length} categorías para idioma: ${language}`);
-    console.log(`🔧 [CategoryMenuScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
     
     if (sourceCategories.length === 0) {
       console.log('⚠️ [CategoryMenuScreen] No hay categorías para procesar');
@@ -217,17 +202,10 @@ const CategoryMenuScreen = () => {
       const originalName = category.name || '';
       const originalDescription = category.description || '';
       
-      console.log(`🧪 [CategoryMenuScreen] ANTES del procesamiento ${index + 1}:`);
-      console.log(`   Original name: "${originalName}"`);
-      console.log(`   Tiene colon: ${originalName.includes(':')}`);
       
       const processedName = BilingualTextProcessor.extractText(originalName, language);
       const processedDescription = BilingualTextProcessor.extractText(originalDescription, language);
       
-      console.log(`🎯 [CategoryMenuScreen] DESPUÉS del procesamiento ${index + 1}:`);
-      console.log(`   Processed name: "${processedName}"`);
-      console.log(`   Language usado: ${language}`);
-      console.log(`   Cambió: ${originalName !== processedName ? 'SÍ' : 'NO'}`);
       
       return {
         ...category,
@@ -235,12 +213,7 @@ const CategoryMenuScreen = () => {
         description: processedDescription,
       };
     });
-    
-    console.log(`✅ [CategoryMenuScreen] RESULTADO FINAL - Categorías procesadas para idioma: ${language}`);
-    console.log('📋 [CategoryMenuScreen] Lista completa procesada:');
-    processedCategories.forEach((category, index) => {
-      console.log(`  ${index + 1}. "${category.name}"`);
-    });
+
     
     setCategories(processedCategories);
   };
