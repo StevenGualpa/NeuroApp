@@ -2,11 +2,11 @@
 
 NeuroApp es una aplicación móvil educativa diseñada específicamente para usuarios neurodivergentes, que ofrece actividades interactivas, gamificación, sistema de progreso personalizado y configuraciones avanzadas de accesibilidad.
 
-## 📱 **Versión Actual: 2.3.0**
+## 📱 **Versión Actual: 2.4.0**
 
-### 🎉 **NUEVA VERSIÓN 2.3 - ¡DISPONIBLE AHORA!**
+### 🎉 **NUEVA VERSIÓN 2.4 - ¡DISEÑO UNIFICADO COMPLETO!**
 
-#### 🔧 **CONFIGURACIONES AVANZADAS COMPLETAS**
+#### 🎨 **INTERFAZ TOTALMENTE RENOVADA**
 **La funcionalidad estrella de esta versión**
 - ✅ **6 configuraciones activas** completamente funcionales
 - ✅ **Sistema de recuperación de contraseña** con modal multi-paso
