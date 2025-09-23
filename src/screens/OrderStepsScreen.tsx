@@ -143,6 +143,9 @@ const OrderStepsScreen = () => {
   const [helpBlinkAnimation] = useState(new Animated.Value(1));
   const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
   const audioService = useRef(AudioService.getInstance());
+  
+  // Mount control for safe state updates
+  const isMountedRef = useRef(true);
 
   // Memoized values
   const totalSteps = useMemo(() => shuffledOptions.length, [shuffledOptions]);
@@ -191,6 +194,13 @@ const OrderStepsScreen = () => {
     processStepForLanguage();
   }, [language]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Initialize achievements service
   useEffect(() => {
     const initAchievements = async () => {
@@ -227,10 +237,14 @@ const OrderStepsScreen = () => {
         // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
-        if (step.helpMessage) {
-          helpMessage = step.helpMessage;
+        if (processedStep.helpMessage) {
+          // Use the already processed helpMessage from the step
+          helpMessage = processedStep.helpMessage;
+          console.log(`🔊 Using processed lesson help: ${helpMessage}`);
         } else {
-          helpMessage = message;
+          // Process the service message for current language
+          helpMessage = BilingualTextProcessor.extractText(message, language);
+          console.log(`🔊 Using processed default help for ${_activityType}: ${helpMessage}`);
         }
         
         audioService.current.playTextToSpeech(helpMessage, true); // true indica que es mensaje de ayuda
@@ -290,6 +304,8 @@ const OrderStepsScreen = () => {
     
     // Stop help after 5 seconds
     setTimeout(() => {
+      if (!isMountedRef.current) return;
+      
       setIsHelpActive(false);
       setBlinkingStepIndex(null);
       helpBlinkAnimation.setValue(1);
@@ -342,6 +358,8 @@ const OrderStepsScreen = () => {
     setNewAchievement(null);
     
     setTimeout(() => {
+      if (!isMountedRef.current) return;
+      
       processAchievementQueue();
     }, 1000);
   }, [processAchievementQueue]);
@@ -426,6 +444,8 @@ const OrderStepsScreen = () => {
         
         // Show celebration after a short delay
         setTimeout(() => {
+          if (!isMountedRef.current) return;
+          
           setShowCelebration(true);
         }, 1500);
         
@@ -477,6 +497,8 @@ const OrderStepsScreen = () => {
       
       // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
       setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         setShowStars(true);
       }, 800);
     } else if (animationType === 'winner' && score !== totalSteps) {
@@ -534,10 +556,14 @@ const OrderStepsScreen = () => {
 
       setDisabled(true);
       setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         showFeedbackAnimation('error');
         // Play error guidance audio
         audioService.current.playErrorGuidanceMessage();
         setTimeout(() => {
+          if (!isMountedRef.current) return;
+          
           Alert.alert(
             '🤔 ¡Inténtalo otra vez!', 
             'Ese no era el paso correcto. ¡Tú puedes hacerlo!',
@@ -554,6 +580,8 @@ const OrderStepsScreen = () => {
       // TODOS LOS PASOS COMPLETADOS CORRECTAMENTE
       
       setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         showFeedbackAnimation('winner');
       }, 500);
     } else {
@@ -1100,49 +1128,55 @@ const styles = StyleSheet.create({
   },
   stepNumber: {
     position: 'absolute',
-    top: -10,
-    right: -10,
-    width: 36,
-    height: 36,
+    top: -12,
+    right: -12,
+    width: 40,
+    height: 40,
     backgroundColor: '#4caf50',
-    borderRadius: 18,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#4caf50',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 10,
-    borderWidth: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 12,
+    borderWidth: 4,
     borderColor: '#ffffff',
   },
   stepNumberText: {
     color: '#ffffff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '900',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   wrongIndicator: {
     position: 'absolute',
-    top: -10,
-    right: -10,
-    width: 36,
-    height: 36,
+    top: -12,
+    right: -12,
+    width: 40,
+    height: 40,
     backgroundColor: '#f44336',
-    borderRadius: 18,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#f44336',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 10,
-    borderWidth: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 12,
+    elevation: 12,
+    borderWidth: 4,
     borderColor: '#ffffff',
   },
   wrongIndicatorText: {
     color: '#ffffff',
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '900',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   resetContainer: {
     alignItems: 'center',

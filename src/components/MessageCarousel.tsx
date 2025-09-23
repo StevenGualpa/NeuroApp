@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,9 +19,21 @@ export const MessageCarousel: React.FC<MessageCarouselProps> = ({
 }) => {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [fadeAnim] = useState(new Animated.Value(1));
+  const isMountedRef = useRef(true);
+  const animationRef = useRef<any>(null);
 
-  // Mensajes según el estado del juego
-  const getMessages = () => {
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (animationRef.current) {
+        animationRef.current.stop();
+      }
+    };
+  }, []);
+
+  // Memoized messages to prevent recalculation on every render
+  const messages = useMemo(() => {
     if (score === 0) {
       return language === 'es' 
         ? [
@@ -65,38 +77,68 @@ export const MessageCarousel: React.FC<MessageCarouselProps> = ({
             '🎯 Keep it up!'
           ];
     }
-  };
+  }, [score, totalItems, language]);
 
-  const messages = getMessages();
+  // Safe state update function
+  const safeSetCurrentMessageIndex = useCallback((newIndex: number) => {
+    if (isMountedRef.current) {
+      setCurrentMessageIndex(newIndex);
+    }
+  }, []);
 
-  // Cambiar mensaje cada 3 segundos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Fade out
-      Animated.timing(fadeAnim, {
-        toValue: 0,
+  // Animation sequence
+  const animateMessageChange = useCallback(() => {
+    if (!isMountedRef.current) return;
+
+    // Fade out
+    animationRef.current = Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    });
+
+    animationRef.current.start((finished: any) => {
+      if (!finished || !isMountedRef.current) return;
+
+      // Update message index
+      safeSetCurrentMessageIndex((prev) => (prev + 1) % messages.length);
+      
+      // Fade in
+      animationRef.current = Animated.timing(fadeAnim, {
+        toValue: 1,
         duration: 300,
         useNativeDriver: true,
-      }).start(() => {
-        // Cambiar mensaje
-        setCurrentMessageIndex((prev) => (prev + 1) % messages.length);
-        
-        // Fade in
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
       });
+
+      animationRef.current.start();
+    });
+  }, [fadeAnim, messages.length, safeSetCurrentMessageIndex]);
+
+  // Carousel timer effect
+  useEffect(() => {
+    if (messages.length <= 1) return;
+
+    const interval = setInterval(() => {
+      animateMessageChange();
     }, 3000);
 
-    return () => clearInterval(interval);
-  }, [messages.length, fadeAnim]);
+    return () => {
+      clearInterval(interval);
+      if (animationRef.current) {
+        animationRef.current.stop();
+      }
+    };
+  }, [animateMessageChange, messages.length]);
 
-  // Reiniciar al primer mensaje cuando cambia el estado del juego
+  // Reset when game state changes
   useEffect(() => {
-    setCurrentMessageIndex(0);
-    fadeAnim.setValue(1);
+    if (isMountedRef.current) {
+      setCurrentMessageIndex(0);
+      fadeAnim.setValue(1);
+      if (animationRef.current) {
+        animationRef.current.stop();
+      }
+    }
   }, [score, totalItems, fadeAnim]);
 
   return (

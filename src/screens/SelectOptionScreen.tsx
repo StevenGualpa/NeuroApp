@@ -114,6 +114,9 @@ const SelectOptionScreen = () => {
   const [helpBlinkAnimation] = useState(new Animated.Value(1));
   const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
   const audioService = useRef(AudioService.getInstance());
+  
+  // Mount control for safe state updates
+  const isMountedRef = useRef(true);
 
   // Image error states for each option
   const [imageErrors, setImageErrors] = useState<boolean[]>([]);
@@ -193,6 +196,13 @@ const SelectOptionScreen = () => {
     processStepForLanguage();
   }, [language]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Initialize achievements service
   useEffect(() => {
     const initAchievements = async () => {
@@ -262,6 +272,8 @@ const SelectOptionScreen = () => {
     
     // Stop help after 5 seconds
     setTimeout(() => {
+      if (!isMountedRef.current) return;
+      
       setIsHelpActive(false);
       setBlinkingOptionIndex(null);
       helpBlinkAnimation.setValue(1);
@@ -294,10 +306,14 @@ const SelectOptionScreen = () => {
         // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
-        if (step.helpMessage) {
-          helpMessage = step.helpMessage;
+        if (processedStep.helpMessage) {
+          // Use the already processed helpMessage from the step
+          helpMessage = processedStep.helpMessage;
+          console.log(`🔊 Using processed lesson help: ${helpMessage}`);
         } else {
-          helpMessage = message;
+          // Process the service message for current language
+          helpMessage = BilingualTextProcessor.extractText(message, language);
+          console.log(`🔊 Using processed default help for ${_activityType}: ${helpMessage}`);
         }
         
         audioService.current.playTextToSpeech(helpMessage, true); // true indica que es mensaje de ayuda
@@ -341,6 +357,8 @@ const SelectOptionScreen = () => {
     setNewAchievement(null);
     
     setTimeout(() => {
+      if (!isMountedRef.current) return;
+      
       processAchievementQueue();
     }, 1000);
   }, [processAchievementQueue]);
@@ -425,6 +443,8 @@ const SelectOptionScreen = () => {
         
         // Show celebration after a short delay
         setTimeout(() => {
+          if (!isMountedRef.current) return;
+          
           setShowCelebration(true);
         }, 1500);
       }
@@ -472,6 +492,8 @@ const SelectOptionScreen = () => {
       
       // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
       setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         setShowStars(true);
       }, 800);
     }
@@ -920,20 +942,21 @@ const styles = StyleSheet.create({
   },
   optionCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 14,
-    padding: 8,
+    borderRadius: 16,
+    padding: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 100,
+    minHeight: 120,
     shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
     borderWidth: 2,
     borderColor: '#e8f0fe',
-    borderTopWidth: 3,
+    borderTopWidth: 4,
     borderTopColor: '#4285f4',
+    transform: [{ scale: 1 }],
   },
   optionCardIdle: {
     // Estado normal
@@ -964,26 +987,30 @@ const styles = StyleSheet.create({
   iconContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
-    minWidth: 45,
-    minHeight: 45,
+    marginBottom: 10,
+    minWidth: 60,
+    minHeight: 60,
+    backgroundColor: 'rgba(66, 133, 244, 0.06)',
+    borderRadius: 12,
+    padding: 8,
   },
   optionIcon: {
-    fontSize: 28,
+    fontSize: 36,
     marginBottom: 0,
   },
   optionImage: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     borderRadius: 8,
     borderWidth: 0,
   },
   optionLabel: {
-    fontSize: 8,
+    fontSize: 12,
     textAlign: 'center',
     color: '#1a1a1a',
     fontWeight: '600',
-    letterSpacing: 0.1,
+    letterSpacing: 0.2,
+    lineHeight: 16,
   },
   selectedLabel: {
     fontWeight: '700',

@@ -29,13 +29,13 @@ export class AdaptiveReinforcementService {
       inactivityTimeoutMs: 8000, // 8 seconds
       maxConsecutiveErrors: 2,
       helpMessages: {
-        'Selecciona la opción correcta': 'Piensa bien y elige la respuesta correcta',
-        'Asocia elementos': 'Conecta los elementos que van juntos',
-        'Ordena los pasos': 'Ordena los pasos en el orden correcto',
-        'Arrastra y suelta': 'Arrastra cada elemento a su lugar correcto',
-        'Memoria visual': 'Recuerda dónde están los pares iguales',
-        'Reconocimiento de patrones': 'Observa el patrón y complétalo',
-        'default': 'Tómate tu tiempo y piensa bien antes de responder'
+        'Selecciona la opción correcta': 'Piensa bien y elige la respuesta correcta:Think carefully and choose the correct answer',
+        'Asocia elementos': 'Conecta los elementos que van juntos:Connect the elements that go together',
+        'Ordena los pasos': 'Ordena los pasos en el orden correcto:Order the steps in the correct sequence',
+        'Arrastra y suelta': 'Arrastra cada elemento a su lugar correcto:Drag each element to its correct place',
+        'Memoria visual': 'Recuerda dónde están los pares iguales:Remember where the matching pairs are',
+        'Reconocimiento de patrones': 'Observa el patrón y complétalo:Observe the pattern and complete it',
+        'default': 'Tómate tu tiempo y piensa bien antes de responder:Take your time and think carefully before answering'
       }
     };
 

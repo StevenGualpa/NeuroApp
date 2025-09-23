@@ -174,6 +174,13 @@ const DragDropScreen = () => {
     processStepForLanguage();
   }, [language]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
 
   // Adaptive reinforcement states
   const [isHelpActive, setIsHelpActive] = useState(false);
@@ -182,6 +189,9 @@ const DragDropScreen = () => {
   const [helpBlinkAnimation] = useState(new Animated.Value(1));
   const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
   const audioService = useRef(AudioService.getInstance());
+  
+  // Mount control for safe state updates
+  const isMountedRef = useRef(true);
 
   // Image error states for each option
   const [imageErrors, setImageErrors] = useState<boolean[]>([]);
@@ -244,10 +254,14 @@ const DragDropScreen = () => {
         // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
-        if (step.helpMessage) {
-          helpMessage = step.helpMessage;
+        if (processedStep.helpMessage) {
+          // Use the already processed helpMessage from the step
+          helpMessage = processedStep.helpMessage;
+          console.log(`🔊 Using processed lesson help: ${helpMessage}`);
         } else {
-          helpMessage = message;
+          // Process the service message for current language
+          helpMessage = BilingualTextProcessor.extractText(message, language);
+          console.log(`🔊 Using processed default help for ${_activityType}: ${helpMessage}`);
         }
         audioService.current.playTextToSpeech(helpMessage, true); // true indica que es mensaje de ayuda
       },
@@ -467,7 +481,9 @@ const DragDropScreen = () => {
         
         // Show celebration after a short delay
         setTimeout(() => {
-          setShowCelebration(true);
+          if (isMountedRef.current) {
+            setShowCelebration(true);
+          }
         }, 1500);
       }
     } catch (error) {
@@ -517,7 +533,9 @@ const DragDropScreen = () => {
       
       // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
       setTimeout(() => {
-        setShowStars(true);
+        if (isMountedRef.current) {
+          setShowStars(true);
+        }
       }, 800);
     }
   }, [animationType, score, totalItems, gameCompleted, startTime, gameStats, calculateStars, recordGameCompletion, isHelpActive, helpBlinkAnimation]);
@@ -1146,20 +1164,20 @@ const styles = StyleSheet.create({
   },
   zone: {
     backgroundColor: '#ffffff',
-    height: 100,
-    borderRadius: 14,
-    padding: 8,
+    minHeight: 110,
+    borderRadius: 16,
+    padding: 12,
     borderWidth: 2,
     borderColor: '#e8f0fe',
     borderStyle: 'dashed',
     shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-    borderTopWidth: 3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    borderTopWidth: 4,
     borderTopColor: '#4285f4',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   zoneHighlighted: {
     borderColor: '#4285f4',
@@ -1205,21 +1223,26 @@ const styles = StyleSheet.create({
   placedItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 6,
+    padding: 8,
     backgroundColor: '#e8f5e8',
-    borderRadius: 8,
-    borderWidth: 1,
+    borderRadius: 12,
+    borderWidth: 2,
     borderColor: '#4caf50',
-    minWidth: 32,
-    minHeight: 32,
+    minWidth: 40,
+    minHeight: 40,
+    shadowColor: '#4caf50',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   placedIcon: {
-    fontSize: 16,
+    fontSize: 20,
   },
   placedItemImage: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 6,
     borderWidth: 0,
   },
   iconContainer: {

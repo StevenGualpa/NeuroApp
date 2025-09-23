@@ -19,6 +19,7 @@ import AchievementNotification from '../components/AchievementNotification';
 import AchievementCelebration from '../components/AchievementCelebration';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
+import { MessageCarousel } from '../components/MessageCarousel';
 import { AchievementService, Achievement } from '../services/AchievementService';
 // import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
@@ -138,6 +139,9 @@ const MatchScreen = () => {
   const [helpBlinkAnimation] = useState(new Animated.Value(1));
   const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
   const audioService = useRef(AudioService.getInstance());
+  
+  // Mount control for safe state updates
+  const isMountedRef = useRef(true);
 
   // Memoized values
   const totalOptions = useMemo(() => processedOptions.length || 0, [processedOptions]);
@@ -148,6 +152,13 @@ const MatchScreen = () => {
     console.log(`🌍 [MatchScreen] Procesando contenido para idioma: ${language}`);
     processStepForLanguage();
   }, [language]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Process step content for current language
   const processStepForLanguage = useCallback(() => {
@@ -251,12 +262,14 @@ const MatchScreen = () => {
         // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
-        if (step.helpMessage) {
-          helpMessage = step.helpMessage;
-          console.log(`🔊 Using custom lesson help: ${helpMessage}`);
+        if (processedStep.helpMessage) {
+          // Use the already processed helpMessage from the step
+          helpMessage = processedStep.helpMessage;
+          console.log(`🔊 Using processed lesson help: ${helpMessage}`);
         } else {
-          helpMessage = message;
-          console.log(`🔊 Using default help for ${activityType}: ${helpMessage}`);
+          // Process the service message for current language
+          helpMessage = BilingualTextProcessor.extractText(message, language);
+          console.log(`🔊 Using processed default help for ${activityType}: ${helpMessage}`);
         }
         
         console.log(`🔊 About to play TTS: ${helpMessage}`);
@@ -321,6 +334,8 @@ const MatchScreen = () => {
     
     // Stop help after 5 seconds
     setTimeout(() => {
+      if (!isMountedRef.current) return;
+      
       setIsHelpActive(false);
       setBlinkingOptionIndex(null);
       helpBlinkAnimation.setValue(1);
@@ -372,6 +387,8 @@ const MatchScreen = () => {
     setNewAchievement(null);
     
     setTimeout(() => {
+      if (!isMountedRef.current) return;
+      
       processAchievementQueue();
     }, 1000);
   }, [processAchievementQueue]);
@@ -479,6 +496,8 @@ const MatchScreen = () => {
         
         // Show celebration after a short delay
         setTimeout(() => {
+          if (!isMountedRef.current) return;
+          
           setShowCelebration(true);
         }, 1500);
         
@@ -544,6 +563,8 @@ const MatchScreen = () => {
       
       // Small delay before showing winner animation
       setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         console.log('🏆 [MatchScreen] Mostrando animación winner...');
         showFeedbackAnimation('winner');
       }, 300);
@@ -551,6 +572,8 @@ const MatchScreen = () => {
       console.log('🎊 [MatchScreen] Animación winner terminada, mostrando modal...');
       // Show stars after winner animation
       setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         console.log('⭐ [MatchScreen] Modal debería aparecer ahora');
         setShowStars(true);
         console.log(`🎯 [MatchScreen] Estados para modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
@@ -604,6 +627,8 @@ const MatchScreen = () => {
     });
 
     setTimeout(() => {
+      if (!isMountedRef.current) return;
+      
       if (correct) {
         console.log('✅ [MatchScreen] ¡RESPUESTA CORRECTA!');
         setScore(1);
@@ -616,6 +641,8 @@ const MatchScreen = () => {
         // Play error guidance audio
         audioService.current.playErrorGuidanceMessage();
         setTimeout(() => {
+          if (!isMountedRef.current) return;
+          
           setIsAnswered(false);
           setSelectedOption(null);
         }, 1500);
@@ -723,20 +750,22 @@ const MatchScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header simplificado */}
+      {/* Header moderno mejorado */}
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
           onPress={handleBackPress}
         >
+          <Text style={[styles.backButtonText, { fontSize: 14 }]}>←</Text>
           <Text style={styles.backButtonText}>
-            ← {language === 'es' ? 'Volver' : 'Back'}
+            {language === 'es' ? 'Volver' : 'Back'}
           </Text>
         </TouchableOpacity>
         
-        {/* Progress indicator */}
+        {/* Progress indicator mejorado */}
         {progressLoading && (
           <View style={styles.progressIndicator}>
+            <Text style={[styles.progressText, { fontSize: 11, marginRight: 3 }]}>💾</Text>
             <Text style={styles.progressText}>
               {language === 'es' ? 'Guardando...' : 'Saving...'}
             </Text>
@@ -760,14 +789,7 @@ const MatchScreen = () => {
         }}
       >
 
-        {/* Progreso del juego */}
-        <ProgressSection 
-          score={score}
-          totalItems={totalItems}
-          gameStats={gameStats}
-        />
-
-        {/* Pregunta */}
+        {/* 1. CONTEXTO - Pregunta */}
         <View style={styles.questionContainer}>
           <Text style={styles.sectionTitle}>
             {language === 'es' ? 'Pregunta:' : 'Question:'}
@@ -775,10 +797,10 @@ const MatchScreen = () => {
           <Text style={styles.questionText}>{processedStep.text}</Text>
         </View>
 
-        {/* Opciones de respuesta */}
+        {/* 2. ACCIÓN - Opciones de respuesta */}
         <View style={styles.optionsContainer}>
           <Text style={styles.sectionTitle}>
-            {language === 'es' ? 'Opciones disponibles:' : 'Available options:'}
+            {language === 'es' ? 'Selecciona la respuesta correcta:' : 'Select the correct answer:'}
           </Text>
           <View style={styles.optionsGrid}>
             {processedOptions.map((option, idx) => {
@@ -864,28 +886,22 @@ const MatchScreen = () => {
           </View>
         </View>
 
-        {/* Footer motivacional como en otras actividades */}
-        <View style={styles.footer}>
-          <View style={styles.motivationContainer}>
-            <Text style={styles.motivationIcon}>⭐</Text>
-            <Text style={styles.footerText}>
-              {score === 0 
-                ? (language === 'es' ? '¡Piensa bien antes de elegir!' : 'Think carefully before choosing!')
-                : (language === 'es' ? '¡Increíble! Lo lograste' : 'Amazing! You did it!')
-              }
-            </Text>
-            <Text style={styles.motivationIcon}>⭐</Text>
-          </View>
-          
-          {/* Mensaje adicional de ánimo */}
-          <View style={styles.encouragementFooter}>
-            <Text style={styles.encouragementFooterText}>
-              {language === 'es' 
-                ? '🧠 Cada respuesta te hace más inteligente ✨'
-                : '🧠 Every answer makes you smarter ✨'
-              }
-            </Text>
-          </View>
+        {/* 3. PROGRESO/MOTIVACIÓN - Progreso del juego */}
+        <View style={{ marginTop: 4 }}>
+          <ProgressSection 
+            score={score}
+            totalItems={totalItems}
+            gameStats={gameStats}
+          />
+        </View>
+
+        {/* Carrusel de mensajes motivacionales */}
+        <View style={{ marginTop: 2 }}>
+          <MessageCarousel 
+            score={score}
+            totalItems={totalItems}
+            language={language}
+          />
         </View>
 
         <View style={styles.bottomSpacing} />
@@ -938,106 +954,136 @@ const MatchScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8faff',
+    backgroundColor: '#f0f4ff',
   },
   header: {
-    backgroundColor: '#f8faff',
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingTop: 6,
     paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    shadowColor: '#4285f4',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#4285f4',
   },
   backButton: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    backgroundColor: '#4285f4',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 12,
     shadowColor: '#4285f4',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 3,
     borderWidth: 1,
-    borderColor: '#e8f0fe',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   backButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4285f4',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginLeft: 2,
+    letterSpacing: 0.1,
   },
   progressIndicator: {
-    backgroundColor: '#4285f4',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
+    shadowColor: '#ff9800',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   progressText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
     color: '#ffffff',
+    letterSpacing: 0.1,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingTop: 8,
+    paddingTop: 4,
   },
   questionContainer: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
-    borderLeftWidth: 3,
-    borderLeftColor: '#ff9800',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 8,
+    marginHorizontal: 4,
+    shadowColor: '#ff9800',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+    borderTopWidth: 3,
+    borderTopColor: '#ff9800',
   },
   questionText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
     color: '#1a1a1a',
-    lineHeight: 22,
+    lineHeight: 20,
+    letterSpacing: 0.2,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 12,
+    color: '#4285f4',
+    marginBottom: 10,
     textAlign: 'center',
+    letterSpacing: 0.3,
   },
   optionsContainer: {
-    marginBottom: 16,
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 12,
+    justifyContent: 'center',
+    gap: 10,
   },
   optionWrapper: {
-    width: (width - 44) / 2,
+    width: (width - 52) / 2,
+    marginBottom: 8,
   },
   optionButton: {
     backgroundColor: '#ffffff',
     borderRadius: 16,
-    padding: 16,
-    minHeight: 120,
+    padding: 12,
+    minHeight: 130,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#4285f4',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
     elevation: 6,
     borderWidth: 2,
     borderColor: '#e8f0fe',
+    borderTopWidth: 4,
+    borderTopColor: '#4285f4',
     position: 'relative',
   },
   optionButtonCorrect: {
@@ -1071,39 +1117,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconContainer: {
-    backgroundColor: 'rgba(66, 133, 244, 0.1)',
-    borderRadius: 30,
-    width: 60,
-    height: 60,
+    backgroundColor: 'rgba(66, 133, 244, 0.06)',
+    borderRadius: 12,
+    width: 70,
+    height: 70,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
+    padding: 8,
   },
   iconContainerCorrect: {
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    backgroundColor: 'rgba(76, 175, 80, 0.15)',
     borderWidth: 2,
     borderColor: '#4caf50',
   },
   iconContainerIncorrect: {
-    backgroundColor: 'rgba(244, 67, 54, 0.2)',
+    backgroundColor: 'rgba(244, 67, 54, 0.15)',
     borderWidth: 2,
     borderColor: '#f44336',
   },
   icon: {
-    fontSize: 28,
+    fontSize: 36,
   },
   optionImage: {
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderRadius: 8,
     borderWidth: 0,
   },
   label: {
-    fontSize: 12,
+    fontSize: 13,
     textAlign: 'center',
     color: '#1a1a1a',
     fontWeight: '600',
-    lineHeight: 16,
+    lineHeight: 18,
+    letterSpacing: 0.2,
   },
   labelCorrect: {
     color: '#2e7d32',
@@ -1144,52 +1192,8 @@ const styles = StyleSheet.create({
   resultIconIncorrect: {
     color: '#ffffff',
   },
-  footer: {
-    alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-  },
-  motivationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 20,
-    shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    marginBottom: 12,
-  },
-  motivationIcon: {
-    fontSize: 18,
-    marginHorizontal: 6,
-  },
-  footerText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    flex: 1,
-  },
-  encouragementFooter: {
-    backgroundColor: '#f0f9ff',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  encouragementFooterText: {
-    fontSize: 12,
-    color: '#1e40af',
-    fontWeight: '600',
-    textAlign: 'center',
-  },
   bottomSpacing: {
-    height: 20,
+    height: 4,
   },
 });
 

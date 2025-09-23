@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,42 @@ const RealAchievementNotification: React.FC<RealAchievementNotificationProps> = 
   const slideAnim = useRef(new Animated.Value(-200)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
+  const isMountedRef = useRef(true);
+  const glowAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (glowAnimationRef.current) {
+        glowAnimationRef.current.stop();
+      }
+    };
+  }, []);
+
+  const hideNotification = useCallback(() => {
+    if (glowAnimationRef.current) {
+      glowAnimationRef.current.stop();
+    }
+
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: -200,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 0.8,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      if (isMountedRef.current) {
+        glowAnim.setValue(0);
+        onHide();
+      }
+    });
+  }, [slideAnim, scaleAnim, glowAnim, onHide]);
 
   useEffect(() => {
     if (visible) {
@@ -49,7 +85,7 @@ const RealAchievementNotification: React.FC<RealAchievementNotificationProps> = 
       ]).start();
 
       // Glow animation
-      Animated.loop(
+      glowAnimationRef.current = Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 1,
@@ -62,34 +98,24 @@ const RealAchievementNotification: React.FC<RealAchievementNotificationProps> = 
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      glowAnimationRef.current.start();
 
       // Auto hide after 4 seconds
       const timer = setTimeout(() => {
-        hideNotification();
+        if (isMountedRef.current) {
+          hideNotification();
+        }
       }, 4000);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        if (glowAnimationRef.current) {
+          glowAnimationRef.current.stop();
+        }
+      };
     }
-  }, [visible]);
-
-  const hideNotification = () => {
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: -200,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 0.8,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      glowAnim.setValue(0);
-      onHide();
-    });
-  };
+  }, [visible, slideAnim, scaleAnim, glowAnim, hideNotification]);
 
   const getRarityColor = (rarity: string) => {
     switch (rarity.toLowerCase()) {

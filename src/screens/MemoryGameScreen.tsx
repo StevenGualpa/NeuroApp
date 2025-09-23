@@ -151,6 +151,9 @@ const MemoryGameScreen = () => {
   const [helpBlinkAnimation] = useState(new Animated.Value(1));
   const adaptiveService = useRef(AdaptiveReinforcementService.getInstance());
   const audioService = useRef(AudioService.getInstance());
+  
+  // Mount control for safe state updates
+  const isMountedRef = useRef(true);
 
   // Memoized values
   const totalPairs = useMemo(() => processedOptions.length || 0, [processedOptions]);
@@ -193,6 +196,13 @@ const MemoryGameScreen = () => {
     processStepForLanguage();
   }, [language]);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Initialize achievements service
   useEffect(() => {
     const initAchievements = async () => {
@@ -225,10 +235,14 @@ const MemoryGameScreen = () => {
         // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
-        if (step.helpMessage) {
-          helpMessage = step.helpMessage;
+        if (processedStep.helpMessage) {
+          // Use the already processed helpMessage from the step
+          helpMessage = processedStep.helpMessage;
+          console.log(`🔊 Using processed lesson help: ${helpMessage}`);
         } else {
-          helpMessage = message;
+          // Process the service message for current language
+          helpMessage = BilingualTextProcessor.extractText(message, language);
+          console.log(`🔊 Using processed default help for ${_activityType}: ${helpMessage}`);
         }
         
         audioService.current.playTextToSpeech(helpMessage, true); // true indica que es mensaje de ayuda
@@ -274,6 +288,8 @@ const MemoryGameScreen = () => {
 
     // Show cards for 4 seconds (reduced)
     const timer = setTimeout(() => {
+      if (!isMountedRef.current) return;
+      
       setShowingCards(false);
       const reset = shuffled.map((c) => ({
         ...c,
@@ -357,6 +373,8 @@ const MemoryGameScreen = () => {
     
     // Stop help after 5 seconds
     setTimeout(() => {
+      if (!isMountedRef.current) return;
+      
       setIsHelpActive(false);
       setBlinkingCardIds([]);
       helpBlinkAnimation.setValue(1);
@@ -410,6 +428,8 @@ const MemoryGameScreen = () => {
     setNewAchievement(null);
     
     setTimeout(() => {
+      if (!isMountedRef.current) return;
+      
       processAchievementQueue();
     }, 1000);
   }, [processAchievementQueue]);
@@ -494,6 +514,8 @@ const MemoryGameScreen = () => {
         
         // Show celebration after a short delay
         setTimeout(() => {
+          if (!isMountedRef.current) return;
+          
           setShowCelebration(true);
         }, 1500);
       }
@@ -543,6 +565,8 @@ const MemoryGameScreen = () => {
       
       // CAMBIO IMPORTANTE: Mostrar modal directamente después de un delay corto
       setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         setShowStars(true);
       }, 800);
     }
@@ -555,6 +579,8 @@ const MemoryGameScreen = () => {
     // Check if game is complete
     if (matchedCount === totalPairs && totalPairs > 0 && !gameCompleted) {
       const timer = setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
         showFeedbackAnimation('winner');
       }, 1000);
       return () => clearTimeout(timer);
@@ -614,6 +640,8 @@ const MemoryGameScreen = () => {
       if (isMatch) {
         // Match found
         setTimeout(() => {
+          if (!isMountedRef.current) return;
+          
           setCards((prev) =>
             prev.map((c) =>
               c.id === first.id || c.id === second.id ? { ...c, matched: true } : c
@@ -640,6 +668,8 @@ const MemoryGameScreen = () => {
         }));
 
         setTimeout(() => {
+          if (!isMountedRef.current) return;
+          
           // Animate cards back
           [first, second].forEach((selectedCard) => {
             const currentCard = cards.find(c => c.id === selectedCard.id);
@@ -665,7 +695,11 @@ const MemoryGameScreen = () => {
         }, 1000);
       }
 
-      setTimeout(() => setSelected([]), 1200);
+      setTimeout(() => {
+        if (!isMountedRef.current) return;
+        
+        setSelected([]);
+      }, 1200);
     }
   }, [cards, selected, gameStarted, showFeedbackAnimation, step.activityType, isHelpActive, helpBlinkAnimation, gameStats.flipCount, totalPairs]);
 
@@ -1086,25 +1120,25 @@ const styles = StyleSheet.create({
   card: {
     width: CARD_SIZE,
     height: CARD_SIZE,
-    borderRadius: 14,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#4285f4',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 6,
   },
   front: {
     backgroundColor: '#4285f4',
-    borderWidth: 2,
+    borderWidth: 3,
     borderColor: '#ffffff',
   },
   back: {
     backgroundColor: '#ffffff',
     borderWidth: 2,
     borderColor: '#e8f0fe',
-    borderTopWidth: 3,
+    borderTopWidth: 4,
     borderTopColor: '#4285f4',
   },
   matchedCard: {
@@ -1135,12 +1169,15 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   cardIcon: {
-    fontSize: 28,
+    fontSize: 32,
+    textShadowColor: 'rgba(0, 0, 0, 0.1)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
   cardImage: {
-    width: CARD_SIZE - 8,
-    height: CARD_SIZE - 8,
-    borderRadius: 8,
+    width: CARD_SIZE - 12,
+    height: CARD_SIZE - 12,
+    borderRadius: 10,
     borderWidth: 0,
   },
   cardFace: {

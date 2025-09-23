@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -121,6 +121,10 @@ const GameIntroAnimation: React.FC<GameIntroAnimationProps> = ({ activityType, o
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const [currentStep, setCurrentStep] = useState(0);
   const [showSteps, setShowSteps] = useState(false);
+  
+  // Referencias para limpieza
+  const isMountedRef = useRef(true);
+  const stepIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Obtener configuración traducida
   const getTranslatedConfig = (activityType: string) => {
@@ -228,6 +232,54 @@ const GameIntroAnimation: React.FC<GameIntroAnimationProps> = ({ activityType, o
 
   const config = getTranslatedConfig(activityType);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+      if (stepIntervalRef.current) {
+        clearInterval(stepIntervalRef.current);
+      }
+    };
+  }, []);
+
+  // Safe state update function
+  const safeSetCurrentStep = useCallback((newStep: number) => {
+    if (isMountedRef.current) {
+      setCurrentStep(newStep);
+    }
+  }, []);
+
+  // Safe set show steps
+  const safeSetShowSteps = useCallback((show: boolean) => {
+    if (isMountedRef.current) {
+      setShowSteps(show);
+    }
+  }, []);
+
+  const animateSteps = useCallback(() => {
+    if (!isMountedRef.current) return;
+
+    stepIntervalRef.current = setInterval(() => {
+      if (!isMountedRef.current) {
+        if (stepIntervalRef.current) {
+          clearInterval(stepIntervalRef.current);
+        }
+        return;
+      }
+
+      setCurrentStep(prev => {
+        const nextStep = prev + 1;
+        if (nextStep >= config.steps.length) {
+          if (stepIntervalRef.current) {
+            clearInterval(stepIntervalRef.current);
+          }
+          return config.steps.length - 1;
+        }
+        return nextStep;
+      });
+    }, 800);
+  }, [config.steps.length]);
+
   useEffect(() => {
     // Animación de entrada
     Animated.sequence([
@@ -251,26 +303,23 @@ const GameIntroAnimation: React.FC<GameIntroAnimationProps> = ({ activityType, o
       }),
     ]).start(() => {
       // Mostrar pasos después de la animación inicial
-      setTimeout(() => {
-        setShowSteps(true);
-        animateSteps();
-      }, 500);
+      if (isMountedRef.current) {
+        setTimeout(() => {
+          if (isMountedRef.current) {
+            safeSetShowSteps(true);
+            animateSteps();
+          }
+        }, 500);
+      }
     });
-  }, []);
+  }, [animateSteps, safeSetShowSteps]);
 
-  const animateSteps = () => {
-    const stepInterval = setInterval(() => {
-      setCurrentStep(prev => {
-        if (prev >= config.steps.length - 1) {
-          clearInterval(stepInterval);
-          return prev;
-        }
-        return prev + 1;
-      });
-    }, 800);
-  };
+  const handleStart = useCallback(() => {
+    // Clean up interval before leaving
+    if (stepIntervalRef.current) {
+      clearInterval(stepIntervalRef.current);
+    }
 
-  const handleStart = () => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 0,
@@ -283,9 +332,11 @@ const GameIntroAnimation: React.FC<GameIntroAnimationProps> = ({ activityType, o
         useNativeDriver: true,
       }),
     ]).start(() => {
-      onComplete();
+      if (isMountedRef.current) {
+        onComplete();
+      }
     });
-  };
+  }, [fadeAnim, scaleAnim, onComplete]);
 
   return (
     <SafeAreaView style={styles.container}>
