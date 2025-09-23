@@ -24,6 +24,7 @@ import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAchievementContext } from '../contexts/AchievementContext';
+import { useAchievementModalSequence } from '../hooks/useAchievementModalSequence';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 import { Image } from 'react-native';
 
@@ -64,7 +65,10 @@ const SelectOptionScreen = () => {
   const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
   
   // Achievement system hook
-  const { recordGameCompletion: recordAchievementCompletion, recordHelpUsed } = useAchievementContext();
+  const { recordHelpUsed } = useAchievementContext();
+  
+  // Achievement modal sequence hook
+  const { shouldShowModal, setShouldShowModal, handleGameCompletion } = useAchievementModalSequence();
 
   // Bilingual states
   const [processedStep, setProcessedStep] = useState(step);
@@ -406,8 +410,8 @@ const SelectOptionScreen = () => {
         activityType: 'completion', // Categoría para el sistema de logros
       };
 
-      // Record achievement completion (notifications handled automatically by AchievementContext)
-      await recordAchievementCompletion(gameData);
+      // Use the new sequence handler (handles achievements and modal timing)
+      await handleGameCompletion(gameData);
       
       console.log('✅ [SelectOptionScreen] Finalización registrada exitosamente');
     } catch (error) {
@@ -415,7 +419,7 @@ const SelectOptionScreen = () => {
       // No mostrar alert para achievements - el usuario no necesita saber si fallan
       // El progreso ya se guardó exitosamente
     }
-  }, [saveProgressToBackend, recordAchievementCompletion, step]);
+  }, [saveProgressToBackend, handleGameCompletion, step]);
 
   // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
@@ -506,6 +510,7 @@ const SelectOptionScreen = () => {
     setGameCompleted(false);
     setShowStars(false);
     setScore(0);
+    setShouldShowModal(false); // Reset modal state
     setGameStats({
       totalAttempts: 0,
       errors: 0,
@@ -518,7 +523,7 @@ const SelectOptionScreen = () => {
       usedHelp: false,
       helpActivations: 0,
     });
-  }, []);
+  }, [setShouldShowModal]);
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, firstTry: boolean) => {
     if (language === 'es') {
@@ -722,7 +727,7 @@ const SelectOptionScreen = () => {
 
       {/* Game Complete Modal */}
       <GameCompletionModal
-        visible={isGameComplete && !showAnimation && showStars && !showCelebration}
+        visible={shouldShowModal && isGameComplete && !showAnimation && showStars && !showCelebration}
         stats={gameStats}
         onReset={resetGame}
         onContinue={() => navigation.goBack()}

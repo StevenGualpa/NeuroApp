@@ -27,6 +27,7 @@ class RealAchievementService {
   private allAchievements: Achievement[] = [];
   private isInitialized = false;
   private currentUserId: number | null = null;
+  private achievementUnlockedListeners: (() => void)[] = [];
 
   /**
    * Inicializar el servicio de logros del servidor
@@ -166,6 +167,35 @@ class RealAchievementService {
   }
 
   /**
+   * Suscribirse a eventos de logros desbloqueados
+   */
+  onAchievementUnlocked(callback: () => void): () => void {
+    this.achievementUnlockedListeners.push(callback);
+    
+    // Retornar función para desuscribirse
+    return () => {
+      const index = this.achievementUnlockedListeners.indexOf(callback);
+      if (index > -1) {
+        this.achievementUnlockedListeners.splice(index, 1);
+      }
+    };
+  }
+
+  /**
+   * Notificar a todos los listeners que se desbloqueó un logro
+   */
+  private notifyAchievementUnlocked(): void {
+    console.log('🔔 [RealAchievementService] Notificando a listeners sobre logro desbloqueado');
+    this.achievementUnlockedListeners.forEach(listener => {
+      try {
+        listener();
+      } catch (error) {
+        console.error('❌ [RealAchievementService] Error en listener de logro desbloqueado:', error);
+      }
+    });
+  }
+
+  /**
    * Reinicializar el servicio (para casos de fallo)
    */
   async reinitialize(userId: number): Promise<void> {
@@ -251,6 +281,9 @@ class RealAchievementService {
             newlyUnlocked.push(achievement);
             const achievementName = achievement.name || achievement.title || `Logro ID ${achievementId}`;
             console.log(`🏆 [RealAchievementService] ¡Logro registrado en servidor!: ${achievementName}`);
+            
+            // Notificar a los listeners que se desbloqueó un logro
+            this.notifyAchievementUnlocked();
           }
         } catch (error) {
           console.error(`❌ [RealAchievementService] Error procesando logro ${achievementId}:`, error);
@@ -492,6 +525,9 @@ class RealAchievementService {
         if (achievement) {
           newlyUnlocked.push(achievement);
           console.log(`🏆 [RealAchievementService] ¡Logro de ayuda registrado en servidor!: ${achievement.name}`);
+          
+          // Notificar a los listeners que se desbloqueó un logro
+          this.notifyAchievementUnlocked();
         }
       }
 

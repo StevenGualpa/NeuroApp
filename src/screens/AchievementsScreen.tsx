@@ -19,6 +19,7 @@ import RealAchievementService from '../services/RealAchievementService';
 import { Achievement, UserAchievement } from '../services/ApiService';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuthContext } from '../hooks/useAuth';
+import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 
 // Extended interface for achievements with user progress
 interface ProcessedAchievement extends Achievement {
@@ -124,6 +125,23 @@ const AchievementsScreen = () => {
     }, [user?.id, isLoading])
   );
 
+  // Listen for achievement unlocks and refresh data
+  useEffect(() => {
+    const handleAchievementUnlocked = () => {
+      console.log('🏆 [AchievementsScreen] Logro desbloqueado detectado, refrescando...');
+      refreshAchievements();
+    };
+
+    // Subscribe to achievement unlock events
+    const unsubscribe = RealAchievementService.onAchievementUnlocked(handleAchievementUnlocked);
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, []);
+
   const initializeAchievements = async () => {
     if (!user?.id) return;
     
@@ -190,17 +208,25 @@ const AchievementsScreen = () => {
       const processedAchievements: ProcessedAchievement[] = serverAchievements.map(achievement => {
         const userAchievement = serverUserAchievements.find(ua => ua.achievement_id === achievement.ID);
         
-        // Ensure name is properly set (fallback to title if name is empty)
-        const achievementName = achievement.name || achievement.title || `Logro ${achievement.ID}`;
+        // Process bilingual texts to show only the configured language
+        const rawName = achievement.name || achievement.title || `Logro ${achievement.ID}`;
+        const rawDescription = achievement.description || '';
+        const rawEncouragement = (achievement as any).encouragement_message || '';
+        
+        const achievementName = BilingualTextProcessor.extractText(rawName, language);
+        const achievementDescription = BilingualTextProcessor.extractText(rawDescription, language);
+        const encouragementMessage = BilingualTextProcessor.extractText(rawEncouragement, language);
         
         return {
           ...achievement,
-          name: achievementName, // Garantizar que name siempre tenga valor
+          name: achievementName, // Texto procesado en el idioma correcto
+          description: achievementDescription, // Descripción en el idioma correcto
+          encouragement_message: encouragementMessage, // Mensaje de aliento en el idioma correcto
           isUnlocked: userAchievement?.is_unlocked || false,
           currentProgress: userAchievement?.progress || 0,
           max_progress: achievement.condition_value || 1, // Use condition_value as max_progress
           unlockedAt: userAchievement?.unlocked_at,
-          encouragementMessage: '', // Add default value
+          encouragementMessage: encouragementMessage, // Add processed encouragement message
         };
       });
       

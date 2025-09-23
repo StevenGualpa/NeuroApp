@@ -310,7 +310,8 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     right: 0,
-    zIndex: 9999,
+    zIndex: 99999, // Z-index muy alto para estar encima de modales
+    elevation: 99999, // Para Android
     alignItems: 'center',
     paddingHorizontal: 20,
   },
@@ -330,7 +331,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 12,
-    elevation: 15,
+    elevation: 25, // Elevación alta para Android
     maxWidth: width - 40,
   },
   header: {
