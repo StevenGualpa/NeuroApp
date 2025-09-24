@@ -21,7 +21,8 @@ import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { MessageCarousel } from '../components/MessageCarousel';
 import { AchievementService, Achievement } from '../services/AchievementService';
-// import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
+import { useAchievementContext } from '../contexts/AchievementContext';
+import { useAchievementModalSequence } from '../hooks/useAchievementModalSequence';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
@@ -66,6 +67,10 @@ const PatternRecognitionScreen = () => {
   // Real progress hook
   const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
 
+  // Achievement system hooks
+  const { recordHelpUsed } = useAchievementContext();
+  const { shouldShowModal, setShouldShowModal, handleGameCompletion } = useAchievementModalSequence();
+
   // Bilingual states
   const [processedStep, setProcessedStep] = useState(step);
   const [rawStep] = useState(step); // Keep original data
@@ -87,8 +92,6 @@ const PatternRecognitionScreen = () => {
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
   
   // New celebration states
-  const [unlockedAchievements, setUnlockedAchievements] = useState<ServerAchievement[]>([]);
-  const [showCelebration, setShowCelebration] = useState(false);
 
   // Gamification states
   const [gameStats, setGameStats] = useState<GameStats>({
@@ -353,7 +356,7 @@ const PatternRecognitionScreen = () => {
   }, []);
 
   // Helper function to trigger help for a specific option
-  const triggerHelpForOption = useCallback((optionIndex: number) => {
+  const triggerHelpForOption = useCallback(async (optionIndex: number) => {
     // NO ACTIVAR AYUDA SI EL JUEGO YA TERMINÓ
     if (gameCompleted || score === 1) {
       console.log('🛑 [PatternRecognitionScreen] Juego completado, no activando ayuda');
@@ -369,6 +372,14 @@ const PatternRecognitionScreen = () => {
       usedHelp: true,
       helpActivations: (prev.helpActivations || 0) + 1,
     }));
+
+    // Record help usage for achievements
+    try {
+      await recordHelpUsed((step as any).lesson_id, (step as any).ID);
+      console.log('📝 [PatternRecognitionScreen] Uso de ayuda registrado para achievements');
+    } catch (error) {
+      console.error('❌ [PatternRecognitionScreen] Error registrando uso de ayuda:', error);
+    }
     
     // Start blinking animation
     const blinkAnimation = () => {
@@ -400,7 +411,7 @@ const PatternRecognitionScreen = () => {
       setBlinkingOptionIndex(null);
       helpBlinkAnimation.setValue(1);
     }, 5000);
-  }, [helpBlinkAnimation, isHelpActive, gameCompleted, score]);
+  }, [helpBlinkAnimation, isHelpActive, gameCompleted, score, recordHelpUsed, step]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, completionTime: number, firstTry: boolean): number => {
@@ -515,71 +526,29 @@ const PatternRecognitionScreen = () => {
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
-      console.log('🎮 [PatternRecognitionScreen] Registrando finalización del juego...');
-
+      console.log('🎮 [PatternRecognitionScreen] Registrando finalización de juego:', finalStats);
+      
       // 1. Save progress to backend first
       await saveProgressToBackend(finalStats);
-
-      // 2. Use the enhanced achievement service that syncs with server
-      const gameData = {
-        stars: finalStats.stars,
-        isPerfect: finalStats.perfectRun,
-        completionTime: finalStats.completionTime,
-        errors: finalStats.errors,
-        activityType: 'Reconocimiento de patrones',
-        showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
-        usedHelp: finalStats.usedHelp || false,
-        tookTime: finalStats.completionTime > 60000,
-        lessonId: (step as any).lesson_id,
-        stepId: (step as any).ID || step.id,
-      };
-
-      console.log('🏆 [PatternRecognitionScreen] Verificando logros con datos:', gameData);
-
-      // const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
-      const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
-      if (newlyUnlocked.length > 0) {
-        console.log(`🎉 [PatternRecognitionScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
-        newlyUnlocked.forEach((achievement, index) => {
-          console.log(`   ${index + 1}. 🏆 ${achievement.title} - ${achievement.description}`);
-        });
-        
-        // Convert to server achievement format for celebration
-        const serverAchievements: ServerAchievement[] = newlyUnlocked.map(achievement => ({
-          ID: achievement.ID || 0,
-          title: achievement.title,
-          description: achievement.description,
-          icon: achievement.icon,
-          rarity: achievement.rarity || 'common',
-          points: achievement.points || 0,
-          category: achievement.category || 'general',
-        }));
-        
-        setUnlockedAchievements(serverAchievements);
-        
-        // Show celebration after a short delay
-        setTimeout(() => {
-          if (!isMountedRef.current) return;
-          
-          setShowCelebration(true);
-        }, 1500);
-        
-      } else {
-        console.log('📊 [PatternRecognitionScreen] No se desbloquearon nuevos logros esta vez');
-        console.log('💡 [PatternRecognitionScreen] Esto puede ser normal si ya tienes logros desbloqueados');
-      }
+      // 2. Use the new achievement system
+      const gameData = {
+        lessonId: (step as any).lesson_id,
+        stepId: (step as any).ID,
+        stars: finalStats.stars,
+        completionTime: Math.round(finalStats.completionTime / 1000),
+        errors: finalStats.errors,
+        usedHelp: finalStats.usedHelp || false,
+        perfectRun: finalStats.perfectRun,
+        activityType: 'patternRecognition', // Category for achievement system
+      };
+      
+      await handleGameCompletion(gameData);
+      console.log('✅ [PatternRecognitionScreen] Finalización registrada exitosamente');
     } catch (error) {
       console.error('❌ [PatternRecognitionScreen] Error registrando finalización:', error);
-      Alert.alert(
-        language === 'es' ? 'Error' : 'Error',
-        language === 'es' 
-          ? 'No se pudieron verificar los logros. Tu progreso se ha guardado.'
-          : 'Could not verify achievements. Your progress has been saved.',
-        [{ text: 'OK' }]
-      );
     }
-  }, [saveProgressToBackend, step, language]);
+  }, [saveProgressToBackend, handleGameCompletion, step]);
 
   // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
@@ -644,10 +613,10 @@ const PatternRecognitionScreen = () => {
         
         console.log('⭐ [PatternRecognitionScreen] Modal debería aparecer ahora');
         setShowStars(true);
-        console.log(`🎯 [PatternRecognitionScreen] Estados para modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
+        console.log(`🎯 [PatternRecognitionScreen] Estados para modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=false, showStars=true`);
       }, 500);
     }
-  }, [animationType, score, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation, isHelpActive, helpBlinkAnimation, showCelebration]);
+  }, [animationType, score, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation, isHelpActive, helpBlinkAnimation]);
 
   const handleAnswerSelect = useCallback((selectedIcon: string, index: number) => {
     if (isAnswered || gameCompleted) return;
@@ -774,7 +743,10 @@ const PatternRecognitionScreen = () => {
         useNativeDriver: true,
       }).start();
     });
-  }, [optionScales, step.difficulty]);
+
+    // Reset modal state
+    setShouldShowModal(false);
+  }, [optionScales, step.difficulty, setShouldShowModal]);
 
   const getDifficultyColor = () => {
     switch (step.difficulty) {
@@ -852,10 +824,6 @@ const PatternRecognitionScreen = () => {
     }
   }, [language]);
 
-  const handleCelebrationClose = useCallback(() => {
-    setShowCelebration(false);
-    setUnlockedAchievements([]);
-  }, []);
 
   const renderSequenceItem = (item: string, index: number) => {
     const isMissing = index === step.missingPosition;
@@ -952,13 +920,13 @@ const PatternRecognitionScreen = () => {
 
   // Log state changes for debugging
   useEffect(() => {
-    console.log(`🎯 [PatternRecognitionScreen] Estado del modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}, showCelebration=${showCelebration}`);
+    console.log(`🎯 [PatternRecognitionScreen] Estado del modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}`);
     
     // Log modal visibility condition
-    const modalShouldBeVisible = score === 1 && gameCompleted && !showAnimation && showStars && !showCelebration;
+    const modalShouldBeVisible = shouldShowModal && score === 1 && gameCompleted && !showAnimation && showStars;
     console.log(`🎯 [PatternRecognitionScreen] ¿Modal debería ser visible? ${modalShouldBeVisible ? 'SÍ' : 'NO'}`);
     
-    if (score === 1 && gameCompleted && showStars && !showCelebration) {
+    if (score === 1 && gameCompleted && showStars) {
       console.log(`🎯 [PatternRecognitionScreen] ✅ Condiciones principales cumplidas para mostrar modal`);
       if (showAnimation) {
         console.log(`🎯 [PatternRecognitionScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
@@ -966,7 +934,7 @@ const PatternRecognitionScreen = () => {
         console.log(`🎯 [PatternRecognitionScreen] ✅ Modal debería estar visible ahora!`);
       }
     }
-  }, [score, gameCompleted, showAnimation, showStars, showCelebration]);
+  }, [score, gameCompleted, showAnimation, showStars, shouldShowModal]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1141,7 +1109,7 @@ const PatternRecognitionScreen = () => {
 
       {/* Game Complete Modal - CONDICIÓN CORREGIDA */}
       <GameCompletionModal
-        visible={score === 1 && gameCompleted && !showAnimation && showStars && !showCelebration}
+        visible={shouldShowModal && score === 1 && gameCompleted && !showAnimation && showStars}
         stats={gameStats}
         onReset={resetGame}
         onContinue={() => navigation.goBack()}
@@ -1183,11 +1151,6 @@ const PatternRecognitionScreen = () => {
       )}
 
       {/* Achievement Celebration - NEW! */}
-      <AchievementCelebration
-        achievements={unlockedAchievements}
-        visible={showCelebration}
-        onClose={handleCelebrationClose}
-      />
 
       {/* Achievement Notification */}
       {newAchievement && (

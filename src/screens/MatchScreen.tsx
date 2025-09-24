@@ -16,12 +16,12 @@ import type { RootStackParamList } from '../navigation/AppNavigator';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FeedbackAnimation from '../components/FeedbackAnimation';
 import AchievementNotification from '../components/AchievementNotification';
-import AchievementCelebration from '../components/AchievementCelebration';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { MessageCarousel } from '../components/MessageCarousel';
 import { AchievementService, Achievement } from '../services/AchievementService';
-// import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
+import { useAchievementContext } from '../contexts/AchievementContext';
+import { useAchievementModalSequence } from '../hooks/useAchievementModalSequence';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
@@ -63,10 +63,14 @@ const MatchScreen = () => {
   // Real progress hook
   const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
 
+  // Achievement system hooks
+  const { recordHelpUsed } = useAchievementContext();
+  const { shouldShowModal, setShouldShowModal, handleGameCompletion } = useAchievementModalSequence();
+
   // Bilingual states
   const [processedStep, setProcessedStep] = useState(step);
   const [rawStep] = useState(step); // Keep original data
-  const [processedOptions, setProcessedOptions] = useState(step.options || []);
+  const [processedOptions, setProcessedOptions] = useState((step as any).options || []);
   
   // Game state
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -84,8 +88,6 @@ const MatchScreen = () => {
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
   
   // New celebration states
-  const [unlockedAchievements, setUnlockedAchievements] = useState<ServerAchievement[]>([]);
-  const [showCelebration, setShowCelebration] = useState(false);
 
   // Gamification states
   const [gameStats, setGameStats] = useState<GameStats>({
@@ -105,7 +107,7 @@ const MatchScreen = () => {
 
   // Animation refs
   const optionAnimations = useRef(
-    step.options?.map(() => new Animated.Value(0)) || []
+    (step as any).options?.map(() => new Animated.Value(0)) || []
   ).current;
 
   // Image error states for each option
@@ -118,10 +120,10 @@ const MatchScreen = () => {
 
   // Initialize image error states when step changes
   useEffect(() => {
-    if (step.options) {
-      setImageErrors(new Array(step.options.length).fill(false));
+    if ((step as any).options) {
+      setImageErrors(new Array((step as any).options.length).fill(false));
     }
-  }, [step.options]);
+  }, [(step as any).options]);
 
   // Handle image error for specific option
   const handleImageError = useCallback((optionIndex: number) => {
@@ -165,9 +167,16 @@ const MatchScreen = () => {
     console.log(`🌍 [MatchScreen] NUEVO PROCESAMIENTO - Contenido para idioma: ${language}`);
     console.log(`🔧 [MatchScreen] BilingualTextProcessor disponible: ${typeof BilingualTextProcessor}`);
     
+    // LOG INICIAL DE OPCIONES
+    console.log('🔍 [MatchScreen] LOG INICIAL DE OPCIONES EN processStepForLanguage:');
+    console.log('   rawStep.options:', (rawStep as any).options);
+    console.log('   rawStep.options type:', typeof (rawStep as any).options);
+    console.log('   rawStep.options length:', (rawStep as any).options?.length);
+    console.log('   rawStep completo:', rawStep);
+    
     // Process step text
     const originalText = rawStep.text || '';
-    const originalHelpMessage = rawStep.helpMessage || '';
+    const originalHelpMessage = rawStep.help_message || '';
     
     console.log(`🧪 [MatchScreen] ANTES del procesamiento:`);
     console.log(`   Original text: "${originalText}"`);
@@ -179,7 +188,13 @@ const MatchScreen = () => {
     const processedHelpMessage = BilingualTextProcessor.extractText(originalHelpMessage, language);
     
     // Process options
-    const newProcessedOptions = rawStep.options?.map((option, index) => {
+    console.log('🔍 [MatchScreen] Procesando opciones:', {
+      rawStepOptions: (rawStep as any).options,
+      rawStepOptionsLength: (rawStep as any).options?.length,
+      rawStep: rawStep
+    });
+    
+    const newProcessedOptions = (rawStep as any).options?.map((option: any, index: number) => {
       const originalLabel = option.label || '';
       
       console.log(`🧪 [MatchScreen] ANTES del procesamiento opción ${index + 1}:`);
@@ -220,10 +235,38 @@ const MatchScreen = () => {
     
     console.log(`✅ [MatchScreen] RESULTADO FINAL - Contenido procesado para idioma: ${language}`);
     console.log('🔗 [MatchScreen] Opciones procesadas:');
-    newProcessedOptions.forEach((option, index) => {
+    newProcessedOptions.forEach((option: any, index: number) => {
       console.log(`  ${index + 1}. "${option.icon}" - "${option.label}" (Correcto: ${option.correct})`);
     });
+    
+    // LOG FINAL DE ESTADOS
+    console.log('🔍 [MatchScreen] LOG FINAL DE ESTADOS:');
+    console.log('   newProcessedOptions length:', newProcessedOptions.length);
+    console.log('   newProcessedOptions:', newProcessedOptions);
+    console.log('   newProcessedStep:', newProcessedStep);
   }, [rawStep, language]);
+
+  // LOG CUANDO processedOptions CAMBIE
+  useEffect(() => {
+    console.log('🔍 [MatchScreen] processedOptions CAMBIÓ:');
+    console.log('   processedOptions length:', processedOptions.length);
+    console.log('   processedOptions:', processedOptions);
+    console.log('   processedOptions type:', typeof processedOptions);
+    
+    if (processedOptions.length > 0) {
+      console.log('✅ [MatchScreen] processedOptions TIENE CONTENIDO:');
+      processedOptions.forEach((option: any, index: number) => {
+        console.log(`   Opción ${index + 1}:`, {
+          label: option.label,
+          icon: option.icon,
+          correct: option.correct,
+          fullOption: option
+        });
+      });
+    } else {
+      console.log('❌ [MatchScreen] processedOptions ESTÁ VACÍO');
+    }
+  }, [processedOptions]);
 
   // Initialize achievements service
   useEffect(() => {
@@ -249,7 +292,7 @@ const MatchScreen = () => {
         // Handle help trigger
         if (helpOptionIndex === -1) {
           // Inactivity help - find correct option
-          const correctIndex = processedOptions.findIndex(option => option.correct) ?? -1;
+          const correctIndex = processedOptions.findIndex((option: any) => option.correct) ?? -1;
           if (correctIndex !== -1) {
             triggerHelpForOption(correctIndex);
           }
@@ -262,9 +305,9 @@ const MatchScreen = () => {
         // Handle audio help - use step's helpMessage if available, otherwise use service message
         let helpMessage: string;
         
-        if (processedStep.helpMessage) {
+        if (processedStep.help_message) {
           // Use the already processed helpMessage from the step
-          helpMessage = processedStep.helpMessage;
+          helpMessage = processedStep.help_message;
           console.log(`🔊 Using processed lesson help: ${helpMessage}`);
         } else {
           // Process the service message for current language
@@ -275,7 +318,7 @@ const MatchScreen = () => {
         console.log(`🔊 About to play TTS: ${helpMessage}`);
         audioService.current.playTextToSpeech(helpMessage, true); // true indica que es mensaje de ayuda
       },
-      step.activityType // Pass the activity type to the service
+      step.ActivityType as unknown as string // Pass the activity type to the service
     );
 
     return () => {
@@ -288,7 +331,7 @@ const MatchScreen = () => {
   useEffect(() => {
     // Entrance animations
     Animated.stagger(150, 
-      optionAnimations.map(anim => 
+      optionAnimations.map((anim: any) => 
         Animated.timing(anim, {
           toValue: 1,
           duration: 500,
@@ -299,7 +342,7 @@ const MatchScreen = () => {
   }, []);
 
   // Helper function to trigger help for a specific option
-  const triggerHelpForOption = useCallback((optionIndex: number) => {
+  const triggerHelpForOption = useCallback(async (optionIndex: number) => {
     setIsHelpActive(true);
     setBlinkingOptionIndex(optionIndex);
     
@@ -309,6 +352,14 @@ const MatchScreen = () => {
       usedHelp: true,
       helpActivations: (prev.helpActivations || 0) + 1,
     }));
+
+    // Record help usage for achievements
+    try {
+      await recordHelpUsed((step as any).lesson_id, (step as any).ID);
+      console.log('📝 [MatchScreen] Uso de ayuda registrado para achievements');
+    } catch (error) {
+      console.error('❌ [MatchScreen] Error registrando uso de ayuda:', error);
+    }
     
     // Start blinking animation
     const blinkAnimation = () => {
@@ -340,7 +391,7 @@ const MatchScreen = () => {
       setBlinkingOptionIndex(null);
       helpBlinkAnimation.setValue(1);
     }, 5000);
-  }, [helpBlinkAnimation, isHelpActive]);
+  }, [helpBlinkAnimation, isHelpActive, recordHelpUsed, step]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, completionTime: number, firstTry: boolean): number => {
@@ -400,7 +451,7 @@ const MatchScreen = () => {
       
       const progressData = {
         lessonId: (step as any).lesson_id || 1,
-        stepId: (step as any).ID || step.id || 1,
+        stepId: (step as any).ID || 1,
         stars: finalStats.stars,
         attempts: finalStats.totalAttempts,
         errors: finalStats.errors,
@@ -451,69 +502,29 @@ const MatchScreen = () => {
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
-      console.log('🎮 [MatchScreen] Registrando finalización del juego...');
-
+      console.log('🎮 [MatchScreen] Registrando finalización de juego:', finalStats);
+      
       // 1. Save progress to backend first
       await saveProgressToBackend(finalStats);
-
-      // 2. Use the enhanced achievement service that syncs with server
-      const gameData = {
-        stars: finalStats.stars,
-        isPerfect: finalStats.perfectRun,
-        completionTime: finalStats.completionTime,
-        errors: finalStats.errors,
-        activityType: 'Asocia elementos',
-        showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
-        usedHelp: finalStats.usedHelp || false,
-        tookTime: finalStats.completionTime > 60000,
-        lessonId: (step as any).lesson_id,
-        stepId: (step as any).ID || step.id,
-      };
-
-      console.log('🏆 [MatchScreen] Verificando logros con datos:', gameData);
-
-      // const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
-      const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
-      if (newlyUnlocked.length > 0) {
-        console.log(`🎉 [MatchScreen] ¡${newlyUnlocked.length} LOGROS DESBLOQUEADOS!:`);
-        newlyUnlocked.forEach((achievement, index) => {
-          console.log(`   ${index + 1}. 🏆 ${achievement.title} - ${achievement.description}`);
-        });
-        
-        // Convert to server achievement format for celebration
-        const serverAchievements: ServerAchievement[] = newlyUnlocked.map(achievement => ({
-          ID: achievement.ID || 0,
-          title: achievement.title,
-          description: achievement.description,
-          icon: achievement.icon,
-          rarity: achievement.rarity || 'common',
-          points: achievement.points || 0,
-          category: achievement.category || 'general',
-        }));
-        
-        setUnlockedAchievements(serverAchievements);
-        
-        // Show celebration after a short delay
-        setTimeout(() => {
-          if (!isMountedRef.current) return;
-          
-          setShowCelebration(true);
-        }, 1500);
-        
-      } else {
-        console.log('📊 [MatchScreen] No se desbloquearon nuevos logros esta vez');
-        console.log('💡 [MatchScreen] Esto puede ser normal si ya tienes logros desbloqueados');
-      }
+      // 2. Use the new achievement system
+      const gameData = {
+        lessonId: (step as any).lesson_id,
+        stepId: (step as any).ID,
+        stars: finalStats.stars,
+        completionTime: Math.round(finalStats.completionTime / 1000),
+        errors: finalStats.errors,
+        usedHelp: finalStats.usedHelp || false,
+        perfectRun: finalStats.perfectRun,
+        activityType: 'association', // Category for achievement system
+      };
+      
+      await handleGameCompletion(gameData);
+      console.log('✅ [MatchScreen] Finalización registrada exitosamente');
     } catch (error) {
       console.error('❌ [MatchScreen] Error registrando finalización:', error);
-      Alert.alert(
-        'Error',
-        'No se pudieron verificar los logros. Tu progreso se ha guardado.',
-        [{ text: 'OK' }]
-      );
     }
-  }, [saveProgressToBackend, step]);
+  }, [saveProgressToBackend, handleGameCompletion, step]);
 
   // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
@@ -576,10 +587,10 @@ const MatchScreen = () => {
         
         console.log('⭐ [MatchScreen] Modal debería aparecer ahora');
         setShowStars(true);
-        console.log(`🎯 [MatchScreen] Estados para modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=false, showStars=true, showCelebration=${showCelebration}`);
+        console.log(`🎯 [MatchScreen] Estados para modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=false, showStars=true`);
       }, 500);
     }
-  }, [animationType, score, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation, isHelpActive, helpBlinkAnimation, showCelebration]);
+  }, [animationType, score, gameCompleted, gameStats, startTime, calculateStars, recordGameCompletion, showFeedbackAnimation, isHelpActive, helpBlinkAnimation]);
 
   const handleOptionPress = useCallback((correct: boolean, index: number) => {
     if (isAnswered || gameCompleted) return;
@@ -587,8 +598,8 @@ const MatchScreen = () => {
     console.log(`🔗 [MatchScreen] Usuario seleccionó opción ${index + 1}: "${processedOptions[index]?.label}" (Correcto: ${correct})`);
     
     // Record action in adaptive reinforcement service
-    const correctOptionIndex = processedOptions.findIndex(option => option.correct) ?? -1;
-    adaptiveService.current.recordAction(correct, correctOptionIndex, step.activityType);
+    const correctOptionIndex = processedOptions.findIndex((option: any) => option.correct) ?? -1;
+        adaptiveService.current.recordAction(correct, correctOptionIndex, step.ActivityType as unknown as string);
 
     // Clear any active help
     if (isHelpActive) {
@@ -648,7 +659,7 @@ const MatchScreen = () => {
         }, 1500);
       }
     }, 500);
-  }, [isAnswered, gameCompleted, gameStats, optionAnimations, showFeedbackAnimation, processedOptions, step.activityType, isHelpActive, helpBlinkAnimation]);
+  }, [isAnswered, gameCompleted, gameStats, optionAnimations, showFeedbackAnimation, processedOptions, step.ActivityType, isHelpActive, helpBlinkAnimation]);
 
   const resetGame = useCallback(() => {
     setSelectedOption(null);
@@ -668,7 +679,10 @@ const MatchScreen = () => {
       usedHelp: false,
       helpActivations: 0,
     });
-  }, []);
+
+    // Reset modal state
+    setShouldShowModal(false);
+  }, [setShouldShowModal]);
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, firstTry: boolean) => {
     if (perfectRun && stars === 3 && firstTry) {
@@ -700,8 +714,6 @@ const MatchScreen = () => {
   }, [gameStats.totalAttempts, gameCompleted, navigation]);
 
   const handleCelebrationClose = useCallback(() => {
-    setShowCelebration(false);
-    setUnlockedAchievements([]);
   }, []);
 
   const getOptionStyle = useCallback((index: number, correct: boolean) => {
@@ -723,22 +735,43 @@ const MatchScreen = () => {
   useEffect(() => {
     console.log('🎮 [MatchScreen] Componente montado');
     console.log('📝 [MatchScreen] Datos del paso:', {
-      stepId: (step as any).ID || step.id,
+      stepId: (step as any).ID,
       lessonId: (step as any).lesson_id,
       text: step.text,
-      optionsCount: step.options?.length || 0,
+      optionsCount: (step as any).options?.length || 0,
     });
+    
+    // LOG DETALLADO DE OPCIONES
+    console.log('🔍 [MatchScreen] ANÁLISIS DETALLADO DE OPCIONES:');
+    console.log('   step.options:', (step as any).options);
+    console.log('   step.options type:', typeof (step as any).options);
+    console.log('   step.options length:', (step as any).options?.length);
+    console.log('   step completo:', JSON.stringify(step, null, 2));
+    
+    if ((step as any).options && (step as any).options.length > 0) {
+      console.log('✅ [MatchScreen] OPCIONES ENCONTRADAS:');
+      (step as any).options.forEach((option: any, index: number) => {
+        console.log(`   Opción ${index + 1}:`, {
+          label: option.label,
+          icon: option.icon,
+          correct: option.correct,
+          fullOption: option
+        });
+      });
+    } else {
+      console.log('❌ [MatchScreen] NO HAY OPCIONES EN step.options');
+    }
   }, [step]);
 
   // Log state changes for debugging
   useEffect(() => {
-    console.log(`🎯 [MatchScreen] Estado del modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}, showCelebration=${showCelebration}`);
+    console.log(`🎯 [MatchScreen] Estado del modal: score=${score}, gameCompleted=${gameCompleted}, showAnimation=${showAnimation}, showStars=${showStars}`);
     
     // Log modal visibility condition
-    const modalShouldBeVisible = gameCompleted && !showAnimation && showStars && !showCelebration;
+    const modalShouldBeVisible = gameCompleted && !showAnimation && showStars;
     console.log(`🎯 [MatchScreen] ¿Modal debería ser visible? ${modalShouldBeVisible ? 'SÍ' : 'NO'}`);
     
-    if (gameCompleted && showStars && !showCelebration) {
+    if (gameCompleted && showStars) {
       console.log(`🎯 [MatchScreen] ✅ Condiciones principales cumplidas para mostrar modal`);
       if (showAnimation) {
         console.log(`🎯 [MatchScreen] ⚠️ Pero showAnimation=${showAnimation} está bloqueando el modal`);
@@ -746,7 +779,7 @@ const MatchScreen = () => {
         console.log(`🎯 [MatchScreen] ✅ Modal debería estar visible ahora!`);
       }
     }
-  }, [score, gameCompleted, showAnimation, showStars, showCelebration]);
+  }, [score, gameCompleted, showAnimation, showStars]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -803,7 +836,15 @@ const MatchScreen = () => {
             {language === 'es' ? 'Selecciona la respuesta correcta:' : 'Select the correct answer:'}
           </Text>
           <View style={styles.optionsGrid}>
-            {processedOptions.map((option, idx) => {
+            {(() => {
+              console.log('🔍 [MatchScreen] Renderizando opciones:', {
+                processedOptionsLength: processedOptions.length,
+                processedOptions: processedOptions,
+                language: language
+              });
+              return null;
+            })()}
+            {processedOptions.map((option: any, idx: number) => {
               const isBlinking = isHelpActive && blinkingOptionIndex === idx;
               return (
                 <Animated.View
@@ -909,7 +950,7 @@ const MatchScreen = () => {
 
       {/* Game Complete Modal usando componente reutilizable */}
       <GameCompletionModal
-        visible={gameCompleted && !showAnimation && showStars && !showCelebration}
+        visible={shouldShowModal && gameCompleted && !showAnimation && showStars}
         stats={gameStats}
         onReset={resetGame}
         onContinue={() => navigation.goBack()}
@@ -932,17 +973,11 @@ const MatchScreen = () => {
         />
       )}
 
-      {/* Achievement Celebration - NEW! */}
-      <AchievementCelebration
-        achievements={unlockedAchievements}
-        visible={showCelebration}
-        onClose={handleCelebrationClose}
-      />
 
       {/* Achievement Notification */}
       {newAchievement && (
         <AchievementNotification
-          achievement={newAchievement}
+          achievement={newAchievement as any}
           visible={showAchievementNotification}
           onHide={handleAchievementNotificationHide}
         />
