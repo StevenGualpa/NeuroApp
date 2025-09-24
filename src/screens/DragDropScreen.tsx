@@ -22,11 +22,12 @@ import { GameStatsDisplay } from '../components/GameStatsDisplay';
 import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { MessageCarousel } from '../components/MessageCarousel';
-import { AchievementService, Achievement } from '../services/AchievementService';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAchievementContext } from '../contexts/AchievementContext';
+import { useAchievementModalSequence } from '../hooks/useAchievementModalSequence';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 import { Image } from 'react-native';
 
@@ -83,6 +84,12 @@ const DragDropScreen = () => {
 
   // Real progress hook
   const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
+  
+  // Achievement system hook
+  const { recordHelpUsed } = useAchievementContext();
+  
+  // Achievement modal sequence hook
+  const { shouldShowModal, setShouldShowModal, handleGameCompletion } = useAchievementModalSequence();
 
   // Bilingual states
   const [processedStep, setProcessedStep] = useState(step);
@@ -445,57 +452,33 @@ const DragDropScreen = () => {
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
+      console.log('🎮 [DragDropScreen] Registrando finalización de juego:', finalStats);
+      
       // 1. Save progress to backend first
       await saveProgressToBackend(finalStats);
 
-      // 2. Use the enhanced achievement service that syncs with server
-      const _gameData = {
-        stars: finalStats.stars,
-        isPerfect: finalStats.perfectRun,
-        completionTime: finalStats.completionTime,
-        errors: finalStats.errors,
-        activityType: t.games.activityTypes.dragDrop,
-        showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
-        usedHelp: finalStats.usedHelp || false,
-        tookTime: finalStats.completionTime > 60000,
+      // 2. Use the new achievement system
+      const gameData = {
         lessonId: (step as any).lesson_id,
         stepId: (step as any).ID || step.id,
+        stars: finalStats.stars,
+        completionTime: Math.round(finalStats.completionTime / 1000), // Convertir a segundos
+        errors: finalStats.errors,
+        usedHelp: finalStats.usedHelp || false,
+        perfectRun: finalStats.perfectRun,
+        activityType: 'dragDrop', // Categoría para el sistema de logros
       };
 
-      // Use the local achievement service (temporarily disabled server sync)
-      const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
+      // Use the new sequence handler (handles achievements and modal timing)
+      await handleGameCompletion(gameData);
       
-      if (newlyUnlocked.length > 0) {
-        // Convert to server achievement format for celebration
-        const serverAchievements: ServerAchievement[] = newlyUnlocked.map(achievement => ({
-          ID: achievement.ID || 0,
-          title: achievement.title,
-          description: achievement.description,
-          icon: achievement.icon,
-          rarity: achievement.rarity || 'common',
-          points: achievement.points || 0,
-          category: achievement.category || 'general',
-        }));
-        
-        setUnlockedAchievements(serverAchievements);
-        
-        // Show celebration after a short delay
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            setShowCelebration(true);
-          }
-        }, 1500);
-      }
+      console.log('✅ [DragDropScreen] Finalización registrada exitosamente');
     } catch (error) {
-      Alert.alert(
-        language === 'es' ? 'Error' : 'Error',
-        language === 'es' 
-          ? 'No se pudieron verificar los logros. Tu progreso se ha guardado.'
-          : 'Could not verify achievements. Your progress has been saved.',
-        [{ text: 'OK' }]
-      );
+      console.error('❌ [DragDropScreen] Error registrando finalización:', error);
+      // No mostrar alert para achievements - el usuario no necesita saber si fallan
+      // El progreso ya se guardó exitosamente
     }
-  }, [saveProgressToBackend, step, language, t.games.activityTypes.dragDrop]);
+  }, [saveProgressToBackend, handleGameCompletion, step]);
 
   // FUNCIÓN CORREGIDA: handleAnimationFinish - Alineada con otras actividades
   const handleAnimationFinish = useCallback(() => {
@@ -674,6 +657,7 @@ const DragDropScreen = () => {
     setScore(0);
     setShowStars(false);
     setGameCompleted(false);
+    setShouldShowModal(false); // Reset modal state
     setGameStats({
       totalAttempts: 0,
       errors: 0,
@@ -686,7 +670,7 @@ const DragDropScreen = () => {
       helpActivations: 0,
       firstTrySuccess: false,
     });
-  }, []);
+  }, [setShouldShowModal]);
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, efficiency: number) => {
     if (language === 'es') {
@@ -991,7 +975,7 @@ const DragDropScreen = () => {
 
       {/* Game Complete Modal */}
       <GameCompletionModal
-        visible={isGameComplete && !showAnimation && showStars && !showCelebration}
+        visible={shouldShowModal && isGameComplete && !showAnimation && showStars && !showCelebration}
         stats={gameStats}
         onReset={resetGame}
         onContinue={() => navigation.goBack()}

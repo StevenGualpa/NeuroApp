@@ -204,6 +204,14 @@ const AchievementsScreen = () => {
       console.log(`✅ [AchievementsScreen] Loaded ${serverAchievements.length} achievements from server`);
       console.log(`👤 [AchievementsScreen] Loaded ${serverUserAchievements.length} user achievements`);
       
+      // Debug: Log user achievements data
+      if (serverUserAchievements.length > 0) {
+        console.log('🔍 [AchievementsScreen] User achievements data:', serverUserAchievements);
+        console.log('🔍 [AchievementsScreen] Sample user achievement:', serverUserAchievements[0]);
+      } else {
+        console.log('🔍 [AchievementsScreen] No user achievements found - user should have 0 unlocked achievements');
+      }
+      
       // Merge achievements with user progress
       const processedAchievements: ProcessedAchievement[] = serverAchievements.map(achievement => {
         const userAchievement = serverUserAchievements.find(ua => ua.achievement_id === achievement.ID);
@@ -217,12 +225,24 @@ const AchievementsScreen = () => {
         const achievementDescription = BilingualTextProcessor.extractText(rawDescription, language);
         const encouragementMessage = BilingualTextProcessor.extractText(rawEncouragement, language);
         
+        const isUnlocked = userAchievement?.is_unlocked || false;
+        
+        // Debug: Log each achievement processing
+        if (isUnlocked) {
+          console.log(`🔍 [AchievementsScreen] Logro ${achievement.ID} marcado como desbloqueado:`, {
+            achievementId: achievement.ID,
+            achievementName: achievementName,
+            userAchievement: userAchievement,
+            isUnlocked: isUnlocked
+          });
+        }
+        
         return {
           ...achievement,
           name: achievementName, // Texto procesado en el idioma correcto
           description: achievementDescription, // Descripción en el idioma correcto
           encouragement_message: encouragementMessage, // Mensaje de aliento en el idioma correcto
-          isUnlocked: userAchievement?.is_unlocked || false,
+          isUnlocked: isUnlocked,
           currentProgress: userAchievement?.progress || 0,
           max_progress: achievement.condition_value || 1, // Use condition_value as max_progress
           unlockedAt: userAchievement?.unlocked_at,

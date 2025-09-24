@@ -39,8 +39,9 @@ class GameEventsService {
     // Cargar estadísticas existentes
     await this.loadUserStats();
     
-    // Registrar evento de juego diario
-    await this.registerDailyPlayEvent();
+    // NO registrar evento de juego diario automáticamente durante inicialización
+    // Esto se hará cuando el usuario realmente juegue una actividad
+    console.log('⏭️ [GameEvents] Saltando registro automático de evento diario durante inicialización');
     
     console.log('✅ [GameEvents] Servicio inicializado');
   }
@@ -198,9 +199,9 @@ class GameEventsService {
   }
 
   /**
-   * Registrar evento de juego diario
+   * Registrar evento de juego diario (función pública para ser llamada desde actividades)
    */
-  private async registerDailyPlayEvent(): Promise<void> {
+  async registerDailyPlayEvent(): Promise<void> {
     const today = new Date().toISOString().split('T')[0];
     const now = new Date();
     const hour = now.getHours();
@@ -300,7 +301,7 @@ class GameEventsService {
       console.log(`🔍 [GameEvents] Evaluando achievement ${achievement.ID}: ${achievement.name}`);
       
       // Obtener progreso actual del usuario
-      const userAchievement = currentUserAchievements.find((ua: any) => ua.achievement_id === achievement.ID);
+      const userAchievement = currentUserAchievements.find((ua: any) => ua && ua.achievement_id === achievement.ID);
       const currentProgress = userAchievement?.progress || 0;
       
       console.log(`📊 [GameEvents] Achievement ${achievement.ID} - Progreso actual: ${currentProgress}, Desbloqueado: ${userAchievement?.is_unlocked || false}`);
@@ -334,6 +335,18 @@ class GameEventsService {
         if (generalResult.unlocked || eventResult.unlocked) {
           // Solo agregar si no estaba ya desbloqueado
           const wasUnlocked = userAchievement?.is_unlocked || false;
+          
+          console.log(`🔍 [GameEvents] Logro ${achievement.ID} evaluado como desbloqueado:`, {
+            wasUnlocked,
+            generalResult: generalResult.unlocked,
+            eventResult: eventResult.unlocked,
+            userAchievement: userAchievement ? {
+              id: userAchievement.achievement_id,
+              isUnlocked: userAchievement.is_unlocked,
+              progress: userAchievement.progress
+            } : 'No existe'
+          });
+          
           if (!wasUnlocked) {
             unlockedAchievements.push(achievement.ID);
             console.log(`🏆 [GameEvents] Logro ${achievement.ID} desbloqueado (solo evaluación): ${achievement.name}`);
@@ -343,7 +356,7 @@ class GameEventsService {
               this.onAchievementUnlocked(achievement.ID);
             }
           } else {
-            console.log(`✅ [GameEvents] Achievement ${achievement.ID} ya estaba desbloqueado`);
+            console.log(`✅ [GameEvents] Achievement ${achievement.ID} ya estaba desbloqueado - NO agregando a lista`);
           }
         } else {
           console.log(`📊 [GameEvents] Achievement ${achievement.ID} - Progreso actualizado (solo evaluación): ${newProgress}`);

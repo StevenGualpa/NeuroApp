@@ -22,7 +22,8 @@ import { GameCompletionModal } from '../components/GameCompletionModal';
 import { ProgressSection } from '../components/ProgressSection';
 import { MessageCarousel } from '../components/MessageCarousel';
 import { AchievementService, Achievement } from '../services/AchievementService';
-// import RealAchievementServiceEnhanced from '../services/RealAchievementService_enhanced';
+import { useAchievementContext } from '../contexts/AchievementContext';
+import { useAchievementModalSequence } from '../hooks/useAchievementModalSequence';
 import AdaptiveReinforcementService from '../services/AdaptiveReinforcementService';
 import AudioService from '../services/AudioService';
 import { useRealProgress } from '../hooks/useRealProgress';
@@ -65,6 +66,10 @@ const OrderStepsScreen = () => {
   // Real progress hook
   const { completeStep, isLoading: progressLoading, error: progressError } = useRealProgress();
 
+  // Achievement system hooks
+  const { recordHelpUsed } = useAchievementContext();
+  const { shouldShowModal, setShouldShowModal, handleGameCompletion } = useAchievementModalSequence();
+
   // Bilingual states
   const [processedStep, setProcessedStep] = useState(step);
   const [rawStep] = useState(step); // Keep original data
@@ -93,6 +98,7 @@ const OrderStepsScreen = () => {
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
   
   // New celebration states
+  // Achievement celebration states (legacy - will be removed)
   const [unlockedAchievements, setUnlockedAchievements] = useState<ServerAchievement[]>([]);
   const [showCelebration, setShowCelebration] = useState(false);
 
@@ -269,7 +275,7 @@ const OrderStepsScreen = () => {
   }, [shuffledOptions]);
 
   // Helper function to trigger help for a specific step
-  const triggerHelpForStep = useCallback((stepIndex: number) => {
+  const triggerHelpForStep = useCallback(async (stepIndex: number) => {
     setIsHelpActive(true);
     setBlinkingStepIndex(stepIndex);
     
@@ -279,6 +285,14 @@ const OrderStepsScreen = () => {
       usedHelp: true,
       helpActivations: (prev.helpActivations || 0) + 1,
     }));
+
+    // Record help usage for achievements
+    try {
+      await recordHelpUsed((step as any).lesson_id, (step as any).ID || step.id);
+      console.log('📝 [OrderStepsScreen] Uso de ayuda registrado para achievements');
+    } catch (error) {
+      console.error('❌ [OrderStepsScreen] Error registrando uso de ayuda:', error);
+    }
     
     // Start blinking animation
     const blinkAnimation = () => {
@@ -310,7 +324,7 @@ const OrderStepsScreen = () => {
       setBlinkingStepIndex(null);
       helpBlinkAnimation.setValue(1);
     }, 5000);
-  }, [helpBlinkAnimation, isHelpActive]);
+  }, [helpBlinkAnimation, isHelpActive, recordHelpUsed, step]);
 
   // Calculate stars based on performance
   const calculateStars = useCallback((errors: number, resets: number, completionTime: number, stepCount: number): number => {
@@ -405,60 +419,29 @@ const OrderStepsScreen = () => {
   // Record game completion and check for achievements
   const recordGameCompletion = useCallback(async (finalStats: GameStats) => {
     try {
-
+      console.log('🎮 [OrderStepsScreen] Registrando finalización de juego:', finalStats);
+      
       // 1. Save progress to backend first
       await saveProgressToBackend(finalStats);
-
-      // 2. Use the enhanced achievement service that syncs with server
-      const _gameData = {
-        stars: finalStats.stars,
-        isPerfect: finalStats.perfectRun,
-        completionTime: finalStats.completionTime,
-        errors: finalStats.errors,
-        activityType: t.games.activityTypes.orderSteps,
-        showedImprovement: finalStats.errors > 0 && finalStats.stars > 1,
-        usedHelp: finalStats.usedHelp || false,
-        tookTime: finalStats.completionTime > 60000,
+      
+      // 2. Use the new achievement system
+      const gameData = {
         lessonId: (step as any).lesson_id,
         stepId: (step as any).ID || step.id,
+        stars: finalStats.stars,
+        completionTime: Math.round(finalStats.completionTime / 1000),
+        errors: finalStats.errors,
+        usedHelp: finalStats.usedHelp || false,
+        perfectRun: finalStats.perfectRun,
+        activityType: 'orderSteps', // Category for achievement system
       };
-
-
-      // const newlyUnlocked = await RealAchievementServiceEnhanced.recordGameCompletion(gameData);
-      const newlyUnlocked: any[] = []; // Temporalmente deshabilitado
       
-      if (newlyUnlocked.length > 0) {
-        
-        // Convert to server achievement format for celebration
-        const serverAchievements: ServerAchievement[] = newlyUnlocked.map(achievement => ({
-          ID: achievement.ID || 0,
-          title: achievement.title,
-          description: achievement.description,
-          icon: achievement.icon,
-          rarity: achievement.rarity || 'common',
-          points: achievement.points || 0,
-          category: achievement.category || 'general',
-        }));
-        
-        setUnlockedAchievements(serverAchievements);
-        
-        // Show celebration after a short delay
-        setTimeout(() => {
-          if (!isMountedRef.current) return;
-          
-          setShowCelebration(true);
-        }, 1500);
-        
-      } else {
-      }
+      await handleGameCompletion(gameData);
+      console.log('✅ [OrderStepsScreen] Finalización registrada exitosamente');
     } catch (error) {
-      Alert.alert(
-        'Error',
-        'No se pudieron verificar los logros. Tu progreso se ha guardado.',
-        [{ text: 'OK' }]
-      );
+      console.error('❌ [OrderStepsScreen] Error registrando finalización:', error);
     }
-  }, [saveProgressToBackend, step]);
+  }, [saveProgressToBackend, handleGameCompletion, step]);
 
   // FUNCIÓN CORREGIDA: handleAnimationFinish
   const handleAnimationFinish = useCallback(() => {
@@ -631,7 +614,10 @@ const OrderStepsScreen = () => {
       helpActivations: 0,
       firstTrySuccess: false,
     });
-  }, [shuffledOptions]);
+    
+    // Reset modal state
+    setShouldShowModal(false);
+  }, [shuffledOptions, setShouldShowModal]);
 
   const getPerformanceMessage = useCallback((stars: number, perfectRun: boolean, resets: number) => {
     if (perfectRun && stars === 3 && resets === 0) {
@@ -854,7 +840,7 @@ const OrderStepsScreen = () => {
 
       {/* Game Complete Modal usando componente reutilizable */}
       <GameCompletionModal
-        visible={gameCompleted && !showAnimation && showStars && !showCelebration}
+        visible={shouldShowModal && gameCompleted && !showAnimation && showStars}
         stats={gameStats}
         onReset={resetGame}
         onContinue={() => navigation.goBack()}

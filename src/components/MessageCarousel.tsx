@@ -82,7 +82,12 @@ export const MessageCarousel: React.FC<MessageCarouselProps> = ({
   // Safe state update function
   const safeSetCurrentMessageIndex = useCallback((newIndex: number) => {
     if (isMountedRef.current) {
-      setCurrentMessageIndex(newIndex);
+      // Use setTimeout to defer state update and avoid useInsertionEffect warning
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          setCurrentMessageIndex(newIndex);
+        }
+      }, 0);
     }
   }, []);
 
@@ -101,7 +106,8 @@ export const MessageCarousel: React.FC<MessageCarouselProps> = ({
       if (!finished || !isMountedRef.current) return;
 
       // Update message index
-      safeSetCurrentMessageIndex((prev) => (prev + 1) % messages.length);
+      const nextIndex = (currentMessageIndex + 1) % messages.length;
+      safeSetCurrentMessageIndex(nextIndex);
       
       // Fade in
       animationRef.current = Animated.timing(fadeAnim, {

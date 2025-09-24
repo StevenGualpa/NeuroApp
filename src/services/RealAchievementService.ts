@@ -245,6 +245,15 @@ class RealAchievementService {
     try {
       console.log('🎮 [RealAchievementService] Procesando finalización de juego:', gameData);
 
+      // Registrar evento de juego diario (solo si es la primera actividad del día)
+      try {
+        await GameEventsService.registerDailyPlayEvent();
+        console.log('📅 [RealAchievementService] Evento diario registrado');
+      } catch (dailyEventError) {
+        console.warn('⚠️ [RealAchievementService] Error registrando evento diario:', dailyEventError);
+        // No fallar si hay error en el evento diario
+      }
+
       // Usar el nuevo sistema de eventos para procesar la lección completada
       // Pasar user achievements actuales para optimizar
       const unlockedAchievementIds = await GameEventsService.processLessonCompletion({
@@ -265,6 +274,12 @@ class RealAchievementService {
           
           // Verificar si ya existe en userAchievements como desbloqueado
           const existingUserAchievement = this.userAchievements.find(ua => ua && ua.achievement_id === achievementId);
+          
+          console.log(`🔍 [RealAchievementService] Verificando logro ${achievementId}:`, {
+            exists: !!existingUserAchievement,
+            isUnlocked: existingUserAchievement?.is_unlocked,
+            progress: existingUserAchievement?.progress
+          });
           
           if (existingUserAchievement && existingUserAchievement.is_unlocked) {
             console.log(`✅ [RealAchievementService] Logro ${achievementId} ya está registrado como desbloqueado - ignorando`);
@@ -462,8 +477,8 @@ class RealAchievementService {
     const achievement = this.allAchievements.find(a => a.ID === achievementId);
     const maxProgress = achievement?.condition_value || 100;
     
-    // Usar el nuevo método de actualización de progreso
-    await this.updateAchievementProgress(achievementId, maxProgress);
+    // Usar el nuevo método de actualización de progreso con isUnlocked: true
+    await this.updateAchievementProgress(achievementId, maxProgress, true);
   }
 
   /**

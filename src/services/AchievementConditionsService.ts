@@ -180,8 +180,21 @@ class AchievementConditionsService {
 
       case 'complete_after_3_attempts':
         // Verificar si alguna lección fue completada después de exactamente 3 intentos
-        const hasThreeAttemptCompletion = Object.values(userStats.attemptsHistory)
-          .some(attempts => attempts >= 3);
+        // Esto significa que falló 2 veces antes de completarse exitosamente
+        const hasThreeAttemptCompletion = Object.entries(userStats.attemptsHistory)
+          .some(([lessonKey, attempts]) => {
+            // Solo considerar lecciones que fueron completadas exitosamente
+            // y que tuvieron exactamente 3 intentos (2 fallos + 1 éxito)
+            console.log(`🔍 [AchievementConditions] Logro Persistente - Lección ${lessonKey}: ${attempts} intentos`);
+            return attempts === 3;
+          });
+        
+        console.log(`🔍 [AchievementConditions] Logro Persistente evaluado:`, {
+          hasThreeAttemptCompletion,
+          attemptsHistory: userStats.attemptsHistory,
+          newProgress: hasThreeAttemptCompletion ? 1 : 0
+        });
+        
         newProgress = hasThreeAttemptCompletion ? 1 : 0;
         break;
 
