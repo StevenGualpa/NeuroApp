@@ -85,6 +85,20 @@ export const API_ENDPOINTS = {
   BULK_UPDATE_USER_SETTINGS: (userId: number) => `/user-settings/user/${userId}/bulk`,
   INITIALIZE_USER_SETTINGS: (userId: number) => `/user-settings/user/${userId}/initialize`,
   
+  // Analysis (NEW)
+  ANALYSIS_QUICK: (userId: number) => `/analysis/user/${userId}/quick`,
+  ANALYSIS_MONTHLY: (userId: number) => `/analysis/user/${userId}/monthly`,
+  ANALYSIS_PROGRESS: (userId: number) => `/analysis/user/${userId}/progress`,
+  ANALYSIS_TRENDS: (userId: number) => `/analysis/user/${userId}/trends`,
+  ANALYSIS_BY_ACTIVITY: (userId: number) => `/analysis/user/${userId}/by-activity`,
+  ANALYSIS_NEURODIVERGENT: (userId: number) => `/analysis/user/${userId}/neurodivergent`,
+  GENERATE_REPORT: (userId: number) => `/analysis/user/${userId}/report`,
+  
+  // Neurodivergent Profiles (NEW)
+  NEURODIVERGENT_PROFILE: (userId: number) => `/neurodivergent/user/${userId}/profile`,
+  NEURODIVERGENT_MILESTONES: (userId: number) => `/neurodivergent/user/${userId}/milestones`,
+  RECORD_MILESTONE: (userId: number) => `/neurodivergent/user/${userId}/milestone`,
+  
   // Health
   HEALTH: '/',
 };

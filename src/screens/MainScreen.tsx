@@ -28,7 +28,7 @@ const MainScreen = () => {
   const [showCredits, setShowCredits] = useState(false);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnims = useRef(Array(6).fill(0).map(() => new Animated.Value(1))).current;
+  const scaleAnims = useRef(Array(7).fill(0).map(() => new Animated.Value(1))).current;
 
   // Menu options - optimized and responsive
   const menuOptions = [
@@ -40,6 +40,13 @@ const MainScreen = () => {
       route: 'activityMenu',
     },
     { 
+      key: 'progreso', 
+      label: language === 'es' ? 'Mi Progreso' : 'My Progress', 
+      icon: '📊', 
+      color: '#4CAF50',
+      route: 'ProgressReport',
+    },
+    { 
       key: 'logros', 
       label: t.navigation.achievements, 
       icon: '🏆', 
@@ -47,11 +54,11 @@ const MainScreen = () => {
       route: 'Achievements',
     },
     { 
-      key: 'estadisticas', 
-      label: t.navigation.statistics, 
-      icon: '📊', 
+      key: 'perfil', 
+      label: language === 'es' ? 'Perfil Médico' : 'Medical Profile', 
+      icon: '🧠', 
       color: '#9C27B0',
-      route: 'Statistics',
+      route: 'NeurodivergentProfile',
     },
     { 
       key: 'opciones', 
