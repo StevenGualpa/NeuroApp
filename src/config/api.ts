@@ -98,6 +98,10 @@ export const API_ENDPOINTS = {
   NEURODIVERGENT_PROFILE: (userId: number) => `/neurodivergent/user/${userId}/profile`,
   NEURODIVERGENT_MILESTONES: (userId: number) => `/neurodivergent/user/${userId}/milestones`,
   RECORD_MILESTONE: (userId: number) => `/neurodivergent/user/${userId}/milestone`,
+
+  // Lesson Progress (NEW)
+  LESSON_PROGRESS: (userId: number, lessonId: number) => `/progress/user/${userId}/lesson/${lessonId}`,
+  STEP_PROGRESS: (userId: number, stepId: number) => `/progress/user/${userId}/step/${stepId}`,
   
   // Health
   HEALTH: '/',

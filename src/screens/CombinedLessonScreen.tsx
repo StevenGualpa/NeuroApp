@@ -20,6 +20,8 @@ import ApiService, { Lesson, Category, Step, Option, Activity } from '../service
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 import GameIntroAnimation from '../components/GameIntroAnimation';
+import { useAuth } from '../hooks';
+import LessonProgressService, { StepProgress } from '../services/LessonProgressService';
 
 const { width } = Dimensions.get('window');
 
@@ -46,6 +48,7 @@ const CombinedLessonScreen = () => {
   const route = useRoute<CombinedLessonScreenRouteProp>();
   const { t, language } = useLanguage();
   const { category, activityType } = route.params;
+  const { user } = useAuth();
 
   // Estados
   const [allSteps, setAllSteps] = useState<StepWithLesson[]>([]);
@@ -60,6 +63,8 @@ const CombinedLessonScreen = () => {
     step: any;
     lessonTitle: string;
   } | null>(null);
+  const [stepsProgress, setStepsProgress] = useState<StepProgress[]>([]);
+  const [loadingProgress, setLoadingProgress] = useState(false);
 
   // Animation refs
   const headerAnimation = useRef(new Animated.Value(0)).current;
@@ -69,6 +74,18 @@ const CombinedLessonScreen = () => {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Recargar progreso cuando el usuario regrese de una actividad
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (user && allSteps.length > 0) {
+        console.log('🔄 [CombinedLessonScreen] Screen focused, reloading progress');
+        loadStepsProgress();
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, user, allSteps.length]);
 
   // Procesar lecciones cuando cambie el idioma
   useEffect(() => {
@@ -170,6 +187,34 @@ const CombinedLessonScreen = () => {
     }
   };
 
+  const loadStepsProgress = async (stepsToLoad?: StepWithLesson[]) => {
+    const steps = stepsToLoad || allSteps;
+    console.log('🔍 [CombinedLessonScreen] loadStepsProgress called with:', { user: user?.id, stepsLength: steps.length });
+    if (!user || steps.length === 0) {
+      console.log('⚠️ [CombinedLessonScreen] No user or no steps, skipping progress load');
+      return;
+    }
+    
+    try {
+      setLoadingProgress(true);
+      const stepIds = steps.map(step => step.ID);
+      console.log('📊 [CombinedLessonScreen] Loading progress for stepIds:', stepIds);
+      const progress = await LessonProgressService.getStepsProgress(user.id, stepIds);
+      console.log('✅ [CombinedLessonScreen] Progress loaded:', progress);
+      setStepsProgress(progress);
+    } catch (error) {
+      console.error('❌ [CombinedLessonScreen] Error loading steps progress:', error);
+      // No mostrar error al usuario, solo continuar sin progreso
+    } finally {
+      setLoadingProgress(false);
+    }
+  };
+
+  // Helper para obtener el progreso de un paso específico
+  const getStepProgress = (stepId: number): StepProgress | null => {
+    return stepsProgress.find(progress => progress.step_id === stepId) || null;
+  };
+
   const processLessonsForLanguage = async (lessonsToProcess?: Lesson[]) => {
     const sourceLessons = lessonsToProcess || rawLessons;
     
@@ -248,6 +293,12 @@ const CombinedLessonScreen = () => {
     });
     
     setAllSteps(sortedSteps);
+    
+    // Cargar progreso después de cargar todos los pasos
+    if (user && sortedSteps.length > 0) {
+      console.log('✅ [CombinedLessonScreen] All steps loaded, now loading progress');
+      await loadStepsProgress(sortedSteps);
+    }
   };
 
   const loadStepsForLesson = async (lessonId: number) => {
@@ -640,6 +691,13 @@ const CombinedLessonScreen = () => {
               const activityColor = getActivityTypeColor(activityType);
               const activityIcon = getActivityTypeIcon(activityType);
               
+              // Obtener progreso del paso
+              const stepProgress = getStepProgress(step.ID);
+              const status = stepProgress ? LessonProgressService.getStepStatus(stepProgress) : 'not_played';
+              const statusColor = LessonProgressService.getStatusColor(status);
+              const statusIcon = LessonProgressService.getStatusIcon(status);
+              const statusText = LessonProgressService.getStatusText(status);
+              
               return (
                 <TouchableOpacity
                   key={step.ID}
@@ -673,6 +731,40 @@ const CombinedLessonScreen = () => {
                           {step.description}
                         </Text>
                       )}
+
+                      {/* Información de progreso */}
+                      <View style={styles.progressInfo}>
+                        <View style={styles.progressRow}>
+                          <Text style={styles.statusText}>
+                            {statusIcon} {statusText}
+                          </Text>
+                        </View>
+                        
+                        {stepProgress && stepProgress.has_progress && (
+                          <View style={styles.progressStats}>
+                            <View style={styles.progressStat}>
+                              <Text style={styles.progressStatLabel}>Mejor tiempo:</Text>
+                              <Text style={[styles.progressStatValue, { color: statusColor }]}>
+                                {stepProgress.best_time_formatted}
+                              </Text>
+                            </View>
+                            <View style={styles.progressStat}>
+                              <Text style={styles.progressStatLabel}>Mejor puntuación:</Text>
+                              <Text style={[styles.progressStatValue, { color: statusColor }]}>
+                                {stepProgress.best_stars}/3 ⭐
+                              </Text>
+                            </View>
+                            {stepProgress.perfect_runs > 0 && (
+                              <View style={styles.progressStat}>
+                                <Text style={styles.progressStatLabel}>Sin errores:</Text>
+                                <Text style={[styles.progressStatValue, { color: '#4CAF50' }]}>
+                                  {stepProgress.perfect_runs} vez{stepProgress.perfect_runs > 1 ? 'es' : ''}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
+                      </View>
                     </View>
 
                     <View style={styles.questionActions}>
@@ -1062,6 +1154,39 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 20,
+  },
+  progressInfo: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  progressStats: {
+    gap: 4,
+  },
+  progressStat: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  progressStatLabel: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: '500',
+  },
+  progressStatValue: {
+    fontSize: 11,
+    fontWeight: '700',
   },
   questionCard: {
     borderRadius: 16,

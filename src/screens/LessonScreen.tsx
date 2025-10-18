@@ -19,6 +19,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import ApiService, { Step, Option, Lesson } from '../services/ApiService';
 import GameIntroAnimation from '../components/GameIntroAnimation';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../hooks';
+import LessonProgressService, { StepProgress } from '../services/LessonProgressService';
 import { 
   getActivityTypeTranslation, 
   getActivityTypeColor, 
@@ -35,6 +37,7 @@ const RealLessonScreen = () => {
   const route = useRoute<RealLessonScreenRouteProp>();
   const { lesson } = route.params;
   const { language, t } = useLanguage();
+  const { user } = useAuth();
 
   // Estados
   const [steps, setSteps] = useState<Step[]>([]);
@@ -46,6 +49,8 @@ const RealLessonScreen = () => {
     activityType: string;
     step: any;
   } | null>(null);
+  const [stepsProgress, setStepsProgress] = useState<StepProgress[]>([]);
+  const [loadingProgress, setLoadingProgress] = useState(false);
 
   // Animation refs
   const headerAnimation = useRef(new Animated.Value(0)).current;
@@ -57,7 +62,8 @@ const RealLessonScreen = () => {
   }, []);
 
   const loadInitialData = async () => {
-    await loadSteps();
+    console.log('🔍 [LessonScreen] loadInitialData called with user:', user);
+    await loadSteps(); // loadSteps ahora maneja la carga de progreso internamente
     
     // Animate on mount
     Animated.sequence([
@@ -98,6 +104,12 @@ const RealLessonScreen = () => {
         setLessonData(sortedSteps[0].Lesson);
       }
       
+      // Cargar progreso después de cargar los pasos
+      if (user && sortedSteps.length > 0) {
+        console.log('✅ [LessonScreen] Steps loaded, now loading progress');
+        await loadStepsProgress();
+      }
+      
     } catch (error) {
       console.error('Error loading steps:', error);
       Alert.alert(
@@ -113,9 +125,31 @@ const RealLessonScreen = () => {
     }
   };
 
+  const loadStepsProgress = async () => {
+    console.log('🔍 [LessonScreen] loadStepsProgress called with:', { user: user?.id, stepsLength: steps.length });
+    if (!user || steps.length === 0) {
+      console.log('⚠️ [LessonScreen] No user or no steps, skipping progress load');
+      return;
+    }
+    
+    try {
+      setLoadingProgress(true);
+      const stepIds = steps.map(step => step.ID);
+      console.log('📊 [LessonScreen] Loading progress for stepIds:', stepIds);
+      const progress = await LessonProgressService.getStepsProgress(user.id, stepIds);
+      console.log('✅ [LessonScreen] Progress loaded:', progress);
+      setStepsProgress(progress);
+    } catch (error) {
+      console.error('❌ [LessonScreen] Error loading steps progress:', error);
+      // No mostrar error al usuario, solo continuar sin progreso
+    } finally {
+      setLoadingProgress(false);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadSteps();
+    await loadSteps(); // loadSteps ahora maneja la carga de progreso internamente
     setRefreshing(false);
   };
 
@@ -277,6 +311,11 @@ const RealLessonScreen = () => {
   // Usar las funciones de traducción importadas
   const getActivityTypeColorLocal = (activityType: string) => getActivityTypeColor(activityType);
   const getActivityTypeIconLocal = (activityType: string) => getActivityTypeIcon(activityType);
+
+  // Helper para obtener el progreso de un paso específico
+  const getStepProgress = (stepId: number): StepProgress | null => {
+    return stepsProgress.find(progress => progress.step_id === stepId) || null;
+  };
 
   // Usar datos de la lección original o de la API
   const displayLesson = lessonData || lesson;
@@ -450,6 +489,15 @@ const RealLessonScreen = () => {
               const activityColor = getActivityTypeColorLocal(activityType);
               const activityIcon = getActivityTypeIconLocal(activityType);
               
+              // Obtener progreso del paso
+              const stepProgress = getStepProgress(step.ID);
+              console.log(`🔍 [LessonScreen] Step ${step.ID} progress:`, stepProgress);
+              const status = stepProgress ? LessonProgressService.getStepStatus(stepProgress) : 'not_played';
+              const statusColor = LessonProgressService.getStatusColor(status);
+              const statusIcon = LessonProgressService.getStatusIcon(status);
+              const statusText = LessonProgressService.getStatusText(status);
+              console.log(`📊 [LessonScreen] Step ${step.ID} status:`, { status, statusColor, statusIcon, statusText });
+              
               return (
                 <TouchableOpacity
                   key={step.ID}
@@ -481,6 +529,40 @@ const RealLessonScreen = () => {
                       <Text style={styles.stepDescription} numberOfLines={2}>
                         {step.description}
                       </Text>
+
+                      {/* Información de progreso */}
+                      <View style={styles.progressInfo}>
+                        <View style={styles.progressRow}>
+                          <Text style={styles.statusText}>
+                            {statusIcon} {statusText}
+                          </Text>
+                        </View>
+                        
+                        {stepProgress && stepProgress.has_progress && (
+                          <View style={styles.progressStats}>
+                            <View style={styles.progressStat}>
+                              <Text style={styles.progressStatLabel}>Mejor tiempo:</Text>
+                              <Text style={[styles.progressStatValue, { color: statusColor }]}>
+                                {stepProgress.best_time_formatted}
+                              </Text>
+                            </View>
+                            <View style={styles.progressStat}>
+                              <Text style={styles.progressStatLabel}>Mejor puntuación:</Text>
+                              <Text style={[styles.progressStatValue, { color: statusColor }]}>
+                                {stepProgress.best_stars}/3 ⭐
+                              </Text>
+                            </View>
+                            {stepProgress.perfect_runs > 0 && (
+                              <View style={styles.progressStat}>
+                                <Text style={styles.progressStatLabel}>Sin errores:</Text>
+                                <Text style={[styles.progressStatValue, { color: '#4CAF50' }]}>
+                                  {stepProgress.perfect_runs} vez{stepProgress.perfect_runs > 1 ? 'es' : ''}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        )}
+                      </View>
                     </View>
 
                     <View style={styles.stepActions}>
@@ -766,6 +848,39 @@ const styles = StyleSheet.create({
   },
   bottomSpacing: {
     height: 20,
+  },
+  progressInfo: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#666',
+  },
+  progressStats: {
+    gap: 4,
+  },
+  progressStat: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  progressStatLabel: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: '500',
+  },
+  progressStatValue: {
+    fontSize: 11,
+    fontWeight: '700',
   },
 });
 
