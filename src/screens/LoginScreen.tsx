@@ -38,6 +38,7 @@ const LoginScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+  const [showCredits, setShowCredits] = useState(false);
   
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { t, language } = useLanguage();
@@ -46,6 +47,27 @@ const LoginScreen = () => {
   const logoAnimation = useRef(new Animated.Value(0)).current;
   const formAnimation = useRef(new Animated.Value(0)).current;
   const loadingAnimation = useRef(new Animated.Value(0)).current;
+  const creditsAnimation = useRef(new Animated.Value(0)).current;
+
+  // Credits data
+  const creditsData = [
+    {
+      category: language === 'es' ? 'Desarrollo' : 'Development',
+      items: [
+        { name: language === 'es' ? 'Desarrollador Principal' : 'Lead Developer', value: 'Steven Gualpa' },
+        { name: language === 'es' ? 'Diseño UI/UX' : 'UI/UX Design', value: 'Steven Gualpa' },
+        { name: language === 'es' ? 'Programación' : 'Programming', value: 'Yolo Team' },
+      ],
+    },
+    {
+      category: language === 'es' ? 'Información' : 'Information',
+      items: [
+        { name: language === 'es' ? 'Versión' : 'Version', value: '2.6.0' },
+        { name: language === 'es' ? 'Plataforma' : 'Platform', value: 'React Native' },
+        { name: language === 'es' ? 'Actualización' : 'Last Update', value: language === 'es' ? 'Oct 2025' : 'Oct 2025' },
+      ],
+    },
+  ];
 
   useEffect(() => {
     // Entrance animations
@@ -219,6 +241,23 @@ const LoginScreen = () => {
         : 'Your password has been successfully changed. You can now sign in with your new password.',
       [{ text: t.common.ok }]
     );
+  };
+
+  const showCreditsScreen = () => {
+    setShowCredits(true);
+    Animated.timing(creditsAnimation, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hideCreditsScreen = () => {
+    Animated.timing(creditsAnimation, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => setShowCredits(false));
   };
 
   const renderInput = (
@@ -434,6 +473,15 @@ const LoginScreen = () => {
                 : '🌟 Learn, play and grow with NeuroApp ✨'
               }
             </Text>
+            <TouchableOpacity 
+              style={styles.creditsButton}
+              onPress={showCreditsScreen}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.creditsButtonText}>
+                👥 {language === 'es' ? 'Créditos' : 'Credits'}
+              </Text>
+            </TouchableOpacity>
             <Text style={styles.versionText}>
               {language === 'es' ? 'Versión 1.0.0' : 'Version 1.0.0'}
             </Text>
@@ -447,6 +495,68 @@ const LoginScreen = () => {
         onClose={handleRecoveryModalClose}
         onSuccess={handleRecoverySuccess}
       />
+
+      {/* Credits Overlay */}
+      {showCredits && (
+        <Animated.View 
+          style={[
+            styles.creditsContainer,
+            {
+              opacity: creditsAnimation,
+              transform: [{
+                scale: creditsAnimation.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.8, 1],
+                })
+              }]
+            }
+          ]}
+        >
+          <View style={styles.creditsContent}>
+            <View style={styles.creditsHeader}>
+              <Text style={styles.creditsTitle}>👥 {language === 'es' ? 'Créditos' : 'Credits'}</Text>
+              <TouchableOpacity 
+                style={styles.closeButton}
+                onPress={hideCreditsScreen}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView 
+              style={styles.creditsScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              {creditsData.map((section, sectionIndex) => (
+                <View key={sectionIndex} style={styles.creditsSection}>
+                  <Text style={styles.sectionTitle}>{section.category}</Text>
+                  {section.items.map((item, itemIndex) => (
+                    <View key={itemIndex} style={styles.creditsItem}>
+                      <Text style={styles.itemLabel}>{item.name}</Text>
+                      <Text style={styles.itemValue}>{item.value}</Text>
+                    </View>
+                  ))}
+                </View>
+              ))}
+              
+              <View style={styles.thankYouSection}>
+                <Text style={styles.thankYouText}>
+                  ❤️ {language === 'es' 
+                    ? 'Gracias por usar NeuroApp'
+                    : 'Thank you for using NeuroApp'
+                  }
+                </Text>
+                <Text style={styles.thankYouSubtext}>
+                  {language === 'es'
+                    ? 'Juntos hacemos el aprendizaje divertido'
+                    : 'Together we make learning fun'
+                  }
+                </Text>
+              </View>
+            </ScrollView>
+          </View>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 };
@@ -640,6 +750,125 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.6)',
     textAlign: 'center',
     fontWeight: '400',
+  },
+  creditsButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginVertical: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  creditsButtonText: {
+    fontSize: isSmallScreen ? 12 : 14,
+    color: '#ffffff',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  // Credits overlay styles
+  creditsContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  creditsContent: {
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    width: '100%',
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  creditsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e8f0fe',
+  },
+  creditsTitle: {
+    fontSize: isSmallScreen ? 18 : 20,
+    fontWeight: '700',
+    color: '#4285f4',
+  },
+  closeButton: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 16,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  creditsScroll: {
+    maxHeight: 400,
+  },
+  creditsSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
+  },
+  sectionTitle: {
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: '700',
+    color: '#4285f4',
+    marginBottom: 10,
+  },
+  creditsItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  itemLabel: {
+    fontSize: isSmallScreen ? 12 : 14,
+    color: '#6b7280',
+    fontWeight: '500',
+    flex: 1,
+  },
+  itemValue: {
+    fontSize: isSmallScreen ? 12 : 14,
+    color: '#1a1a1a',
+    fontWeight: '600',
+    textAlign: 'right',
+    flex: 1,
+  },
+  thankYouSection: {
+    backgroundColor: '#4285f4',
+    margin: 20,
+    borderRadius: 15,
+    padding: 15,
+    alignItems: 'center',
+  },
+  thankYouText: {
+    fontSize: isSmallScreen ? 14 : 16,
+    fontWeight: '700',
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  thankYouSubtext: {
+    fontSize: isSmallScreen ? 12 : 13,
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });
 

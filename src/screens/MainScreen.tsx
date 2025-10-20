@@ -25,10 +25,8 @@ type MainScreenNavigationProp = NativeStackNavigationProp<RootStackParamList>;
 const MainScreen = () => {
   const navigation = useNavigation<MainScreenNavigationProp>();
   const { t, language } = useLanguage();
-  const [showCredits, setShowCredits] = useState(false);
-  const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnims = useRef(Array(7).fill(0).map(() => new Animated.Value(1))).current;
+  const scaleAnims = useRef(Array(6).fill(0).map(() => new Animated.Value(1))).current;
 
   // Menu options - optimized and responsive
   const menuOptions = [
@@ -68,13 +66,6 @@ const MainScreen = () => {
       route: 'Settings',
     },
     { 
-      key: 'creditos', 
-      label: t.navigation.credits, 
-      icon: '👥', 
-      color: '#FFA726',
-      action: 'credits',
-    },
-    { 
       key: 'salir', 
       label: language === 'es' ? 'Salir' : 'Exit', 
       icon: '🚪', 
@@ -83,25 +74,6 @@ const MainScreen = () => {
     },
   ];
 
-  // Credits data - simplified
-  const creditsData = [
-    {
-      category: language === 'es' ? 'Desarrollo' : 'Development',
-      items: [
-        { name: language === 'es' ? 'Desarrollador Principal' : 'Lead Developer', value: 'Steven Gualpa' },
-        { name: language === 'es' ? 'Diseño UI/UX' : 'UI/UX Design', value: 'Steven Gualpa' },
-        { name: language === 'es' ? 'Programación' : 'Programming', value: 'Yolo Team' },
-      ],
-    },
-    {
-      category: language === 'es' ? 'Información' : 'Information',
-      items: [
-        { name: language === 'es' ? 'Versión' : 'Version', value: '1.0.0' },
-        { name: language === 'es' ? 'Plataforma' : 'Platform', value: 'React Native' },
-        { name: language === 'es' ? 'Actualización' : 'Last Update', value: language === 'es' ? 'Dic 2024' : 'Dec 2024' },
-      ],
-    },
-  ];
 
   // Initialize animations
   React.useEffect(() => {
@@ -142,29 +114,11 @@ const MainScreen = () => {
     // Handle navigation
     if (option.route) {
       navigation.navigate(option.route as keyof RootStackParamList);
-    } else if (option.action === 'credits') {
-      showCreditsScreen();
     } else if (option.action === 'exit') {
       handleExit();
     }
   };
 
-  const showCreditsScreen = () => {
-    setShowCredits(true);
-    Animated.timing(slideAnim, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const hideCreditsScreen = () => {
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => setShowCredits(false));
-  };
 
   const handleExit = () => {
     Alert.alert(
@@ -200,63 +154,6 @@ const MainScreen = () => {
     </Animated.View>
   );
 
-  const renderCreditsScreen = () => (
-    <Animated.View 
-      style={[
-        styles.creditsContainer,
-        {
-          transform: [{
-            translateX: slideAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [width, 0],
-            })
-          }]
-        }
-      ]}
-    >
-      <View style={styles.creditsHeader}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={hideCreditsScreen}
-        >
-          <Text style={styles.backButtonText}>← {t.common.back}</Text>
-        </TouchableOpacity>
-        <Text style={styles.creditsTitle}>👥 {t.navigation.credits}</Text>
-      </View>
-      
-      <ScrollView 
-        style={styles.creditsContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {creditsData.map((section, sectionIndex) => (
-          <View key={sectionIndex} style={styles.creditsSection}>
-            <Text style={styles.sectionTitle}>{section.category}</Text>
-            {section.items.map((item, itemIndex) => (
-              <View key={itemIndex} style={styles.creditsItem}>
-                <Text style={styles.itemLabel}>{item.name}</Text>
-                <Text style={styles.itemValue}>{item.value}</Text>
-              </View>
-            ))}
-          </View>
-        ))}
-        
-        <View style={styles.thankYouSection}>
-          <Text style={styles.thankYouText}>
-            ❤️ {language === 'es' 
-              ? 'Gracias por usar NeuroApp'
-              : 'Thank you for using NeuroApp'
-            }
-          </Text>
-          <Text style={styles.thankYouSubtext}>
-            {language === 'es'
-              ? 'Juntos hacemos el aprendizaje divertido'
-              : 'Together we make learning fun'
-            }
-          </Text>
-        </View>
-      </ScrollView>
-    </Animated.View>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -314,8 +211,6 @@ const MainScreen = () => {
         </ScrollView>
       </View>
 
-      {/* Credits Overlay */}
-      {showCredits && renderCreditsScreen()}
     </SafeAreaView>
   );
 };
@@ -426,109 +321,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
-  },
-  // Credits styles
-  creditsContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#f8faff',
-  },
-  creditsHeader: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingVertical: isSmallScreen ? 15 : 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  backButton: {
-    backgroundColor: '#6b7280',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignSelf: 'flex-start',
-    marginBottom: 15,
-  },
-  backButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  creditsTitle: {
-    fontSize: isSmallScreen ? 22 : 26,
-    fontWeight: '800',
-    textAlign: 'center',
-    color: '#1a1a1a',
-  },
-  creditsContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  creditsSection: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: isSmallScreen ? 16 : 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  sectionTitle: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '700',
-    color: '#4285f4',
-    marginBottom: 12,
-  },
-  creditsItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
-  },
-  itemLabel: {
-    fontSize: isSmallScreen ? 13 : 14,
-    color: '#6b7280',
-    fontWeight: '500',
-    flex: 1,
-  },
-  itemValue: {
-    fontSize: isSmallScreen ? 13 : 14,
-    color: '#1a1a1a',
-    fontWeight: '600',
-    textAlign: 'right',
-    flex: 1,
-  },
-  thankYouSection: {
-    backgroundColor: '#4285f4',
-    borderRadius: 16,
-    padding: isSmallScreen ? 16 : 20,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  thankYouText: {
-    fontSize: isSmallScreen ? 16 : 18,
-    fontWeight: '700',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 6,
-  },
-  thankYouSubtext: {
-    fontSize: isSmallScreen ? 13 : 14,
-    color: 'rgba(255, 255, 255, 0.8)',
-    textAlign: 'center',
-    fontWeight: '500',
   },
 });
 
