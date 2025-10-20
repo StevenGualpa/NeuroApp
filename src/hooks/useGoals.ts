@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import AnalysisService, { NeurodivergentProfile } from '../services/AnalysisService';
-import GoalsService, { DailyGoal, WeeklyGoal, GoalProgress, GoalAchievement } from '../services/GoalsService';
+import GoalsServiceBackend, { DailyGoal, WeeklyGoal, GoalProgress, GoalAchievement } from '../services/GoalsServiceBackend';
 
 export const useGoals = () => {
   const { user } = useAuth();
@@ -34,17 +34,17 @@ export const useGoals = () => {
       setNeurodivergentProfile(profile);
 
       // Verificar si ya existe una meta para hoy
-      let todayGoalData = await GoalsService.getTodayGoal(user.id);
+      let todayGoalData = await GoalsServiceBackend.getTodayGoal(user.id);
       
       if (!todayGoalData) {
         // Inicializar nueva meta para hoy
-        todayGoalData = await GoalsService.initializeGoals(user.id, profile);
+        todayGoalData = await GoalsServiceBackend.initializeGoals(user.id, profile);
       }
 
       setTodayGoal(todayGoalData);
 
       // Cargar progreso completo
-      const progress = await GoalsService.getGoalProgress(user.id);
+      const progress = await GoalsServiceBackend.getGoalProgress(user.id);
       setGoalProgress(progress);
 
       console.log('✅ [useGoals] Goals initialized successfully:', {
@@ -73,7 +73,7 @@ export const useGoals = () => {
     try {
       console.log('🔍 [useGoals] Updating activity progress:', { activityType, sessionData });
 
-      const updatedGoal = await GoalsService.updateActivityProgress(
+      const updatedGoal = await GoalsServiceBackend.updateActivityProgress(
         user.id,
         activityType,
         sessionData
@@ -83,7 +83,7 @@ export const useGoals = () => {
         setTodayGoal(updatedGoal);
         
         // Actualizar progreso completo
-        const progress = await GoalsService.getGoalProgress(user.id);
+        const progress = await GoalsServiceBackend.getGoalProgress(user.id);
         setGoalProgress(progress);
         
         console.log('✅ [useGoals] Activity progress updated:', updatedGoal);
@@ -102,29 +102,29 @@ export const useGoals = () => {
 
     return {
       sessions: {
-        completed: todayGoal.completedSessions,
-        target: todayGoal.targetSessions,
-        percentage: todayGoal.targetSessions > 0 
-          ? Math.round((todayGoal.completedSessions / todayGoal.targetSessions) * 100)
+        completed: todayGoal.completed_sessions,
+        target: todayGoal.target_sessions,
+        percentage: todayGoal.target_sessions > 0 
+          ? Math.round((todayGoal.completed_sessions / todayGoal.target_sessions) * 100)
           : 0,
       },
       time: {
-        completed: todayGoal.completedTime,
-        target: todayGoal.targetTime,
-        percentage: todayGoal.targetTime > 0 
-          ? Math.round((todayGoal.completedTime / todayGoal.targetTime) * 100)
+        completed: todayGoal.completed_time,
+        target: todayGoal.target_time,
+        percentage: todayGoal.target_time > 0 
+          ? Math.round((todayGoal.completed_time / todayGoal.target_time) * 100)
           : 0,
       },
       stars: {
-        completed: todayGoal.earnedStars,
-        target: todayGoal.targetStars,
-        percentage: todayGoal.targetStars > 0 
-          ? Math.round((todayGoal.earnedStars / todayGoal.targetStars) * 100)
+        completed: todayGoal.earned_stars,
+        target: todayGoal.target_stars,
+        percentage: todayGoal.target_stars > 0 
+          ? Math.round((todayGoal.earned_stars / todayGoal.target_stars) * 100)
           : 0,
       },
       overall: {
-        percentage: todayGoal.completionPercentage,
-        isCompleted: todayGoal.isCompleted,
+        percentage: todayGoal.completion_percentage,
+        isCompleted: todayGoal.is_completed,
       },
     };
   }, [todayGoal]);
@@ -164,43 +164,52 @@ export const useGoals = () => {
   const getActivityProgress = useCallback((activityType: string) => {
     if (!todayGoal) return null;
 
-    const activityGoal = todayGoal.activities.find(a => 
-      a.activityType.toLowerCase().includes(activityType.toLowerCase()) ||
-      activityType.toLowerCase().includes(a.activityType.toLowerCase())
+    const activityGoal = todayGoal.activity_goals.find(a => 
+      a.activity_type.toLowerCase().includes(activityType.toLowerCase()) ||
+      activityType.toLowerCase().includes(a.activity_type.toLowerCase())
     );
 
     if (!activityGoal) return null;
 
     return {
-      completed: activityGoal.completedSessions,
-      target: activityGoal.targetSessions,
-      percentage: activityGoal.targetSessions > 0 
-        ? Math.round((activityGoal.completedSessions / activityGoal.targetSessions) * 100)
+      completed: activityGoal.completed_sessions,
+      target: activityGoal.target_sessions,
+      percentage: activityGoal.target_sessions > 0 
+        ? Math.round((activityGoal.completed_sessions / activityGoal.target_sessions) * 100)
         : 0,
-      isCompleted: activityGoal.isCompleted,
+      isCompleted: activityGoal.is_completed,
       priority: activityGoal.priority,
     };
   }, [todayGoal]);
 
   const getNewAchievements = useCallback(() => {
     if (!goalProgress) return [];
-    return goalProgress.achievements.filter(achievement => achievement.isNew);
+    return goalProgress.achievements.filter(achievement => achievement.is_new);
   }, [goalProgress]);
 
-  const markAchievementAsSeen = useCallback((achievementId: string) => {
-    if (!goalProgress) return;
+  const markAchievementAsSeen = useCallback(async (achievementId: number) => {
+    if (!user) return;
 
-    const updatedAchievements = goalProgress.achievements.map(achievement => 
-      achievement.id === achievementId 
-        ? { ...achievement, isNew: false }
-        : achievement
-    );
+    try {
+      await GoalsServiceBackend.markAchievementAsSeen(user.id, achievementId);
+      
+      // Actualizar el estado local
+      if (goalProgress) {
+        const updatedAchievements = goalProgress.achievements.map(achievement => 
+          achievement.id === achievementId 
+            ? { ...achievement, is_new: false }
+            : achievement
+        );
 
-    setGoalProgress({
-      ...goalProgress,
-      achievements: updatedAchievements,
-    });
-  }, [goalProgress]);
+        setGoalProgress({
+          ...goalProgress,
+          achievements: updatedAchievements,
+        });
+      }
+    } catch (error) {
+      console.error('❌ [useGoals] Error marking achievement as seen:', error);
+    }
+  }, [user, goalProgress]);
 
   const getMotivationalMessage = useCallback(() => {
     if (!todayGoal) return '¡Comienza tu día de aprendizaje!';

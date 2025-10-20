@@ -103,6 +103,14 @@ export const API_ENDPOINTS = {
   LESSON_PROGRESS: (userId: number, lessonId: number) => `/progress/user/${userId}/lesson/${lessonId}`,
   STEP_PROGRESS: (userId: number, stepId: number) => `/progress/user/${userId}/step/${stepId}`,
   
+  // Goals (NEW)
+  GOALS_DAILY: (userId: number) => `/goals/user/${userId}/daily`,
+  GOALS_TODAY: (userId: number) => `/goals/user/${userId}/daily/today`,
+  GOALS_ACTIVITY_PROGRESS: (userId: number) => `/goals/user/${userId}/activity-progress`,
+  GOALS_PROGRESS: (userId: number) => `/goals/user/${userId}/progress`,
+  GOALS_ACHIEVEMENTS: (userId: number) => `/goals/user/${userId}/achievements`,
+  GOALS_MARK_ACHIEVEMENT_SEEN: (userId: number, achievementId: number) => `/goals/user/${userId}/achievements/${achievementId}/seen`,
+  
   // Health
   HEALTH: '/',
 };
