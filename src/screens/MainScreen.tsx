@@ -53,13 +53,13 @@ const MainScreen = () => {
       color: '#45B7D1',
       route: 'Achievements',
     },
-    { 
-      key: 'perfil', 
-      label: language === 'es' ? 'Perfil Médico' : 'Medical Profile', 
-      icon: '🧠', 
-      color: '#9C27B0',
-      route: 'NeurodivergentProfile',
-    },
+      {
+        key: 'perfil',
+        label: language === 'es' ? 'Perfil Médico' : 'Medical Profile',
+        icon: '🧠',
+        color: '#9C27B0',
+        route: 'NeurodivergentProfile',
+      },
     { 
       key: 'opciones', 
       label: t.navigation.settings, 

@@ -27,6 +27,7 @@ import StatisticsScreen from '../screens/StatisticsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ProgressReportScreen from '../screens/ProgressReportScreen';
 import NeurodivergentProfileScreen from '../screens/NeurodivergentProfileScreen';
+import PersonalizedDashboardScreen from '../screens/PersonalizedDashboardScreen';
 
 import type { Lesson, Step } from '../services/ApiService';
 
@@ -58,6 +59,7 @@ export type RootStackParamList = {
   Settings: undefined;
   ProgressReport: undefined;
   NeurodivergentProfile: undefined;
+  PersonalizedDashboard: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -92,8 +94,9 @@ const AppNavigator = () => (
       <Stack.Screen name="Achievements" component={AchievementsScreen} />
       <Stack.Screen name="Statistics" component={StatisticsScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
-      <Stack.Screen name="ProgressReport" component={ProgressReportScreen} />
-      <Stack.Screen name="NeurodivergentProfile" component={NeurodivergentProfileScreen} />
+        <Stack.Screen name="ProgressReport" component={ProgressReportScreen} />
+        <Stack.Screen name="NeurodivergentProfile" component={NeurodivergentProfileScreen} />
+        <Stack.Screen name="PersonalizedDashboard" component={PersonalizedDashboardScreen} />
     </Stack.Navigator>
   </NavigationContainer>
 );

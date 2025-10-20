@@ -25,6 +25,8 @@ import { useRealProgress } from '../hooks/useRealProgress';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAchievementContext } from '../contexts/AchievementContext';
 import { useAchievementModalSequence } from '../hooks/useAchievementModalSequence';
+import { useActivityAdaptation } from '../hooks/useActivityAdaptation';
+import { useGoals } from '../hooks/useGoals';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 import { Image } from 'react-native';
 
@@ -69,6 +71,23 @@ const SelectOptionScreen = () => {
   
   // Achievement modal sequence hook
   const { shouldShowModal, setShouldShowModal, handleGameCompletion } = useAchievementModalSequence();
+
+  // Activity adaptation hook
+  const { 
+    adaptation, 
+    getAdaptedTime, 
+    getTextStyle, 
+    getButtonStyle, 
+    getContainerStyle,
+    shouldShowHelp,
+    getHelpFrequency,
+    getMaxAttempts,
+    shouldGiveMoreStars,
+    getAchievementThresholds
+  } = useActivityAdaptation();
+
+  // Goals hook
+  const { updateActivityProgress } = useGoals();
 
   // Bilingual states
   const [processedStep, setProcessedStep] = useState(step);
@@ -291,6 +310,10 @@ const SelectOptionScreen = () => {
     // Sincronizar idioma de voz con el idioma actual
     audioService.current.syncWithAppLanguage(language);
     
+    // Configurar ayuda adaptativa basada en el perfil
+    const helpFrequency = getHelpFrequency();
+    const maxAttempts = getMaxAttempts();
+    
     adaptiveService.current.initialize(
       (helpOptionIndex) => {
         // Handle help trigger
@@ -320,9 +343,14 @@ const SelectOptionScreen = () => {
           console.log(`🔊 Using processed default help for ${_activityType}: ${helpMessage}`);
         }
         
-        audioService.current.playTextToSpeech(helpMessage, true); // true indica que es mensaje de ayuda
+        // Aplicar adaptaciones de audio
+        if (adaptation?.audioAids.readAloud) {
+          audioService.current.playTextToSpeech(helpMessage, true);
+        }
       },
-      step.activityType // Pass the activity type to the service
+      step.activityType, // Pass the activity type to the service
+      helpFrequency, // Usar frecuencia personalizada
+      maxAttempts // Usar intentos máximos personalizados
     );
 
     return () => {
@@ -412,6 +440,16 @@ const SelectOptionScreen = () => {
 
       // Use the new sequence handler (handles achievements and modal timing)
       await handleGameCompletion(gameData);
+
+      // Actualizar metas de progreso
+      await updateActivityProgress(
+        step.ActivityType?.name || 'Unknown',
+        {
+          duration: finalStats.completionTime,
+          stars: finalStats.stars,
+          completed: finalStats.perfectRun || finalStats.stars > 0,
+        }
+      );
       
       console.log('✅ [SelectOptionScreen] Finalización registrada exitosamente');
     } catch (error) {
@@ -625,12 +663,12 @@ const SelectOptionScreen = () => {
           <Text style={styles.sectionTitle}>
             {language === 'es' ? 'Pregunta:' : 'Question:'}
           </Text>
-          <Text style={styles.questionText}>{processedStep.text}</Text>
+          <Text style={[styles.questionText, getTextStyle()]}>{processedStep.text}</Text>
         </View>
 
         {/* 2. ACCIÓN - Opciones de respuesta */}
-        <View style={styles.optionsContainer}>
-          <Text style={styles.sectionTitle}>
+        <View style={[styles.optionsContainer, getContainerStyle()]}>
+          <Text style={[styles.sectionTitle, getTextStyle()]}>
             {language === 'es' ? 'Selecciona la opción correcta:' : 'Select the correct option:'}
           </Text>
           <View style={styles.optionsGrid}>
@@ -662,6 +700,7 @@ const SelectOptionScreen = () => {
                   <TouchableOpacity
                     style={[
                       styles.optionCard,
+                      getButtonStyle(),
                       styles[`optionCard${optionStatus.charAt(0).toUpperCase() + optionStatus.slice(1)}`],
                       isBlinking && styles.optionCardHelp,
                     ]}
@@ -687,7 +726,7 @@ const SelectOptionScreen = () => {
                         </Text>
                       )}
                     </View>
-                    <Text style={[styles.optionLabel, isSelected && styles.selectedLabel]}>
+                    <Text style={[styles.optionLabel, getTextStyle(), isSelected && styles.selectedLabel]}>
                       {option.label}
                     </Text>
                     {isAnswered && isSelected && (

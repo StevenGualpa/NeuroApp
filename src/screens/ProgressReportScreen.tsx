@@ -1,7 +1,7 @@
 // src/screens/ProgressReportScreen.tsx
 // Pantalla unificada de reportes de progreso y estadísticas
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,15 +11,21 @@ import {
   TouchableOpacity,
   Alert,
   Dimensions,
+  SafeAreaView,
+  Animated,
+  RefreshControl,
 } from 'react-native';
 import { useAuth } from '../hooks';
-import AnalysisService, { QuickAnalysis, MonthlyAnalysis } from '../services/AnalysisService';
+import AnalysisService, { QuickAnalysis, MonthlyAnalysis, NeurodivergentProfile } from '../services/AnalysisService';
+import PersonalizationService, { PersonalizedRecommendations, ActivityPriority } from '../services/PersonalizationService';
+import { useGoals } from '../hooks/useGoals';
 import ApiService from '../services/ApiService';
+import { useLanguage } from '../contexts/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
 type PeriodType = 'weekly' | 'monthly';
-type TabType = 'analysis' | 'statistics';
+type TabType = 'dashboard' | 'analysis' | 'statistics';
 
 interface UserStats {
   total_activities_completed: number;
@@ -43,11 +49,30 @@ interface GameSession {
 
 const ProgressReportScreen = ({ navigation }: any) => {
   const { user } = useAuth();
+  const { t, language } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [analysis, setAnalysis] = useState<QuickAnalysis | MonthlyAnalysis | null>(null);
   const [period, setPeriod] = useState<PeriodType>('monthly');
   const [hasProfile, setHasProfile] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('analysis');
+  const [activeTab, setActiveTab] = useState<TabType>('dashboard');
+  
+  // Estados para dashboard personalizado
+  const [neurodivergentProfile, setNeurodivergentProfile] = useState<NeurodivergentProfile | null>(null);
+  const [recommendations, setRecommendations] = useState<PersonalizedRecommendations | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  
+  // Goals hook
+  const { 
+    todayGoal, 
+    goalProgress, 
+    getTodayProgress, 
+    getMotivationalMessage, 
+    getStreakMessage,
+    refreshGoals 
+  } = useGoals();
+
+  // Obtener progreso de hoy
+  const todayProgress = getTodayProgress();
   
   // Estados para estadísticas
   const [userStats, setUserStats] = useState<UserStats | null>(null);
@@ -58,6 +83,7 @@ const ProgressReportScreen = ({ navigation }: any) => {
       checkProfile();
       loadAnalysis();
       loadStatistics();
+      loadNeurodivergentProfile();
     }
   }, [user, period]);
 
@@ -119,6 +145,29 @@ const ProgressReportScreen = ({ navigation }: any) => {
       console.log('✅ Estadísticas cargadas');
     } catch (error) {
       console.error('❌ Error loading statistics:', error);
+    }
+  };
+
+  const loadNeurodivergentProfile = async () => {
+    if (!user) return;
+    
+    try {
+      console.log('🔍 [ProgressReportScreen] Loading neurodivergent profile for user:', user.id);
+      
+      const profile = await AnalysisService.getNeurodivergentProfile(user.id);
+      console.log('✅ [ProgressReportScreen] Profile loaded:', profile);
+      
+      setNeurodivergentProfile(profile);
+      
+      // Obtener recomendaciones personalizadas
+      const personalizedRecommendations = PersonalizationService.getPersonalizedRecommendations(profile);
+      console.log('📊 [ProgressReportScreen] Recommendations loaded:', personalizedRecommendations);
+      
+      setRecommendations(personalizedRecommendations);
+      
+    } catch (error) {
+      console.error('❌ [ProgressReportScreen] Error loading profile:', error);
+      // No mostrar error al usuario, continuar sin personalización
     }
   };
 
@@ -282,6 +331,13 @@ const ProgressReportScreen = ({ navigation }: any) => {
         {/* Tab Selector */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
+            style={[styles.tab, activeTab === 'dashboard' && styles.tabActive]}
+            onPress={() => setActiveTab('dashboard')}>
+            <Text style={[styles.tabText, activeTab === 'dashboard' && styles.tabTextActive]}>
+              Dashboard
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.tab, activeTab === 'analysis' && styles.tabActive]}
             onPress={() => setActiveTab('analysis')}>
             <Text style={[styles.tabText, activeTab === 'analysis' && styles.tabTextActive]}>
@@ -319,6 +375,123 @@ const ProgressReportScreen = ({ navigation }: any) => {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* CONTENIDO TAB: DASHBOARD */}
+      {activeTab === 'dashboard' && (
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+          {console.log('🔍 [ProgressReportScreen] Dashboard render:', {
+            hasProfile: !!neurodivergentProfile,
+            hasRecommendations: !!recommendations,
+            todayGoal: todayGoal,
+            todayProgress: todayProgress
+          })}
+          {neurodivergentProfile ? (
+            <>
+              {/* Header del perfil */}
+              <View style={styles.profileHeader}>
+                <Text style={styles.profileTitle}>
+                  🧠 {language === 'es' ? 'Dashboard Personalizado' : 'Personalized Dashboard'}
+                </Text>
+                <Text style={styles.profileSubtitle}>
+                  {language === 'es' ? 'Personalizado para' : 'Personalized for'} {neurodivergentProfile.primary_diagnosis}
+                </Text>
+              </View>
+
+              {/* Metas del día */}
+              <View style={styles.goalCard}>
+                <Text style={styles.goalTitle}>🎯 {language === 'es' ? 'Meta del Día' : 'Today\'s Goal'}</Text>
+                <Text style={styles.goalText}>
+                  {language === 'es' ? 'Completa' : 'Complete'} {todayGoal?.sessions || 0} {language === 'es' ? 'sesiones' : 'sessions'} 
+                  {language === 'es' ? ' de actividades' : ' of activities'}
+                </Text>
+                <View style={styles.progressBar}>
+                  <View style={[styles.progressFill, { width: `${todayProgress?.overall?.percentage || 0}%` }]} />
+                </View>
+                <Text style={styles.progressText}>
+                  {todayProgress?.overall?.percentage || 0}% {language === 'es' ? 'completado' : 'completed'}
+                </Text>
+              </View>
+
+              {/* Actividades recomendadas */}
+              {recommendations && recommendations.activityPriorities ? (
+                <View style={styles.recommendationsCard}>
+                  <Text style={styles.recommendationsTitle}>
+                    ⭐ {language === 'es' ? 'Actividades Recomendadas' : 'Recommended Activities'}
+                  </Text>
+                  {recommendations.activityPriorities.map((priority, index) => (
+                    <View key={index} style={styles.priorityItem}>
+                      <View style={[
+                        styles.priorityBadge,
+                        { backgroundColor: PersonalizationService.getPriorityColor(priority.priority) }
+                      ]}>
+                        <Text style={styles.priorityIcon}>
+                          {PersonalizationService.getPriorityIcon(priority.priority)}
+                        </Text>
+                        <Text style={styles.priorityText}>
+                          {PersonalizationService.getPriorityText(priority.priority)}
+                        </Text>
+                      </View>
+                      <Text style={styles.activityName}>{priority.activityType}</Text>
+                      <Text style={styles.dailyGoal}>
+                        🎯 {priority.dailyGoal} {language === 'es' ? 'sesiones/día' : 'sessions/day'}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.recommendationsCard}>
+                  <Text style={styles.recommendationsTitle}>
+                    ⭐ {language === 'es' ? 'Actividades Recomendadas' : 'Recommended Activities'}
+                  </Text>
+                  <Text style={styles.noDataText}>
+                    {language === 'es' ? 'Cargando recomendaciones...' : 'Loading recommendations...'}
+                  </Text>
+                </View>
+              )}
+
+              {/* Mensaje motivacional */}
+              <View style={styles.motivationCard}>
+                <Text style={styles.motivationTitle}>
+                  💪 {language === 'es' ? 'Mensaje Motivacional' : 'Motivational Message'}
+                </Text>
+                <Text style={styles.motivationText}>
+                  {typeof getMotivationalMessage === 'function' ? getMotivationalMessage() : '¡Sigue así! 💪'}
+                </Text>
+              </View>
+
+              {/* Racha actual */}
+              <View style={styles.streakCard}>
+                <Text style={styles.streakTitle}>
+                  🔥 {language === 'es' ? 'Racha Actual' : 'Current Streak'}
+                </Text>
+                <Text style={styles.streakText}>
+                  {typeof getStreakMessage === 'function' ? getStreakMessage() : '¡Mantén la racha! 🔥'}
+                </Text>
+              </View>
+            </>
+          ) : (
+            <View style={styles.noProfileContainer}>
+              <Text style={styles.noProfileIcon}>🧠</Text>
+              <Text style={styles.noProfileTitle}>
+                {language === 'es' ? 'Sin Perfil Personalizado' : 'No Personalized Profile'}
+              </Text>
+              <Text style={styles.noProfileText}>
+                {language === 'es' 
+                  ? 'Crea tu perfil neurodivergente para ver recomendaciones personalizadas'
+                  : 'Create your neurodivergent profile to see personalized recommendations'
+                }
+              </Text>
+              <TouchableOpacity
+                style={styles.createProfileButton}
+                onPress={() => navigation.navigate('NeurodivergentProfile')}>
+                <Text style={styles.createProfileButtonText}>
+                  {language === 'es' ? 'Crear Perfil' : 'Create Profile'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
+      )}
 
       {/* CONTENIDO TAB: ANÁLISIS */}
       {activeTab === 'analysis' && overall_progress && (
@@ -916,6 +1089,176 @@ const styles = StyleSheet.create({
   sessionStat: {
     fontSize: 12,
     color: '#666',
+  },
+  // Estilos del Dashboard
+  profileHeader: {
+    backgroundColor: '#F8F9FA',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  profileTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D3436',
+    marginBottom: 4,
+  },
+  profileSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontStyle: 'italic',
+  },
+  goalCard: {
+    backgroundColor: '#E3F2FD',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  goalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1976D2',
+    marginBottom: 8,
+  },
+  goalText: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 12,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  recommendationsCard: {
+    backgroundColor: '#FFF3E0',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  recommendationsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#F57C00',
+    marginBottom: 12,
+  },
+  priorityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingVertical: 8,
+  },
+  priorityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginRight: 12,
+  },
+  priorityIcon: {
+    fontSize: 12,
+    marginRight: 4,
+  },
+  priorityText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  activityName: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  dailyGoal: {
+    fontSize: 12,
+    color: '#666',
+  },
+  motivationCard: {
+    backgroundColor: '#F3E5F5',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  motivationTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#7B1FA2',
+    marginBottom: 8,
+  },
+  motivationText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  streakCard: {
+    backgroundColor: '#FFEBEE',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  streakTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#C62828',
+    marginBottom: 8,
+  },
+  streakText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  noProfileContainer: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  noProfileIcon: {
+    fontSize: 64,
+    marginBottom: 16,
+  },
+  noProfileTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D3436',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  noProfileText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  createProfileButton: {
+    backgroundColor: '#4285f4',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  createProfileButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  noDataText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
 });
 

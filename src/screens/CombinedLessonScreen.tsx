@@ -22,6 +22,8 @@ import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 import GameIntroAnimation from '../components/GameIntroAnimation';
 import { useAuth } from '../hooks';
 import LessonProgressService, { StepProgress } from '../services/LessonProgressService';
+import AnalysisService, { NeurodivergentProfile } from '../services/AnalysisService';
+import PersonalizationService, { ActivityPriority } from '../services/PersonalizationService';
 
 const { width } = Dimensions.get('window');
 
@@ -66,6 +68,12 @@ const CombinedLessonScreen = () => {
   const [stepsProgress, setStepsProgress] = useState<StepProgress[]>([]);
   const [loadingProgress, setLoadingProgress] = useState(false);
 
+  // Estados para personalización
+  const [neurodivergentProfile, setNeurodivergentProfile] = useState<NeurodivergentProfile | null>(null);
+  const [activityPriorities, setActivityPriorities] = useState<ActivityPriority[]>([]);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [showAllActivities, setShowAllActivities] = useState(false);
+
   // Animation refs
   const headerAnimation = useRef(new Animated.Value(0)).current;
   const cardsAnimation = useRef(new Animated.Value(0)).current;
@@ -74,6 +82,13 @@ const CombinedLessonScreen = () => {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Cargar perfil neurodivergente
+  useEffect(() => {
+    if (user) {
+      loadNeurodivergentProfile();
+    }
+  }, [user]);
 
   // Recargar progreso cuando el usuario regrese de una actividad
   useEffect(() => {
@@ -120,6 +135,32 @@ const CombinedLessonScreen = () => {
         }),
       ]),
     ]).start();
+  };
+
+  const loadNeurodivergentProfile = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingProfile(true);
+      console.log('🔍 [CombinedLessonScreen] Loading neurodivergent profile for user:', user.id);
+      
+      const profile = await AnalysisService.getNeurodivergentProfile(user.id);
+      console.log('✅ [CombinedLessonScreen] Profile loaded:', profile);
+      
+      setNeurodivergentProfile(profile);
+      
+      // Obtener recomendaciones personalizadas
+      const recommendations = PersonalizationService.getPersonalizedRecommendations(profile);
+      console.log('📊 [CombinedLessonScreen] Recommendations loaded:', recommendations);
+      
+      setActivityPriorities(recommendations.activityPriorities);
+      
+    } catch (error) {
+      console.error('❌ [CombinedLessonScreen] Error loading profile:', error);
+      // No mostrar error al usuario, continuar sin personalización
+    } finally {
+      setLoadingProfile(false);
+    }
   };
 
   const loadCategories = async () => {
@@ -215,6 +256,79 @@ const CombinedLessonScreen = () => {
     return stepsProgress.find(progress => progress.step_id === stepId) || null;
   };
 
+  // Helper para obtener la prioridad de una actividad
+  const getActivityPriority = (activityType: string): ActivityPriority | null => {
+    return activityPriorities.find(priority => 
+      priority.activityType.toLowerCase().includes(activityType.toLowerCase()) ||
+      activityType.toLowerCase().includes(priority.activityType.toLowerCase())
+    ) || null;
+  };
+
+  // Función para filtrar actividades basada en el perfil neurodivergente
+  const filterActivitiesByProfile = (steps: StepWithLesson[]): StepWithLesson[] => {
+    console.log('🔍 [CombinedLessonScreen] filterActivitiesByProfile called:', {
+      hasProfile: !!neurodivergentProfile,
+      showAllActivities,
+      stepsCount: steps.length,
+      activityTypes: [...new Set(steps.map(s => s.ActivityType?.name))]
+    });
+
+    if (!neurodivergentProfile || showAllActivities) {
+      console.log('📋 [CombinedLessonScreen] No profile or showing all activities, returning all');
+      return steps;
+    }
+
+    const diagnosis = neurodivergentProfile.primary_diagnosis;
+    const severity = neurodivergentProfile.severity;
+
+    console.log('🧠 [CombinedLessonScreen] Profile info:', { diagnosis, severity });
+
+    // Filtrar pasos basado en las prioridades de actividades
+    const filtered = steps.filter(step => {
+      const activityType = step.ActivityType?.name || '';
+      const priority = getActivityPriority(activityType);
+      
+      if (!priority) {
+        console.log(`📊 [CombinedLessonScreen] Activity "${activityType}" has no priority, showing by default`);
+        return true; // Mostrar actividades sin prioridad definida
+      }
+
+      console.log(`📊 [CombinedLessonScreen] Activity "${activityType}" priority:`, priority.priority);
+      
+      // Para severidad leve, mostrar todas las prioridades
+      if (severity === 'Leve') {
+        return true;
+      }
+      
+      // Para severidad moderada, mostrar alta y media
+      if (severity === 'Moderado') {
+        return priority.priority === 'high' || priority.priority === 'medium';
+      }
+      
+      // Para severidad severa, mostrar solo alta
+      if (severity === 'Severo') {
+        return priority.priority === 'high';
+      }
+      
+      return true;
+    });
+
+    console.log('✅ [CombinedLessonScreen] Filtered activities:', filtered.map(s => s.ActivityType?.name));
+
+    // Ordenar por prioridad
+    return filtered.sort((a, b) => {
+      const priorityA = getActivityPriority(a.ActivityType?.name || '');
+      const priorityB = getActivityPriority(b.ActivityType?.name || '');
+      
+      if (!priorityA && !priorityB) return 0;
+      if (!priorityA) return 1;
+      if (!priorityB) return -1;
+      
+      const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
+      return priorityOrder[priorityA.priority] - priorityOrder[priorityB.priority];
+    });
+  };
+
   const processLessonsForLanguage = async (lessonsToProcess?: Lesson[]) => {
     const sourceLessons = lessonsToProcess || rawLessons;
     
@@ -292,12 +406,14 @@ const CombinedLessonScreen = () => {
       return a.sort_order - b.sort_order;
     });
     
-    setAllSteps(sortedSteps);
+    // Aplicar filtrado basado en el perfil neurodivergente
+    const filteredSteps = filterActivitiesByProfile(sortedSteps);
+    setAllSteps(filteredSteps);
     
     // Cargar progreso después de cargar todos los pasos
-    if (user && sortedSteps.length > 0) {
+    if (user && filteredSteps.length > 0) {
       console.log('✅ [CombinedLessonScreen] All steps loaded, now loading progress');
-      await loadStepsProgress(sortedSteps);
+      await loadStepsProgress(filteredSteps);
     }
   };
 
@@ -633,7 +749,27 @@ const CombinedLessonScreen = () => {
         
         {/* Título */}
         <View style={styles.headerContent}>
-          <Text style={styles.categoryTitle}>{processedCategoryName}</Text>
+          <View style={styles.titleSection}>
+            <Text style={styles.categoryTitle}>{processedCategoryName}</Text>
+            {neurodivergentProfile && (
+              <Text style={styles.profileInfo}>
+                {language === 'es' ? 'Personalizado para' : 'Personalized for'} {neurodivergentProfile.primary_diagnosis}
+              </Text>
+            )}
+          </View>
+          
+          <View style={styles.headerActions}>
+            {neurodivergentProfile && (
+              <TouchableOpacity 
+                style={styles.toggleButton}
+                onPress={() => setShowAllActivities(!showAllActivities)}
+              >
+                <Text style={styles.toggleButtonText}>
+                  {showAllActivities ? '🎯 Filtrado' : '📋 Todas'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Barra de progreso */}
@@ -765,6 +901,35 @@ const CombinedLessonScreen = () => {
                           </View>
                         )}
                       </View>
+
+                      {/* Badges de prioridad personalizada */}
+                      {neurodivergentProfile && (
+                        <View style={styles.priorityBadges}>
+                          {(() => {
+                            const priority = getActivityPriority(activityType);
+                            if (!priority) return null;
+                            
+                            return (
+                              <>
+                                <View style={[
+                                  styles.priorityBadge,
+                                  { backgroundColor: priority.priority === 'high' ? '#EF4444' : priority.priority === 'medium' ? '#F59E0B' : '#10B981' }
+                                ]}>
+                                  <Text style={styles.priorityBadgeText}>
+                                    {priority.priority === 'high' ? '🔥' : priority.priority === 'medium' ? '⭐' : '💚'} 
+                                    {priority.priority === 'high' ? 'Prioridad Alta' : priority.priority === 'medium' ? 'Recomendado' : 'Opcional'}
+                                  </Text>
+                                </View>
+                                <View style={styles.dailyGoalBadge}>
+                                  <Text style={styles.dailyGoalText}>
+                                    🎯 {priority.dailyGoal} sesiones/día
+                                  </Text>
+                                </View>
+                              </>
+                            );
+                          })()}
+                        </View>
+                      )}
                     </View>
 
                     <View style={styles.questionActions}>
@@ -827,7 +992,35 @@ const styles = StyleSheet.create({
     width: 70,
   },
   headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 12,
+  },
+  titleSection: {
+    flex: 1,
+  },
+  headerActions: {
+    alignItems: 'center',
+  },
+  toggleButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  toggleButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: 'white',
+  },
+  profileInfo: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginTop: 2,
+    fontStyle: 'italic',
   },
   titleRow: {
     flexDirection: 'row',
@@ -1187,6 +1380,35 @@ const styles = StyleSheet.create({
   progressStatValue: {
     fontSize: 11,
     fontWeight: '700',
+  },
+  priorityBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  priorityBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'white',
+  },
+  dailyGoalBadge: {
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  dailyGoalText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#495057',
   },
   questionCard: {
     borderRadius: 16,

@@ -20,6 +20,9 @@ import { AchievementService } from '../services/AchievementService';
 import { useLanguage } from '../contexts/LanguageContext';
 import BilingualTextProcessor from '../utils/BilingualTextProcessor';
 import ActivityImage from '../components/ActivityImage';
+import { useAuth } from '../hooks';
+import AnalysisService, { NeurodivergentProfile } from '../services/AnalysisService';
+import PersonalizationService, { ActivityPriority } from '../services/PersonalizationService';
 
 const { width } = Dimensions.get('window');
 
@@ -36,6 +39,7 @@ const accentColors = [
 const ActivityMenuScreen = () => {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { t, language } = useLanguage();
+  const { user } = useAuth();
   
   // Estados
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -45,6 +49,12 @@ const ActivityMenuScreen = () => {
   const [totalPoints, setTotalPoints] = useState(0);
   const [unlockedAchievements, setUnlockedAchievements] = useState(0);
   
+  // Estados para personalización
+  const [neurodivergentProfile, setNeurodivergentProfile] = useState<NeurodivergentProfile | null>(null);
+  const [activityPriorities, setActivityPriorities] = useState<ActivityPriority[]>([]);
+  const [loadingProfile, setLoadingProfile] = useState(false);
+  const [showAllActivities, setShowAllActivities] = useState(false); // false = filtrado por defecto
+  
   // Animaciones
   const scaleValues = React.useRef<Animated.Value[]>([]).current;
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
@@ -53,12 +63,26 @@ const ActivityMenuScreen = () => {
     loadInitialData();
   }, []);
 
+  // Cargar perfil neurodivergente
+  useEffect(() => {
+    if (user) {
+      loadNeurodivergentProfile();
+    }
+  }, [user]);
+
   // Procesar actividades cuando cambie el idioma
   useEffect(() => {
     if (rawActivities.length > 0) {
       processActivitiesForLanguage();
     }
   }, [language, rawActivities]);
+
+  // Reprocesar actividades cuando cambie el filtrado
+  useEffect(() => {
+    if (rawActivities.length > 0) {
+      processActivitiesForLanguage();
+    }
+  }, [showAllActivities, neurodivergentProfile, activityPriorities]);
 
   // Reload stats when screen comes into focus
   useEffect(() => {
@@ -81,6 +105,32 @@ const ActivityMenuScreen = () => {
       duration: 800,
       useNativeDriver: true,
     }).start();
+  };
+
+  const loadNeurodivergentProfile = async () => {
+    if (!user) return;
+    
+    try {
+      setLoadingProfile(true);
+      console.log('🔍 [ActivityMenuScreen] Loading neurodivergent profile for user:', user.id);
+      
+      const profile = await AnalysisService.getNeurodivergentProfile(user.id);
+      console.log('✅ [ActivityMenuScreen] Profile loaded:', profile);
+      
+      setNeurodivergentProfile(profile);
+      
+      // Obtener recomendaciones personalizadas
+      const recommendations = PersonalizationService.getPersonalizedRecommendations(profile);
+      console.log('📊 [ActivityMenuScreen] Recommendations loaded:', recommendations);
+      
+      setActivityPriorities(recommendations.activityPriorities);
+      
+    } catch (error) {
+      console.error('❌ [ActivityMenuScreen] Error loading profile:', error);
+      // No mostrar error al usuario, continuar sin personalización
+    } finally {
+      setLoadingProfile(false);
+    }
   };
 
   const loadActivities = async () => {
@@ -133,12 +183,12 @@ const ActivityMenuScreen = () => {
     const processedActivities = sourceActivities.map((activity, index) => {
       const originalName = activity.name || '';
       const originalDescription = activity.description || '';
- 
+  
       
       const processedName = BilingualTextProcessor.extractText(originalName, language);
       const processedDescription = BilingualTextProcessor.extractText(originalDescription, language);
       
-  
+   
       
       return {
         ...activity,
@@ -146,9 +196,11 @@ const ActivityMenuScreen = () => {
         description: processedDescription,
       };
     });
-  
+
+    // Aplicar filtrado basado en el perfil neurodivergente
+    const filteredActivities = filterActivitiesByProfile(processedActivities);
     
-    setActivities(processedActivities);
+    setActivities(filteredActivities);
   };
 
   const loadAchievementStats = async () => {
@@ -215,6 +267,80 @@ const ActivityMenuScreen = () => {
     return accentColors[index % accentColors.length];
   };
 
+  // Helper para obtener la prioridad de una actividad
+  const getActivityPriority = (activityName: string): ActivityPriority | null => {
+    return activityPriorities.find(priority => 
+      priority.activityType.toLowerCase().includes(activityName.toLowerCase()) ||
+      activityName.toLowerCase().includes(priority.activityType.toLowerCase())
+    ) || null;
+  };
+
+  // Función para filtrar actividades basada en el perfil neurodivergente
+  const filterActivitiesByProfile = (activitiesToFilter: Activity[]): Activity[] => {
+    console.log('🔍 [ActivityMenuScreen] filterActivitiesByProfile called:', {
+      hasProfile: !!neurodivergentProfile,
+      showAllActivities,
+      activitiesCount: activitiesToFilter.length,
+      activityNames: activitiesToFilter.map(a => a.name)
+    });
+
+    if (!neurodivergentProfile || showAllActivities) {
+      console.log('📋 [ActivityMenuScreen] No profile or showing all activities, returning all');
+      return activitiesToFilter;
+    }
+
+    const diagnosis = neurodivergentProfile.primary_diagnosis;
+    const severity = neurodivergentProfile.severity;
+
+    console.log('🧠 [ActivityMenuScreen] Profile info:', { diagnosis, severity });
+
+    // Filtrar actividades basado en las prioridades
+    const filtered = activitiesToFilter.filter(activity => {
+      const priority = getActivityPriority(activity.name);
+      
+      if (!priority) {
+        console.log(`📊 [ActivityMenuScreen] Activity "${activity.name}" has no priority, filtering out`);
+        return false; // No mostrar actividades sin prioridad definida en modo filtrado
+      }
+
+      console.log(`📊 [ActivityMenuScreen] Activity "${activity.name}" priority:`, priority.priority);
+      
+      // En modo filtrado, solo mostrar actividades de prioridad alta y media
+      // Los opcionales (low) son completamente invisibles en modo filtrado
+      if (severity === 'Leve') {
+        return priority.priority === 'high' || priority.priority === 'medium';
+      }
+      
+      // Para severidad moderada, mostrar alta y media
+      if (severity === 'Moderado') {
+        return priority.priority === 'high' || priority.priority === 'medium';
+      }
+      
+      // Para severidad severa, mostrar solo alta
+      if (severity === 'Severo') {
+        return priority.priority === 'high';
+      }
+      
+      // Por defecto, no mostrar opcionales en modo filtrado
+      return priority.priority === 'high' || priority.priority === 'medium';
+    });
+
+    console.log('✅ [ActivityMenuScreen] Filtered activities:', filtered.map(a => a.name));
+
+    // Ordenar por prioridad
+    return filtered.sort((a, b) => {
+      const priorityA = getActivityPriority(a.name);
+      const priorityB = getActivityPriority(b.name);
+      
+      if (!priorityA && !priorityB) return 0;
+      if (!priorityA) return 1;
+      if (!priorityB) return -1;
+      
+      const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
+      return priorityOrder[priorityA.priority] - priorityOrder[priorityB.priority];
+    });
+  };
+
   const getActivityStatus = (activity: Activity) => {
     return activity.is_active 
       ? (language === 'es' ? 'Activo' : 'Active')
@@ -256,6 +382,7 @@ const ActivityMenuScreen = () => {
 
   const renderActivityCard = (activity: Activity, index: number) => {
     const colors = getActivityColors(index);
+    const priority = getActivityPriority(activity.name);
     
     return (
       <Animated.View
@@ -302,15 +429,37 @@ const ActivityMenuScreen = () => {
             />
           </View>
 
-          {/* Content */}
-          <View style={styles.cardContent}>
-            <Text style={[styles.cardTitle, { color: '#111827' }]} numberOfLines={2}>
-              {activity.name}
-            </Text>
-            <Text style={[styles.cardDescription, { color: '#374151' }]} numberOfLines={3}>
-              {activity.description}
-            </Text>
-          </View>
+           {/* Content */}
+           <View style={styles.cardContent}>
+             <Text style={[styles.cardTitle, { color: '#111827' }]} numberOfLines={2}>
+               {activity.name}
+             </Text>
+             <Text style={[styles.cardDescription, { color: '#374151' }]} numberOfLines={3}>
+               {activity.description}
+             </Text>
+             
+             {/* Badges de prioridad personalizada */}
+             {neurodivergentProfile && priority && (
+               <View style={styles.priorityBadges}>
+                 <View style={[
+                   styles.priorityBadge,
+                   { backgroundColor: PersonalizationService.getPriorityColor(priority.priority) }
+                 ]}>
+                   <Text style={styles.priorityIcon}>
+                     {PersonalizationService.getPriorityIcon(priority.priority)}
+                   </Text>
+                   <Text style={styles.priorityText}>
+                     {PersonalizationService.getPriorityText(priority.priority)}
+                   </Text>
+                 </View>
+                 <View style={styles.dailyGoalBadge}>
+                   <Text style={styles.dailyGoalText}>
+                     🎯 {priority.dailyGoal} sesiones/día
+                   </Text>
+                 </View>
+               </View>
+             )}
+           </View>
 
           {/* Accent Dot */}
           <View style={[styles.accentDot, { backgroundColor: colors.accent }]} />
@@ -353,13 +502,38 @@ const ActivityMenuScreen = () => {
             </Text>
           </TouchableOpacity>
           
-          <View style={styles.titleSection}>
-            <Text style={styles.title}>
-              🎮 {language === 'es' ? 'Actividades' : 'Activities'}
-            </Text>
-          </View>
-          
-          <View style={styles.headerSpacer} />
+           <View style={styles.titleSection}>
+             <Text style={styles.title}>
+               🎮 {language === 'es' ? 'Actividades' : 'Activities'}
+             </Text>
+             {neurodivergentProfile && (
+               <Text style={styles.profileInfo}>
+                 {language === 'es' ? 'Personalizado para' : 'Personalized for'} {neurodivergentProfile.primary_diagnosis}
+               </Text>
+             )}
+           </View>
+           
+           <View style={styles.headerActions}>
+             {neurodivergentProfile && (
+               <TouchableOpacity 
+                 style={[
+                   styles.toggleButton,
+                   !showAllActivities && styles.toggleButtonActive
+                 ]}
+                 onPress={() => setShowAllActivities(!showAllActivities)}
+               >
+                 <Text style={[
+                   styles.toggleButtonText,
+                   !showAllActivities && styles.toggleButtonTextActive
+                 ]}>
+                   {showAllActivities ? '📋 Todas' : '🎯 Filtrado'}
+                 </Text>
+                 {!showAllActivities && (
+                   <View style={styles.activeIndicator} />
+                 )}
+               </TouchableOpacity>
+             )}
+           </View>
         </View>
       </View>
 
@@ -436,6 +610,46 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingHorizontal: 16,
+  },
+  profileInfo: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
+  headerActions: {
+    alignItems: 'center',
+  },
+  toggleButton: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  toggleButtonActive: {
+    backgroundColor: '#4285f4',
+    borderColor: '#4285f4',
+  },
+  toggleButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+  },
+  toggleButtonTextActive: {
+    color: 'white',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+    borderWidth: 1,
+    borderColor: 'white',
   },
   title: {
     fontSize: 18,
@@ -595,6 +809,42 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
+  },
+  priorityBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+    justifyContent: 'center',
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  priorityIcon: {
+    fontSize: 10,
+  },
+  priorityText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: 'white',
+  },
+  dailyGoalBadge: {
+    backgroundColor: '#E5E7EB',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  dailyGoalText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#495057',
   },
   decorativeCircle1: {
     position: 'absolute',
