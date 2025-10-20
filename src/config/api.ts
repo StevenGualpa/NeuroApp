@@ -111,6 +111,11 @@ export const API_ENDPOINTS = {
   GOALS_ACHIEVEMENTS: (userId: number) => `/goals/user/${userId}/achievements`,
   GOALS_MARK_ACHIEVEMENT_SEEN: (userId: number, achievementId: number) => `/goals/user/${userId}/achievements/${achievementId}/seen`,
   
+  // Achievement Evaluation (NEW)
+  ACHIEVEMENT_EVALUATION: (userId: number) => `/achievement-evaluation/user/${userId}/evaluate`,
+  ACHIEVEMENT_EVALUATION_USER_ACHIEVEMENTS: (userId: number) => `/achievement-evaluation/user/${userId}/achievements`,
+  ACHIEVEMENT_EVALUATION_STATS: (userId: number) => `/achievement-evaluation/user/${userId}/stats`,
+  
   // Health
   HEALTH: '/',
 };

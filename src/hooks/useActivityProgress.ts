@@ -5,6 +5,7 @@ import useGameSessions from './useGameSessions';
 import useUserProgress from './useUserProgress';
 import useUserStats from './useUserStats';
 import { useRealAchievements } from './useRealAchievements';
+import AchievementEvaluationService from '../services/AchievementEvaluationService';
 
 export interface ActivityResult {
   lessonId: number;
@@ -185,21 +186,40 @@ export const useActivityProgress = () => {
         improved: result.showedImprovement || false,
       });
 
-      // 4. Procesar logros si la actividad fue completada
-      if (result.completed) {
-        console.log('🏆 Procesando logros...');
-        await achievements.recordGameCompletion({
-          stars: result.stars,
-          isPerfect: result.perfectRun,
-          completionTime: result.timeSpent,
-          errors: result.errors,
-          activityType: result.activityType,
-          showedImprovement: result.showedImprovement,
-          usedHelp: result.usedHelp,
-          tookTime: result.timeSpent > 120, // Más de 2 minutos
-          lessonId: result.lessonId,
-          stepId: result.stepId,
-        });
+      // 4. Procesar logros con el nuevo sistema backend si la actividad fue completada
+      if (result.completed && user) {
+        console.log('🏆 Evaluando logros en el backend...');
+        try {
+          const gameData = AchievementEvaluationService.processGameData(
+            user.id,
+            result.activityType,
+            {
+              stars: result.stars,
+              isPerfect: result.perfectRun,
+              completionTime: Math.round(result.timeSpent / 1000), // convertir a segundos
+              errors: result.errors,
+              usedHelp: result.usedHelp,
+              showedImprovement: result.showedImprovement || false,
+              sessionDuration: Math.round(result.timeSpent / 1000), // convertir a segundos
+            }
+          );
+
+          const achievementResult = await AchievementEvaluationService.evaluateAchievements(user.id, gameData);
+          
+          if (achievementResult.newly_unlocked.length > 0) {
+            console.log('🎉 ¡Nuevos logros desbloqueados!', achievementResult.newly_unlocked);
+            // Aquí podrías mostrar notificaciones de logros desbloqueados
+            // TODO: Implementar notificaciones de logros
+          }
+          
+          console.log('✅ Logros evaluados exitosamente:', {
+            newlyUnlocked: achievementResult.newly_unlocked.length,
+            totalPoints: achievementResult.total_points
+          });
+        } catch (error) {
+          console.error('❌ Error evaluando logros:', error);
+          // No lanzar error para no interrumpir el flujo de la actividad
+        }
       }
 
       // 5. Limpiar sesión actual

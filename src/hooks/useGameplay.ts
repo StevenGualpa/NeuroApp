@@ -5,6 +5,7 @@ import useGameSessions, { SessionData, SessionEndData, SessionUpdateData } from 
 import useUserProgress, { ProgressData } from './useUserProgress';
 import { useRealAchievements } from './useRealAchievements';
 import useUserStats from './useUserStats';
+import AchievementEvaluationService from '../services/AchievementEvaluationService';
 
 export interface GameplaySession {
   sessionId: number | null;
@@ -167,32 +168,39 @@ export const useGameplay = () => {
         improved: result.errors < currentGameplay.attempts / 2, // Mejoró si tiene menos errores que la mitad de intentos
       });
 
-      // 4. Actualizar progreso de logros
-      if (result.completed) {
-        // Logro: Completar primera lección
-        await achievements.updateProgress('complete_first_lesson', 1);
-        
-        // Logro: Completar 5 lecciones
-        await achievements.updateProgress('complete_5_lessons', 1);
-        
-        // Logro: Ganar estrellas
-        await achievements.updateProgress('earn_10_stars', result.stars);
-        await achievements.updateProgress('earn_50_stars', result.stars);
-        await achievements.updateProgress('earn_100_stars', result.stars);
-        
-        // Logro: Lección perfecta
-        if (result.perfectRun) {
-          await achievements.updateProgress('perfect_lesson', 1);
-        }
-        
-        // Logro: Completar rápido
-        if (result.timeSpent < 60) { // Menos de 1 minuto
-          await achievements.updateProgress('fast_completion', 1);
-        }
-        
-        // Logro: Usar ayuda
-        if (result.usedHelp) {
-          await achievements.updateProgress('use_help_5_times', result.helpActivations);
+      // 4. Procesar logros con el nuevo sistema backend si la actividad fue completada
+      if (result.completed && user) {
+        console.log('🏆 Evaluando logros en el backend...');
+        try {
+          const gameData = AchievementEvaluationService.processGameData(
+            user.id,
+            'lesson_step', // Tipo de actividad para gameplay
+            {
+              stars: result.stars,
+              isPerfect: result.perfectRun,
+              completionTime: Math.round(result.timeSpent / 1000), // convertir a segundos
+              errors: result.errors,
+              usedHelp: result.usedHelp,
+              showedImprovement: result.errors < currentGameplay.attempts / 2,
+              sessionDuration: Math.round(result.timeSpent / 1000), // convertir a segundos
+            }
+          );
+
+          const achievementResult = await AchievementEvaluationService.evaluateAchievements(user.id, gameData);
+          
+          if (achievementResult.newly_unlocked.length > 0) {
+            console.log('🎉 ¡Nuevos logros desbloqueados!', achievementResult.newly_unlocked);
+            // Aquí podrías mostrar notificaciones de logros desbloqueados
+            // TODO: Implementar notificaciones de logros
+          }
+          
+          console.log('✅ Logros evaluados exitosamente:', {
+            newlyUnlocked: achievementResult.newly_unlocked.length,
+            totalPoints: achievementResult.total_points
+          });
+        } catch (error) {
+          console.error('❌ Error evaluando logros:', error);
+          // No lanzar error para no interrumpir el flujo de la actividad
         }
       }
 
